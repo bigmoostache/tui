@@ -1,0 +1,369 @@
+use crate::persistence::{delete_message, save_message};
+use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
+
+/// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1
+/// Returns the 0-based index if matched
+pub fn parse_context_pattern(input: &str) -> Option<usize> {
+    let input = input.trim();
+    if input.is_empty() {
+        return None;
+    }
+
+    let input_lower = input.to_lowercase();
+
+    // Must start with 'p'
+    if !input_lower.starts_with('p') {
+        return None;
+    }
+
+    // Get the rest after 'p'
+    let rest = &input_lower[1..];
+
+    // Skip optional separator (- or _)
+    let num_str = if rest.starts_with('-') || rest.starts_with('_') {
+        &rest[1..]
+    } else {
+        rest
+    };
+
+    // Parse the number (1-based in input, convert to 0-based)
+    num_str.parse::<usize>().ok().and_then(|n| n.checked_sub(1))
+}
+
+#[derive(Debug, Clone)]
+pub enum Action {
+    InputChar(char),
+    InputBackspace,
+    InputDelete,
+    InputSubmit,
+    CursorLeft,
+    CursorRight,
+    CursorUp,
+    CursorDown,
+    CursorWordLeft,
+    CursorWordRight,
+    CursorHome,
+    CursorEnd,
+    ClearConversation,
+    NewContext,
+    AppendChars(String),
+    StreamDone { _input_tokens: usize, output_tokens: usize },
+    StreamError(String),
+    ScrollUp(f32),
+    ScrollDown(f32),
+    ToggleCopyMode,
+    StopStreaming,
+    None,
+}
+
+pub enum ActionResult {
+    Nothing,
+    StartStream,
+    StopStream,
+    Save,
+    SaveMessage(String),
+}
+
+pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
+    match action {
+        Action::InputChar(c) => {
+            state.input.insert(state.input_cursor, c);
+            state.input_cursor += c.len_utf8();
+            ActionResult::Nothing
+        }
+        Action::InputBackspace => {
+            if state.input_cursor > 0 {
+                // Find the previous character boundary
+                let prev = state.input[..state.input_cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                state.input.remove(prev);
+                state.input_cursor = prev;
+            }
+            ActionResult::Nothing
+        }
+        Action::InputDelete => {
+            if state.input_cursor < state.input.len() {
+                state.input.remove(state.input_cursor);
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorLeft => {
+            if state.input_cursor > 0 {
+                state.input_cursor = state.input[..state.input_cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorRight => {
+            if state.input_cursor < state.input.len() {
+                state.input_cursor = state.input[state.input_cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| state.input_cursor + i)
+                    .unwrap_or(state.input.len());
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorUp => {
+            // Move to same column in previous line
+            let before_cursor = &state.input[..state.input_cursor];
+            if let Some(current_line_start) = before_cursor.rfind('\n') {
+                let col = state.input_cursor - current_line_start - 1;
+                let prev_content = &state.input[..current_line_start];
+                let prev_line_start = prev_content.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let prev_line_len = current_line_start - prev_line_start;
+                state.input_cursor = prev_line_start + col.min(prev_line_len);
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorDown => {
+            // Move to same column in next line
+            let before_cursor = &state.input[..state.input_cursor];
+            let current_line_start = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let col = state.input_cursor - current_line_start;
+            if let Some(next_newline) = state.input[state.input_cursor..].find('\n') {
+                let next_line_start = state.input_cursor + next_newline + 1;
+                let next_line_end = state.input[next_line_start..].find('\n')
+                    .map(|i| next_line_start + i)
+                    .unwrap_or(state.input.len());
+                let next_line_len = next_line_end - next_line_start;
+                state.input_cursor = next_line_start + col.min(next_line_len);
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorWordLeft => {
+            if state.input_cursor > 0 {
+                let before = &state.input[..state.input_cursor];
+                // Skip whitespace, then skip word chars
+                let trimmed = before.trim_end();
+                if trimmed.is_empty() {
+                    state.input_cursor = 0;
+                } else {
+                    let word_start = trimmed.rfind(|c: char| c.is_whitespace())
+                        .map(|i| i + 1)
+                        .unwrap_or(0);
+                    state.input_cursor = word_start;
+                }
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorWordRight => {
+            if state.input_cursor < state.input.len() {
+                let after = &state.input[state.input_cursor..];
+                // Skip current word chars, then skip whitespace
+                let skip_word = after.find(|c: char| c.is_whitespace()).unwrap_or(after.len());
+                let remaining = &after[skip_word..];
+                let skip_space = remaining.find(|c: char| !c.is_whitespace()).unwrap_or(remaining.len());
+                state.input_cursor += skip_word + skip_space;
+            }
+            ActionResult::Nothing
+        }
+        Action::CursorHome => {
+            // Move to start of current line
+            let before_cursor = &state.input[..state.input_cursor];
+            state.input_cursor = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
+            ActionResult::Nothing
+        }
+        Action::CursorEnd => {
+            // Move to end of current line
+            let after_cursor = &state.input[state.input_cursor..];
+            state.input_cursor += after_cursor.find('\n').unwrap_or(after_cursor.len());
+            ActionResult::Nothing
+        }
+        Action::InputSubmit => {
+            if state.input.is_empty() {
+                return ActionResult::Nothing;
+            }
+
+            // Context switching is always allowed, even during streaming
+            if let Some(index) = parse_context_pattern(&state.input) {
+                if index < state.context.len() {
+                    state.selected_context = index;
+                    state.scroll_offset = 0.0;
+                    state.user_scrolled = false;
+                    state.input.clear();
+                    state.input_cursor = 0;
+                    return ActionResult::Nothing;
+                }
+            }
+
+            // Starting a new message is blocked during streaming
+            if state.is_streaming {
+                return ActionResult::Nothing;
+            }
+
+            let content = std::mem::take(&mut state.input);
+            state.input_cursor = 0;
+            let user_token_estimate = estimate_tokens(&content);
+
+            // Assign IDs
+            let user_id = format!("U{}", state.next_user_id);
+            state.next_user_id += 1;
+            let assistant_id = format!("A{}", state.next_assistant_id);
+            state.next_assistant_id += 1;
+
+            let user_msg = Message {
+                id: user_id,
+                role: "user".to_string(),
+                message_type: MessageType::TextMessage,
+                content,
+                content_token_count: user_token_estimate,
+                tl_dr: None,
+                tl_dr_token_count: 0,
+                status: MessageStatus::Full,
+                tool_uses: Vec::new(),
+                tool_results: Vec::new(),
+            };
+            save_message(&user_msg);
+
+            // Add user message tokens to context
+            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                ctx.token_count += user_token_estimate;
+            }
+
+            state.messages.push(user_msg);
+
+            let assistant_msg = Message {
+                id: assistant_id,
+                role: "assistant".to_string(),
+                message_type: MessageType::TextMessage,
+                content: String::new(),
+                content_token_count: 0,
+                tl_dr: None,
+                tl_dr_token_count: 0,
+                status: MessageStatus::Full,
+                tool_uses: Vec::new(),
+                tool_results: Vec::new(),
+            };
+            state.messages.push(assistant_msg);
+
+            state.is_streaming = true;
+            state.streaming_estimated_tokens = 0;
+            ActionResult::StartStream
+        }
+        Action::ClearConversation => {
+            for msg in &state.messages {
+                delete_message(&msg.id);
+            }
+            state.messages.clear();
+            state.input.clear();
+            // Reset token count for current context
+            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                ctx.token_count = 0;
+            }
+            ActionResult::Save
+        }
+        Action::NewContext => {
+            let num = state.context.len() + 1;
+            state.context.push(ContextElement {
+                context_type: ContextType::Conversation,
+                name: format!("Conv {}", num),
+                token_count: 0,
+                file_path: None,
+                file_hash: None,
+                glob_pattern: None,
+                glob_path: None,
+            });
+            ActionResult::Save
+        }
+        Action::AppendChars(text) => {
+            if let Some(msg) = state.messages.last_mut() {
+                if msg.role == "assistant" {
+                    msg.content.push_str(&text);
+
+                    // Update estimated token count during streaming
+                    let new_estimate = estimate_tokens(&msg.content);
+                    let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
+
+                    if added > 0 {
+                        if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                            ctx.token_count += added;
+                        }
+                        state.streaming_estimated_tokens = new_estimate;
+                    }
+                }
+            }
+            ActionResult::Nothing
+        }
+        Action::StreamDone { _input_tokens: _, output_tokens } => {
+            state.is_streaming = false;
+
+            // Correct the estimated tokens with actual output tokens
+            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                // Remove our estimate, add actual
+                ctx.token_count = ctx.token_count
+                    .saturating_sub(state.streaming_estimated_tokens)
+                    .saturating_add(output_tokens);
+            }
+            state.streaming_estimated_tokens = 0;
+
+            // Store actual token count on message
+            if let Some(msg) = state.messages.last_mut() {
+                if msg.role == "assistant" {
+                    msg.content_token_count = output_tokens;
+                    let id = msg.id.clone();
+                    return ActionResult::SaveMessage(id);
+                }
+            }
+            ActionResult::Save
+        }
+        Action::StreamError(e) => {
+            state.is_streaming = false;
+
+            // Remove estimated tokens on error
+            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+            }
+            state.streaming_estimated_tokens = 0;
+
+            if let Some(msg) = state.messages.last_mut() {
+                if msg.role == "assistant" {
+                    msg.content = format!("[Error: {}]", e);
+                    let id = msg.id.clone();
+                    return ActionResult::SaveMessage(id);
+                }
+            }
+            ActionResult::Save
+        }
+        Action::ScrollUp(amount) => {
+            state.scroll_offset = (state.scroll_offset - amount).max(0.0);
+            state.user_scrolled = true;
+            ActionResult::Nothing
+        }
+        Action::ScrollDown(amount) => {
+            state.scroll_offset += amount;
+            // user_scrolled will be reset in render if at bottom
+            ActionResult::Nothing
+        }
+        Action::ToggleCopyMode => {
+            state.copy_mode = !state.copy_mode;
+            ActionResult::Nothing
+        }
+        Action::StopStreaming => {
+            if state.is_streaming {
+                state.is_streaming = false;
+                // Remove estimated tokens on cancel
+                if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                    ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+                }
+                state.streaming_estimated_tokens = 0;
+                // Mark partial response
+                if let Some(msg) = state.messages.last_mut() {
+                    if msg.role == "assistant" && !msg.content.is_empty() {
+                        msg.content.push_str("\n[Stopped]");
+                    }
+                }
+                ActionResult::StopStream
+            } else {
+                ActionResult::Nothing
+            }
+        }
+        Action::None => ActionResult::Nothing,
+    }
+}
