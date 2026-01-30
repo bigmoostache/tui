@@ -54,6 +54,8 @@ pub fn load_state() -> State {
                 is_streaming: false,
                 scroll_offset: 0.0,
                 user_scrolled: false,
+                scroll_accel: 1.0,
+                max_scroll: 0.0,
                 streaming_estimated_tokens: 0,
                 copy_mode: false,
                 tree_filter: persisted.tree_filter,
@@ -62,6 +64,13 @@ pub fn load_state() -> State {
                 next_assistant_id: persisted.next_assistant_id,
                 next_tool_id: persisted.next_tool_id,
                 next_result_id: persisted.next_result_id,
+                next_context_id: persisted.next_context_id,
+                todos: persisted.todos,
+                next_todo_id: persisted.next_todo_id,
+                memories: persisted.memories,
+                next_memory_id: persisted.next_memory_id,
+                tools: persisted.tools,
+                is_cleaning_context: false,
             };
         }
     }
@@ -82,6 +91,12 @@ pub fn save_state(state: &State) {
         next_assistant_id: state.next_assistant_id,
         next_tool_id: state.next_tool_id,
         next_result_id: state.next_result_id,
+        next_context_id: state.next_context_id,
+        todos: state.todos.clone(),
+        next_todo_id: state.next_todo_id,
+        memories: state.memories.clone(),
+        next_memory_id: state.next_memory_id,
+        tools: state.tools.clone(),
     };
 
     let path = dir.join(STATE_FILE);

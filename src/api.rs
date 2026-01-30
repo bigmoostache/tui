@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::tools::{get_tool_definitions, ToolResult, ToolUse};
+use crate::tool_defs::{ToolDefinition, build_api_tools};
+use crate::tools::{ToolResult, ToolUse};
 
 #[derive(Debug)]
 pub enum StreamEvent {
@@ -86,17 +87,36 @@ fn messages_to_api(
     messages: &[Message],
     file_context: &[(String, String)],
     glob_context: &[(String, String)],
+    tmux_context: &[(String, String)],
+    todo_context: &str,
+    memory_context: &str,
+    overview_context: &str,
     directory_tree: &str,
     include_last_tool_uses: bool,
 ) -> Vec<ApiMessage> {
     let mut api_messages: Vec<ApiMessage> = Vec::new();
 
-    // Build system context with tree, files, and globs
+    // Build system context with tree, files, globs, tmux, and todos
     let mut context_parts: Vec<String> = Vec::new();
 
     // Add directory tree first
     if !directory_tree.is_empty() {
         context_parts.push(format!("=== Directory Tree ===\n{}\n=== End of Directory Tree ===", directory_tree));
+    }
+
+    // Add todo list
+    if !todo_context.is_empty() {
+        context_parts.push(format!("=== Todo List ===\n{}\n=== End of Todo List ===", todo_context));
+    }
+
+    // Add memories
+    if !memory_context.is_empty() && memory_context != "No memories" {
+        context_parts.push(format!("=== Memories ===\n{}\n=== End of Memories ===", memory_context));
+    }
+
+    // Add context overview (self-awareness of context usage)
+    if !overview_context.is_empty() {
+        context_parts.push(format!("=== Context Overview ===\n{}\n=== End of Context Overview ===", overview_context));
     }
 
     // Add open files
@@ -107,6 +127,11 @@ fn messages_to_api(
     // Add glob results
     for (name, results) in glob_context {
         context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", name, results, name));
+    }
+
+    // Add tmux pane outputs
+    for (header, content) in tmux_context {
+        context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", header, content, header));
     }
 
     for (idx, msg) in messages.iter().enumerate() {
@@ -222,12 +247,41 @@ pub fn start_streaming(
     messages: Vec<Message>,
     file_context: Vec<(String, String)>,
     glob_context: Vec<(String, String)>,
+    tmux_context: Vec<(String, String)>,
+    todo_context: String,
+    memory_context: String,
+    overview_context: String,
     directory_tree: String,
+    tools: Vec<ToolDefinition>,
     tool_results: Option<Vec<ToolResult>>,
     tx: Sender<StreamEvent>,
 ) {
     thread::spawn(move || {
-        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &directory_tree, tool_results.as_deref(), &tx) {
+        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, None, tool_results.as_deref(), &tx) {
+            let _ = tx.send(StreamEvent::Error(e));
+        }
+    });
+}
+
+/// Start context cleaning with specialized prompt and limited tools
+pub fn start_cleaning(
+    messages: Vec<Message>,
+    file_context: Vec<(String, String)>,
+    glob_context: Vec<(String, String)>,
+    tmux_context: Vec<(String, String)>,
+    todo_context: String,
+    memory_context: String,
+    overview_context: String,
+    directory_tree: String,
+    tools: Vec<ToolDefinition>,
+    state: &crate::state::State,
+    tx: Sender<StreamEvent>,
+) {
+    let cleaner_context = crate::context_cleaner::build_cleaner_context(state);
+    let system_prompt = crate::context_cleaner::get_cleaner_system_prompt().to_string();
+
+    thread::spawn(move || {
+        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, Some((&system_prompt, &cleaner_context)), None, &tx) {
             let _ = tx.send(StreamEvent::Error(e));
         }
     });
@@ -237,7 +291,13 @@ fn stream_response(
     messages: &[Message],
     file_context: &[(String, String)],
     glob_context: &[(String, String)],
+    tmux_context: &[(String, String)],
+    todo_context: &str,
+    memory_context: &str,
+    overview_context: &str,
     directory_tree: &str,
+    tools: &[ToolDefinition],
+    cleaner_prompt: Option<(&str, &str)>, // (system_prompt, cleaner_context)
     tool_results: Option<&[ToolResult]>,
     tx: &Sender<StreamEvent>,
 ) -> Result<(), String> {
@@ -249,7 +309,7 @@ fn stream_response(
 
     // Include tool_uses in last assistant message only if we're sending tool_results
     let include_tool_uses = tool_results.is_some();
-    let mut api_messages = messages_to_api(messages, file_context, glob_context, directory_tree, include_tool_uses);
+    let mut api_messages = messages_to_api(messages, file_context, glob_context, tmux_context, todo_context, memory_context, overview_context, directory_tree, include_tool_uses);
 
     // If we have tool results, add them
     if let Some(results) = tool_results {
@@ -268,29 +328,25 @@ fn stream_response(
         });
     }
 
-    let system_prompt = r#"You are a helpful coding assistant. You have access to tools that let you interact with the user's project:
-
-- open_file: Open a file to add it to the context
-- close_file: Remove a file from the context
-- glob: Search for files matching a pattern (creates a persistent context element)
-- edit_tree_filter: Modify the directory tree filter
-- set_message_status: Manage context by changing message status (full/summarized/forgotten)
-
-When the user asks you to search for files, open files, or perform other file operations, USE the actual tools - do not just describe what you would do. Call the tools directly.
-
-Messages are prefixed with short IDs like [U1], [U2] for user messages and [A1], [A2] for assistant messages. You can use set_message_status with these IDs to manage context:
-- "summarized": Use the TL;DR version of the message (saves tokens)
-- "full": Restore the full message content
-- "forgotten": Remove the message from context entirely
-
-Use this to manage long conversations efficiently."#;
+    // Handle cleaner mode - add cleaner context as user message
+    let system_prompt = if let Some((prompt, context)) = cleaner_prompt {
+        api_messages.push(ApiMessage {
+            role: "user".to_string(),
+            content: vec![ContentBlock::Text {
+                text: format!("Please clean up the context to reduce token usage:\n\n{}", context),
+            }],
+        });
+        prompt.to_string()
+    } else {
+        String::new()
+    };
 
     let request = ApiRequest {
-        model: "claude-sonnet-4-20250514".to_string(),
+        model: "claude-opus-4-5".to_string(),
         max_tokens: 4096,
-        system: system_prompt.to_string(),
+        system: system_prompt,
         messages: api_messages,
-        tools: get_tool_definitions(),
+        tools: build_api_tools(tools),
         stream: true,
     };
 

@@ -2,27 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ignore::gitignore::GitignoreBuilder;
-use serde_json::{json, Value};
 
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextType, State};
-
-pub fn definition() -> Value {
-    json!({
-        "name": "edit_tree_filter",
-        "description": "Edit the gitignore-style filter that controls which files/folders appear in the directory tree. Use standard gitignore patterns (e.g., '*.log', 'node_modules/', '!important.txt' to negate).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "filter": {
-                    "type": "string",
-                    "description": "The new gitignore-style filter content. Each pattern on a new line."
-                }
-            },
-            "required": ["filter"]
-        }
-    })
-}
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let filter = match tool.input.get("filter").and_then(|v| v.as_str()) {

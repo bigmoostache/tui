@@ -1,6 +1,7 @@
-use crossterm::event::{Event, KeyCode, KeyModifiers, MouseEventKind};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, Action};
+use crate::mouse::handle_mouse;
 use crate::state::State;
 
 pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
@@ -23,6 +24,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('y') => return Some(Action::ToggleCopyMode),
                     KeyCode::Char('j') => return Some(Action::InputSubmit), // Ctrl+J as alternative to Ctrl+Enter
+                    KeyCode::Char('k') => return Some(Action::StartContextCleaning),
                     // Ctrl+arrows for word navigation (handled below in Input focus)
                     _ => {}
                 }
@@ -49,11 +51,13 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::InputSubmit);
             }
 
-            // Ctrl+arrows for word navigation
+            // Ctrl+arrows for word navigation and scrolling
             if ctrl {
                 return Some(match key.code {
                     KeyCode::Left => Action::CursorWordLeft,
                     KeyCode::Right => Action::CursorWordRight,
+                    KeyCode::Up => Action::ScrollUp(3.0),
+                    KeyCode::Down => Action::ScrollDown(3.0),
                     KeyCode::Backspace => Action::CursorWordLeft, // TODO: delete word
                     _ => Action::None,
                 });
@@ -76,13 +80,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             };
             Some(action)
         }
-        Event::Mouse(mouse) => {
-            match mouse.kind {
-                MouseEventKind::ScrollUp => Some(Action::ScrollUp(1.5)),
-                MouseEventKind::ScrollDown => Some(Action::ScrollDown(1.5)),
-                _ => Some(Action::None),
-            }
-        }
+        Event::Mouse(mouse) => Some(handle_mouse(mouse, state)),
         _ => Some(Action::None),
     }
 }

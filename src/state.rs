@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::tool_defs::{ToolDefinition, get_all_tool_definitions, estimate_tools_tokens};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextType {
@@ -7,6 +9,11 @@ pub enum ContextType {
     File,
     Tree,
     Glob,
+    Tmux,
+    Todo,
+    Memory,
+    Overview,
+    Tools,
 }
 
 impl ContextType {
@@ -17,12 +24,19 @@ impl ContextType {
             ContextType::File => "◇",
             ContextType::Tree => "≡",
             ContextType::Glob => "✦",
+            ContextType::Tmux => "▣",
+            ContextType::Todo => "☐",
+            ContextType::Memory => "◈",
+            ContextType::Overview => "◎",
+            ContextType::Tools => "⚙",
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextElement {
+    /// Context element ID (e.g., P1, P2, ...)
+    pub id: String,
     pub context_type: ContextType,
     pub name: String,
     pub token_count: usize,
@@ -38,6 +52,109 @@ pub struct ContextElement {
     /// Glob search path (for Glob context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glob_path: Option<String>,
+    /// Tmux pane ID (for Tmux context type)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmux_pane_id: Option<String>,
+    /// Number of lines to capture from tmux pane
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmux_lines: Option<usize>,
+    /// Last keys sent to this tmux pane
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmux_last_keys: Option<String>,
+    /// Description of what this tmux pane is for
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmux_description: Option<String>,
+}
+
+/// Todo item status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TodoStatus {
+    #[default]
+    Pending,    // ' '
+    InProgress, // '~'
+    Done,       // 'x'
+}
+
+impl TodoStatus {
+    pub fn icon(&self) -> char {
+        match self {
+            TodoStatus::Pending => ' ',
+            TodoStatus::InProgress => '~',
+            TodoStatus::Done => 'x',
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            " " | "pending" => Some(TodoStatus::Pending),
+            "~" | "in_progress" => Some(TodoStatus::InProgress),
+            "x" | "X" | "done" => Some(TodoStatus::Done),
+            _ => None,
+        }
+    }
+}
+
+/// A todo item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TodoItem {
+    /// Todo ID (X1, X2, ...)
+    pub id: String,
+    /// Parent todo ID (for nesting)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// Todo name/title
+    pub name: String,
+    /// Detailed description
+    #[serde(default)]
+    pub description: String,
+    /// Status: pending, in_progress, done
+    #[serde(default)]
+    pub status: TodoStatus,
+}
+
+/// Memory importance level
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryImportance {
+    Low,
+    #[default]
+    Medium,
+    High,
+    Critical,
+}
+
+impl MemoryImportance {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "low" => Some(MemoryImportance::Low),
+            "medium" => Some(MemoryImportance::Medium),
+            "high" => Some(MemoryImportance::High),
+            "critical" => Some(MemoryImportance::Critical),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MemoryImportance::Low => "low",
+            MemoryImportance::Medium => "medium",
+            MemoryImportance::High => "high",
+            MemoryImportance::Critical => "critical",
+        }
+    }
+}
+
+/// A memory item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryItem {
+    /// Memory ID (M1, M2, ...)
+    pub id: String,
+    /// Memory content
+    pub content: String,
+    /// Importance level
+    #[serde(default)]
+    pub importance: MemoryImportance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,10 +257,36 @@ pub struct PersistedState {
     /// Next result message ID
     #[serde(default = "default_one")]
     pub next_result_id: usize,
+    /// Next context element ID
+    #[serde(default = "default_context_id")]
+    pub next_context_id: usize,
+    /// Todo items
+    #[serde(default)]
+    pub todos: Vec<TodoItem>,
+    /// Next todo ID
+    #[serde(default = "default_one")]
+    pub next_todo_id: usize,
+    /// Memory items
+    #[serde(default)]
+    pub memories: Vec<MemoryItem>,
+    /// Next memory ID
+    #[serde(default = "default_one")]
+    pub next_memory_id: usize,
+    /// Tool definitions with enabled state
+    #[serde(default = "default_tools")]
+    pub tools: Vec<ToolDefinition>,
+}
+
+fn default_tools() -> Vec<ToolDefinition> {
+    get_all_tool_definitions()
 }
 
 fn default_one() -> usize {
     1
+}
+
+fn default_context_id() -> usize {
+    7 // Start at 7 since P1-P6 are defaults (Main, Directory, Todo, Memory, Overview, Tools)
 }
 
 fn default_tree_filter() -> String {
@@ -166,6 +309,10 @@ pub struct State {
     pub is_streaming: bool,
     pub scroll_offset: f32,
     pub user_scrolled: bool,
+    /// Scroll acceleration (increases when holding scroll keys)
+    pub scroll_accel: f32,
+    /// Maximum scroll offset (set by UI based on content height)
+    pub max_scroll: f32,
     /// Estimated tokens added during current streaming session (for correction when done)
     pub streaming_estimated_tokens: usize,
     /// Copy mode - disables mouse capture for text selection
@@ -182,6 +329,20 @@ pub struct State {
     pub next_tool_id: usize,
     /// Next result message ID (R1, R2, ...)
     pub next_result_id: usize,
+    /// Next context element ID (P1, P2, ...)
+    pub next_context_id: usize,
+    /// Todo items
+    pub todos: Vec<TodoItem>,
+    /// Next todo ID (X1, X2, ...)
+    pub next_todo_id: usize,
+    /// Memory items
+    pub memories: Vec<MemoryItem>,
+    /// Next memory ID (M1, M2, ...)
+    pub next_memory_id: usize,
+    /// Tool definitions with enabled state
+    pub tools: Vec<ToolDefinition>,
+    /// Whether context cleaning is in progress
+    pub is_cleaning_context: bool,
 }
 
 impl Default for State {
@@ -189,15 +350,7 @@ impl Default for State {
         Self {
             context: vec![
                 ContextElement {
-                    context_type: ContextType::Tree,
-                    name: "Directory".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                },
-                ContextElement {
+                    id: "P1".to_string(),
                     context_type: ContextType::Conversation,
                     name: "Main".to_string(),
                     token_count: 0,
@@ -205,6 +358,80 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                },
+                ContextElement {
+                    id: "P2".to_string(),
+                    context_type: ContextType::Tree,
+                    name: "Directory".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                },
+                ContextElement {
+                    id: "P3".to_string(),
+                    context_type: ContextType::Todo,
+                    name: "Todo".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                },
+                ContextElement {
+                    id: "P4".to_string(),
+                    context_type: ContextType::Memory,
+                    name: "Memory".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                },
+                ContextElement {
+                    id: "P5".to_string(),
+                    context_type: ContextType::Overview,
+                    name: "Overview".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                },
+                ContextElement {
+                    id: "P6".to_string(),
+                    context_type: ContextType::Tools,
+                    name: "Tools".to_string(),
+                    token_count: estimate_tools_tokens(&get_all_tool_definitions()),
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
                 },
             ],
             messages: vec![],
@@ -214,6 +441,8 @@ impl Default for State {
             is_streaming: false,
             scroll_offset: 0.0,
             user_scrolled: false,
+            scroll_accel: 1.0,
+            max_scroll: 0.0,
             streaming_estimated_tokens: 0,
             copy_mode: false,
             tree_filter: DEFAULT_TREE_FILTER.to_string(),
@@ -222,7 +451,13 @@ impl Default for State {
             next_assistant_id: 1,
             next_tool_id: 1,
             next_result_id: 1,
+            next_context_id: 7, // P1-P6 are defaults
+            todos: vec![],
+            next_todo_id: 1,
+            memories: vec![],
+            next_memory_id: 1,
+            tools: get_all_tool_definitions(),
+            is_cleaning_context: false,
         }
     }
 }
-

@@ -1,29 +1,7 @@
 use ignore::WalkBuilder;
-use serde_json::{json, Value};
 
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
-
-pub fn definition() -> Value {
-    json!({
-        "name": "glob",
-        "description": "Search for files matching a glob pattern. Creates a context element showing matching files that updates on each message.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Glob pattern to match files (e.g., '**/*.rs', 'src/*.ts', '*.json')"
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Directory to search in (defaults to current working directory)"
-                }
-            },
-            "required": ["pattern"]
-        }
-    })
-}
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
@@ -43,9 +21,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let search_path = path.as_deref().unwrap_or(".").to_string();
 
+    // Generate context ID
+    let context_id = format!("P{}", state.next_context_id);
+    state.next_context_id += 1;
+
     // Create context element
     let name = format!("glob:{}", pattern);
     state.context.push(ContextElement {
+        id: context_id.clone(),
         context_type: ContextType::Glob,
         name,
         token_count: 0,
@@ -53,6 +36,10 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         file_hash: None,
         glob_pattern: Some(pattern.to_string()),
         glob_path: path,
+        tmux_pane_id: None,
+        tmux_lines: None,
+        tmux_last_keys: None,
+        tmux_description: None,
     });
 
     // Compute initial results
@@ -66,7 +53,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("Created glob search for '{}' in '{}': {} files found", pattern, &search_path, count),
+        content: format!("Created glob {} for '{}' in '{}': {} files found", context_id, pattern, &search_path, count),
         is_error: false,
     }
 }

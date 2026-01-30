@@ -46,6 +46,7 @@ pub enum Action {
     CursorEnd,
     ClearConversation,
     NewContext,
+    SelectContext(usize),
     AppendChars(String),
     StreamDone { _input_tokens: usize, output_tokens: usize },
     StreamError(String),
@@ -53,6 +54,7 @@ pub enum Action {
     ScrollDown(f32),
     ToggleCopyMode,
     StopStreaming,
+    StartContextCleaning,
     None,
 }
 
@@ -60,11 +62,17 @@ pub enum ActionResult {
     Nothing,
     StartStream,
     StopStream,
+    StartCleaning,
     Save,
     SaveMessage(String),
 }
 
 pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
+    // Reset scroll acceleration on non-scroll actions
+    if !matches!(action, Action::ScrollUp(_) | Action::ScrollDown(_)) {
+        state.scroll_accel = 1.0;
+    }
+
     match action {
         Action::InputChar(c) => {
             state.input.insert(state.input_cursor, c);
@@ -260,17 +268,31 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::NewContext => {
-            let num = state.context.len() + 1;
+            let context_id = format!("P{}", state.next_context_id);
+            state.next_context_id += 1;
             state.context.push(ContextElement {
+                id: context_id,
                 context_type: ContextType::Conversation,
-                name: format!("Conv {}", num),
+                name: format!("Conv {}", state.context.len()),
                 token_count: 0,
                 file_path: None,
                 file_hash: None,
                 glob_pattern: None,
                 glob_path: None,
+                tmux_pane_id: None,
+                tmux_lines: None,
+                tmux_last_keys: None,
+                tmux_description: None,
             });
             ActionResult::Save
+        }
+        Action::SelectContext(index) => {
+            if index < state.context.len() {
+                state.selected_context = index;
+                state.scroll_offset = 0.0;
+                state.user_scrolled = false;
+            }
+            ActionResult::Nothing
         }
         Action::AppendChars(text) => {
             if let Some(msg) = state.messages.last_mut() {
@@ -332,13 +354,20 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::ScrollUp(amount) => {
-            state.scroll_offset = (state.scroll_offset - amount).max(0.0);
+            let accel_amount = amount * state.scroll_accel;
+            state.scroll_offset = (state.scroll_offset - accel_amount).max(0.0);
             state.user_scrolled = true;
+            // Increase acceleration (max 2.5x)
+            state.scroll_accel = (state.scroll_accel + 0.3).min(2.5);
             ActionResult::Nothing
         }
         Action::ScrollDown(amount) => {
-            state.scroll_offset += amount;
+            let accel_amount = amount * state.scroll_accel;
+            // Limit scroll to max_scroll (set by UI during render)
+            state.scroll_offset = (state.scroll_offset + accel_amount).min(state.max_scroll);
             // user_scrolled will be reset in render if at bottom
+            // Increase acceleration (max 2.5x)
+            state.scroll_accel = (state.scroll_accel + 0.3).min(2.5);
             ActionResult::Nothing
         }
         Action::ToggleCopyMode => {
@@ -362,6 +391,15 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 ActionResult::StopStream
             } else {
                 ActionResult::Nothing
+            }
+        }
+        Action::StartContextCleaning => {
+            // Don't start if already streaming or cleaning
+            if state.is_streaming || state.is_cleaning_context {
+                ActionResult::Nothing
+            } else {
+                state.is_cleaning_context = true;
+                ActionResult::StartCleaning
             }
         }
         Action::None => ActionResult::Nothing,

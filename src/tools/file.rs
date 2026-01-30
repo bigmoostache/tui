@@ -3,44 +3,8 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-use serde_json::{json, Value};
-
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
-
-pub fn definition_open_file() -> Value {
-    json!({
-        "name": "open_file",
-        "description": "Open a file and add it to the context. The file contents will be available for reference.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The path to the file to open"
-                }
-            },
-            "required": ["path"]
-        }
-    })
-}
-
-pub fn definition_close_file() -> Value {
-    json!({
-        "name": "close_file",
-        "description": "Close a file and remove it from the context.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The path to the file to close"
-                }
-            },
-            "required": ["path"]
-        }
-    })
-}
 
 fn hash_content(content: &str) -> String {
     let mut hasher = DefaultHasher::new();
@@ -88,8 +52,13 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| path.to_string());
 
+    // Generate context ID
+    let context_id = format!("P{}", state.next_context_id);
+    state.next_context_id += 1;
+
     // Add to context
     state.context.push(ContextElement {
+        id: context_id.clone(),
         context_type: ContextType::File,
         name: file_name,
         token_count,
@@ -97,43 +66,16 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         file_hash: Some(hash),
         glob_pattern: None,
         glob_path: None,
+        tmux_pane_id: None,
+        tmux_lines: None,
+        tmux_last_keys: None,
+        tmux_description: None,
     });
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("Opened '{}' ({} tokens)", path, token_count),
+        content: format!("Opened '{}' as {} ({} tokens)", path, context_id, token_count),
         is_error: false,
-    }
-}
-
-pub fn execute_close(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let path = match tool.input.get("path").and_then(|v| v.as_str()) {
-        Some(p) => p,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'path' parameter".to_string(),
-                is_error: true,
-            }
-        }
-    };
-
-    // Find and remove the file from context
-    let initial_len = state.context.len();
-    state.context.retain(|c| c.file_path.as_deref() != Some(path));
-
-    if state.context.len() < initial_len {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Closed '{}'", path),
-            is_error: false,
-        }
-    } else {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is not open in context", path),
-            is_error: true,
-        }
     }
 }
 

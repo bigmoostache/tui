@@ -510,3 +510,783 @@ Got summary: Updated tree filter to ignore `.context-pilot/` di
 Send result: true
 Received TL;DR for message A21
 Saved TL;DR for message A21
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U6
+Saved TL;DR for message U6
+Token count: 123
+Calling LLM for summary...
+Got summary: The assistant recognizes Context Pilot as an impre
+Send result: true
+Received TL;DR for message A22
+Saved TL;DR for message A22
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U7
+Saved TL;DR for message U7
+Token count: 137
+Calling LLM for summary...
+Got summary: The application needs to run inside a tmux session
+Send result: true
+Received TL;DR for message A24
+Saved TL;DR for message A24
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U8
+Saved TL;DR for message U8
+Token count: 135
+Calling LLM for summary...
+Got summary: Created a new tmux pane (%15) for general developm
+Send result: true
+Received TL;DR for message A26
+Saved TL;DR for message A26
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U9
+Saved TL;DR for message U9
+Token count: 158
+Calling LLM for summary...
+Got summary: The tmux session was detached or ended, so you nee
+Send result: true
+Received TL;DR for message A28
+Saved TL;DR for message A28
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 131
+Calling LLM for summary...
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Got summary: The assistant acknowledges your Rust TUI project a
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 13
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 102
+Calling LLM for summary...
+Got summary: You need to start a tmux session first using `tmux
+Send result: true
+Received TL;DR for message A3
+Message A3 not found in state!
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 70
+Calling LLM for summary...
+Got summary: A new tmux pane (%17) has been created and is read
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 27
+Calling LLM for summary...
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A7
+Saved TL;DR for message A7
+Got summary: The user offers to help explore and demonstrate tm
+Send result: true
+Received TL;DR for message A6
+Saved TL;DR for message A6
+Token count: 141
+Calling LLM for summary...
+Got summary: The system is ready in the `/root/tui` directory w
+Send result: true
+Received TL;DR for message A9
+Saved TL;DR for message A9
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U5
+Saved TL;DR for message U5
+Token count: 42
+Calling LLM for summary...
+Got summary: The message confirms that someone named Guillaume 
+Send result: true
+Received TL;DR for message A11
+Saved TL;DR for message A11
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U6
+Saved TL;DR for message U6
+Token count: 29
+Calling LLM for summary...
+Got summary: The assistant wants to explore and demonstrate var
+Send result: true
+Received TL;DR for message A12
+Saved TL;DR for message A12
+Token count: 45
+Calling LLM for summary...
+Got summary: The message acknowledges system details (running a
+Send result: true
+Received TL;DR for message A16
+Saved TL;DR for message A16
+Token count: 96
+Calling LLM for summary...
+Got summary: Your TUI project has 2,821 lines of Rust code with
+Send result: true
+Received TL;DR for message A17
+Saved TL;DR for message A17
+Token count: 32
+Calling LLM for summary...
+Got summary: Continue using the application until the tmux cons
+Send result: true
+Received TL;DR for message U7
+Saved TL;DR for message U7
+Token count: 42
+Calling LLM for summary...
+Got summary: The user acknowledges they're correct and wants to
+Send result: true
+Received TL;DR for message A18
+Saved TL;DR for message A18
+Token count: 14
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A22
+Saved TL;DR for message A22
+Token count: 142
+Calling LLM for summary...
+Got summary: The tmux pane is working correctly, displaying onl
+Send result: true
+Received TL;DR for message A23
+Saved TL;DR for message A23
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U8
+Saved TL;DR for message U8
+Token count: 85
+Calling LLM for summary...
+Got summary: The tmux pane was increased from 50 to 100 lines t
+Send result: true
+Received TL;DR for message A25
+Saved TL;DR for message A25
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U9
+Saved TL;DR for message U9
+Token count: 107
+Calling LLM for summary...
+Got summary: A second tmux pane (%18) called "Second terminal s
+Send result: true
+Received TL;DR for message A27
+Saved TL;DR for message A27
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U10
+Saved TL;DR for message U10
+Token count: 53
+Calling LLM for summary...
+Got summary: Closed the first tmux pane (%17). Only the second 
+Send result: true
+Received TL;DR for message A29
+Saved TL;DR for message A29
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U11
+Saved TL;DR for message U11
+Token count: 45
+Calling LLM for summary...
+Got summary: Executed `cargo run` in tmux pane %18 to compile a
+Send result: true
+Received TL;DR for message A31
+Saved TL;DR for message A31
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U12
+Saved TL;DR for message U12
+Token count: 203
+Calling LLM for summary...
+Got summary: The user is excited about tmux integration that al
+Send result: true
+Received TL;DR for message A32
+Saved TL;DR for message A32
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U13
+Saved TL;DR for message U13
+Token count: 19
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A33
+Saved TL;DR for message A33
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U14
+Saved TL;DR for message U14
+Token count: 324
+Calling LLM for summary...
+Got summary: I have tools for file management (open/close/searc
+Send result: true
+Received TL;DR for message A38
+Saved TL;DR for message A38
+Token count: 15
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U15
+Saved TL;DR for message U15
+Token count: 269
+Calling LLM for summary...
+Got summary: The system has loaded 7 context elements totaling 
+Send result: true
+Received TL;DR for message A39
+Saved TL;DR for message A39
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U16
+Saved TL;DR for message U16
+Token count: 18
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A40
+Saved TL;DR for message A40
+Token count: 40
+Calling LLM for summary...
+Got summary: Messages have been set to summarized status to red
+Send result: true
+Received TL;DR for message A73
+Saved TL;DR for message A73
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 33
+Calling LLM for summary...
+Got summary: The person will examine key files to understand a 
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 21
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A7
+Saved TL;DR for message A7
+Token count: 860
+Calling LLM for summary...
+Got summary: This is a sophisticated terminal-based AI coding a
+Send result: true
+Received TL;DR for message A10
+Saved TL;DR for message A10
+Token count: 16
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 107
+Calling LLM for summary...
+Got summary: The conversation context has been cleaned up, remo
+Send result: true
+Received TL;DR for message A12
+Saved TL;DR for message A12
+Token count: 11
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 103
+Calling LLM for summary...
+Got summary: A test todo item (ID: X1) was created with "Pendin
+Send result: true
+Received TL;DR for message A14
+Saved TL;DR for message A14
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 211
+Calling LLM for summary...
+Got summary: Created 20 todo items in 3 sections: Core Features
+Send result: true
+Received TL;DR for message A17
+Saved TL;DR for message A17
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U5
+Saved TL;DR for message U5
+Token count: 42
+Calling LLM for summary...
+Got summary: All even-numbered todos (X2-X20) have been marked 
+Send result: true
+Received TL;DR for message A19
+Saved TL;DR for message A19
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U6
+Saved TL;DR for message U6
+Token count: 58
+Calling LLM for summary...
+Got summary: Successfully deleted 11 odd-numbered todos, leavin
+Send result: true
+Received TL;DR for message A21
+Saved TL;DR for message A21
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U7
+Saved TL;DR for message U7
+Token count: 82
+Calling LLM for summary...
+Got summary: The tree filter has been updated to ignore YAML fi
+Send result: true
+Received TL;DR for message A23
+Saved TL;DR for message A23
+Token count: 11
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U8
+Saved TL;DR for message U8
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A25
+Saved TL;DR for message A25
+Token count: 45
+Calling LLM for summary...
+Got summary: The user encountered an error because the `/home/o
+Send result: true
+Received TL;DR for message A26
+Saved TL;DR for message A26
+Token count: 123
+Calling LLM for summary...
+Got summary: The user ran `cargo build` and noted a potential i
+Send result: true
+Received TL;DR for message A27
+Saved TL;DR for message A27
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U9
+Saved TL;DR for message U9
+Token count: 18
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A28
+Saved TL;DR for message A28
+Token count: 16
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A29
+Saved TL;DR for message A29
+Token count: 944
+Calling LLM for summary...
+Got summary: The message provides a detailed technical analysis
+Send result: true
+Received TL;DR for message A30
+Saved TL;DR for message A30
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U10
+Saved TL;DR for message U10
+Token count: 932
+Calling LLM for summary...
+Got summary: The message proposes feature ideas for a coding as
+Send result: true
+Received TL;DR for message A31
+Saved TL;DR for message A31
+Token count: 11
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U11
+Saved TL;DR for message U11
+Token count: 91
+Calling LLM for summary...
+Got summary: **Summary:** The sender greets Guillaume Draznieks
+Send result: true
+Received TL;DR for message A32
+Saved TL;DR for message A32
+Token count: 15
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U12
+Saved TL;DR for message U12
+Token count: 163
+Calling LLM for summary...
+Got summary: Conversation history was compressed to TL;DR summa
+Send result: true
+Received TL;DR for message A34
+Saved TL;DR for message A34
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U13
+Saved TL;DR for message U13
+Token count: 128
+Calling LLM for summary...
+Got summary: **Summary:** The sender explains they can only see
+Send result: true
+Received TL;DR for message A35
+Saved TL;DR for message A35
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U14
+Saved TL;DR for message U14
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A36
+Saved TL;DR for message A36
+Token count: 122
+Calling LLM for summary...
+Got summary: The assistant created a comprehensive README.md fo
+Send result: true
+Received TL;DR for message A37
+Saved TL;DR for message A37
+Token count: 13
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U15
+Saved TL;DR for message U15
+Token count: 34
+Calling LLM for summary...
+Got summary: The Project Structure section was removed from the
+Send result: true
+Received TL;DR for message A39
+Saved TL;DR for message A39
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U16
+Saved TL;DR for message U16
+Token count: 63
+Calling LLM for summary...
+Got summary: The assistant greets Guillaume and offers help wit
+Send result: true
+Received TL;DR for message A40
+Saved TL;DR for message A40
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 23
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 471
+Calling LLM for summary...
+Got summary: **Summary:** Context Pilot is a Rust-based termina
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 11
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 362
+Calling LLM for summary...
+Got summary: The user lists their available tools in Context Pi
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 17
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 151
+Calling LLM for summary...
+Got summary: **Summary:** Created a humorous nested todo list f
+Send result: true
+Received TL;DR for message A6
+Saved TL;DR for message A6
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 128
+Calling LLM for summary...
+Got summary: User marked "Step 4: Profit" as complete in their 
+Send result: true
+Received TL;DR for message A8
+Saved TL;DR for message A8
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U5
+Saved TL;DR for message U5
+Token count: 421
+Calling LLM for summary...
+Got summary: The message lists 14 available tools organized int
+Send result: true
+Received TL;DR for message A9
+Saved TL;DR for message A9
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U6
+Saved TL;DR for message U6
+Token count: 174
+Calling LLM for summary...
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U7
+Saved TL;DR for message U7
+Got summary: Your memory is currently empty (just 3 tokens for 
+Send result: true
+Received TL;DR for message A10
+Saved TL;DR for message A10
+Token count: 63
+Calling LLM for summary...
+Got summary: The user notes the memory context is still empty s
+Send result: true
+Received TL;DR for message A11
+Saved TL;DR for message A11
+Token count: 104
+Calling LLM for summary...
+Got summary: The assistant confirmed it saved two memories: (1)
+Send result: true
+Received TL;DR for message A12
+Saved TL;DR for message A12
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U8
+Saved TL;DR for message U8
+Token count: 209
+Calling LLM for summary...
+Got summary: Context health is excellent at 12.1% usage (12.1K/
+Send result: true
+Received TL;DR for message A13
+Saved TL;DR for message A13
+Token count: 12
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U9
+Saved TL;DR for message U9
+Token count: 185
+Calling LLM for summary...
+Got summary: The context grew by ~400 tokens (from 12.1K to 12.
+Send result: true
+Received TL;DR for message A14
+Saved TL;DR for message A14
+Token count: 17
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U10
+Saved TL;DR for message U10
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A15
+Saved TL;DR for message A15
+Token count: 166
+Calling LLM for summary...
+Got summary: The assistant summarized 11 messages, reducing ver
+Send result: true
+Received TL;DR for message A16
+Saved TL;DR for message A16
+Token count: 1
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U11
+Saved TL;DR for message U11
+Token count: 155
+Calling LLM for summary...
+Got summary: Summarization is working, showing ~90% token reduc
+Send result: true
+Received TL;DR for message A17
+Saved TL;DR for message A17
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U12
+Saved TL;DR for message U12
+Token count: 73
+Calling LLM for summary...
+Got summary: The assistant confirmed updating a memory note (M2
+Send result: true
+Received TL;DR for message A19
+Saved TL;DR for message A19
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U13
+Saved TL;DR for message U13
+Token count: 121
+Calling LLM for summary...
+Got summary: Context is at 11.3% (11.3K/100K tokens) with ~88.7
+Send result: true
+Received TL;DR for message A20
+Saved TL;DR for message A20
+Token count: 47
+Calling LLM for summary...
+Got summary: The sender updated the code to enable live updates
+Send result: true
+Received TL;DR for message U14
+Saved TL;DR for message U14
+Token count: 175
+Calling LLM for summary...
+Got summary: **Summary:** Context now shows TL;DR versions of m
+Send result: true
+Received TL;DR for message A22
+Saved TL;DR for message A22
+Token count: 16
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U15
+Saved TL;DR for message U15
+Token count: 171
+Calling LLM for summary...
+Got summary: Context panel updates correctly after closing main
+Send result: true
+Received TL;DR for message A24
+Saved TL;DR for message A24
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U12
+Saved TL;DR for message U12
+Token count: 32
+Calling LLM for summary...
+Got summary: The speaker will examine the main files of a proje
+Send result: true
+Received TL;DR for message A32
+Saved TL;DR for message A32
+Token count: 25
+Calling LLM for summary...
+Got summary: The user wants to examine the core application sta
+Send result: true
+Received TL;DR for message A35
+Saved TL;DR for message A35
+Token count: 730
+Calling LLM for summary...
+Got summary: Context Pilot is a sophisticated Rust-based termin
+Send result: true
+Received TL;DR for message A37
+Saved TL;DR for message A37
+Token count: 8
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 35
+Calling LLM for summary...
+Got summary: The user plans to explore a project by examining k
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 21
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 513
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal UI codi
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 8
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 195
+Calling LLM for summary...
+Got summary: Current token usage is 8.2K/100K (8.2%), with main
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 1
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 126
+Calling LLM for summary...
+Got summary: No context element with ID P65 exists. Current ele
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 410
+Calling LLM for summary...
+Got summary: The message lists available tools for file operati
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 112
+Calling LLM for summary...
+Got summary: The assistant notes its memory is empty and asks w
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 34
+Calling LLM for summary...
+Got summary: Claude is creating memories based on a directory s
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 86
+Calling LLM for summary...
+Got summary: The assistant confirmed storing basic project obse
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4

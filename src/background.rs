@@ -113,7 +113,7 @@ fn summarize_content(content: &str) -> Result<String, String> {
     }
 
     let request = SummaryRequest {
-        model: "claude-sonnet-4-20250514".to_string(),
+        model: "claude-opus-4-5".to_string(),
         max_tokens: 100,
         messages: vec![SummaryMessage {
             role: "user".to_string(),

@@ -1,101 +1,98 @@
-use serde_json::{json, Value};
-
 use super::{ToolResult, ToolUse};
 use crate::persistence::save_message;
 use crate::state::{MessageStatus, State};
 
-pub fn definition() -> Value {
-    json!({
-        "name": "set_message_status",
-        "description": "Change a message's status to manage context size. Messages are identified by their short ID (e.g., 'U1', 'A1'). Status options: 'full' (show complete content), 'summarized' (show TL;DR only), 'forgotten' (exclude from context entirely).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "message_id": {
-                    "type": "string",
-                    "description": "The short message ID (e.g., 'U1' for user message 1, 'A3' for assistant message 3)"
-                },
-                "status": {
-                    "type": "string",
-                    "enum": ["full", "summarized", "forgotten"],
-                    "description": "The new status: 'full' to show complete content, 'summarized' to show TL;DR, 'forgotten' to exclude from context"
-                }
-            },
-            "required": ["message_id", "status"]
-        }
-    })
-}
-
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let message_id = match tool.input.get("message_id").and_then(|v| v.as_str()) {
-        Some(id) => id,
+    let changes = match tool.input.get("changes").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'message_id' parameter".to_string(),
+                content: "Missing 'changes' array parameter".to_string(),
                 is_error: true,
             }
         }
     };
 
-    let status_str = match tool.input.get("status").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'status' parameter".to_string(),
-                is_error: true,
+    if changes.is_empty() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "Empty 'changes' array".to_string(),
+            is_error: true,
+        };
+    }
+
+    let mut results: Vec<String> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+
+    for change in changes {
+        let message_id = match change.get("message_id").and_then(|v| v.as_str()) {
+            Some(id) => id,
+            None => {
+                errors.push("Missing 'message_id' in change".to_string());
+                continue;
+            }
+        };
+
+        let status_str = match change.get("status").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => {
+                errors.push(format!("{}: missing 'status'", message_id));
+                continue;
+            }
+        };
+
+        let new_status = match status_str {
+            "full" => MessageStatus::Full,
+            "summarized" => MessageStatus::Summarized,
+            "forgotten" => MessageStatus::Forgotten,
+            _ => {
+                errors.push(format!("{}: invalid status '{}'", message_id, status_str));
+                continue;
+            }
+        };
+
+        // Find message by id
+        let msg = state.messages.iter_mut().find(|m| m.id == message_id);
+
+        match msg {
+            Some(m) => {
+                // Check if trying to summarize without a TL;DR
+                if new_status == MessageStatus::Summarized && m.tl_dr.is_none() {
+                    errors.push(format!("{}: no TL;DR available", message_id));
+                    continue;
+                }
+
+                let old_status = m.status;
+                m.status = new_status;
+
+                // Save the updated message
+                save_message(m);
+
+                results.push(format!("{}: {:?} → {:?}", message_id, old_status, new_status));
+            }
+            None => {
+                errors.push(format!("{}: not found", message_id));
             }
         }
-    };
+    }
 
-    let new_status = match status_str {
-        "full" => MessageStatus::Full,
-        "summarized" => MessageStatus::Summarized,
-        "forgotten" => MessageStatus::Forgotten,
-        _ => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Invalid status '{}'. Must be 'full', 'summarized', or 'forgotten'", status_str),
-                is_error: true,
-            }
+    let mut output = String::new();
+
+    if !results.is_empty() {
+        output.push_str(&format!("Updated {} message(s):\n{}", results.len(), results.join("\n")));
+    }
+
+    if !errors.is_empty() {
+        if !output.is_empty() {
+            output.push_str("\n\n");
         }
-    };
+        output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
+    }
 
-    // Find message by id
-    let msg = state.messages.iter_mut().find(|m| {
-        m.id == message_id
-    });
-
-    match msg {
-        Some(m) => {
-            // Check if trying to summarize without a TL;DR
-            if new_status == MessageStatus::Summarized && m.tl_dr.is_none() {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Cannot set {} to 'summarized': no TL;DR available yet", message_id),
-                    is_error: true,
-                };
-            }
-
-            let old_status = m.status;
-            m.status = new_status;
-
-            // Save the updated message
-            save_message(m);
-
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Changed {} status from {:?} to {:?}", message_id, old_status, new_status),
-                is_error: false,
-            }
-        }
-        None => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Message '{}' not found", message_id),
-                is_error: true,
-            }
-        }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: output,
+        is_error: errors.len() > 0 && results.is_empty(),
     }
 }

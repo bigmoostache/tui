@@ -1,10 +1,13 @@
 mod actions;
 mod api;
 mod background;
+mod context_cleaner;
 mod events;
 mod highlight;
+mod mouse;
 mod persistence;
 mod state;
+mod tool_defs;
 mod tools;
 mod typewriter;
 mod ui;
@@ -21,13 +24,76 @@ use crossterm::{
 use ratatui::prelude::*;
 
 use actions::{apply_action, Action, ActionResult};
-use api::{start_streaming, StreamEvent};
+use api::{start_cleaning, start_streaming, StreamEvent};
 use background::{generate_tldr, TlDrResult};
 use events::handle_event;
 use persistence::{load_state, save_message, save_state};
-use state::{MessageStatus, MessageType, ToolUseRecord};
-use tools::{execute_tool, generate_directory_tree, get_context_files, get_glob_context, refresh_file_hashes, refresh_glob_results, ToolResult, ToolUse};
+use state::{MessageStatus, MessageType, State, ToolUseRecord};
+use tools::{execute_tool, generate_directory_tree, get_context_files, get_glob_context, get_memory_context, get_overview_context, get_tmux_context, get_todo_context, refresh_conversation_context, refresh_file_hashes, refresh_glob_results, refresh_memory_context, refresh_overview_context, refresh_tmux_context, refresh_todo_context, refresh_tools_context, ToolResult, ToolUse};
 use typewriter::TypewriterBuffer;
+
+/// Context data prepared for streaming
+struct StreamContext {
+    messages: Vec<state::Message>,
+    file_context: Vec<(String, String)>,
+    glob_context: Vec<(String, String)>,
+    tmux_context: Vec<(String, String)>,
+    todo_context: String,
+    memory_context: String,
+    overview_context: String,
+    directory_tree: String,
+    tools: Vec<tool_defs::ToolDefinition>,
+}
+
+/// Refresh all context elements and prepare data for streaming
+fn prepare_stream_context(state: &mut State, include_last_message: bool) -> StreamContext {
+    // Refresh file hashes and token counts
+    refresh_file_hashes(state);
+
+    // Refresh all context element token counts
+    refresh_conversation_context(state);
+    refresh_glob_results(state);
+    refresh_tmux_context(state);
+    refresh_todo_context(state);
+    refresh_memory_context(state);
+    refresh_overview_context(state);
+    refresh_tools_context(state);
+
+    // Get context content
+    let file_context = get_context_files(state);
+    let glob_context = get_glob_context(state);
+    let tmux_context = get_tmux_context(state);
+    let todo_context = get_todo_context(state);
+    let memory_context = get_memory_context(state);
+    let overview_context = get_overview_context(state);
+    let directory_tree = generate_directory_tree(state);
+
+    // Prepare messages
+    let messages: Vec<_> = if include_last_message {
+        state.messages.iter()
+            .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+            .cloned()
+            .collect()
+    } else {
+        state.messages.iter()
+            .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+            .take(state.messages.len().saturating_sub(1))
+            .cloned()
+            .collect()
+    };
+
+    StreamContext {
+        messages,
+        file_context,
+        glob_context,
+        tmux_context,
+        todo_context,
+        memory_context,
+        overview_context,
+        directory_tree,
+        tools: state.tools.clone(),
+    }
+}
 
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
@@ -37,9 +103,31 @@ fn main() -> io::Result<()> {
 
     let mut state = load_state();
 
-    // Ensure Tree context element exists (for old state files)
-    if !state.context.iter().any(|c| c.context_type == state::ContextType::Tree) {
+    // Migration: Ensure default context elements exist with correct IDs
+    // P1 = Main (Conversation), P2 = Directory (Tree), P3 = Todo
+
+    // Ensure Main conversation exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Conversation && c.name == "Main") {
         state.context.insert(0, state::ContextElement {
+            id: "P1".to_string(),
+            context_type: state::ContextType::Conversation,
+            name: "Main".to_string(),
+            token_count: 0,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+        });
+    }
+
+    // Ensure Tree context element exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Tree) {
+        state.context.insert(1.min(state.context.len()), state::ContextElement {
+            id: "P2".to_string(),
             context_type: state::ContextType::Tree,
             name: "Directory".to_string(),
             token_count: 0,
@@ -47,6 +135,82 @@ fn main() -> io::Result<()> {
             file_hash: None,
             glob_pattern: None,
             glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+        });
+    }
+
+    // Ensure Todo context element exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Todo) {
+        state.context.insert(2.min(state.context.len()), state::ContextElement {
+            id: "P3".to_string(),
+            context_type: state::ContextType::Todo,
+            name: "Todo".to_string(),
+            token_count: 0,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+        });
+    }
+
+    // Ensure Memory context element exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Memory) {
+        state.context.insert(3.min(state.context.len()), state::ContextElement {
+            id: "P4".to_string(),
+            context_type: state::ContextType::Memory,
+            name: "Memory".to_string(),
+            token_count: 0,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+        });
+    }
+
+    // Ensure Overview context element exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Overview) {
+        state.context.insert(4.min(state.context.len()), state::ContextElement {
+            id: "P5".to_string(),
+            context_type: state::ContextType::Overview,
+            name: "Overview".to_string(),
+            token_count: 0,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+        });
+    }
+
+    // Ensure Tools context element exists
+    if !state.context.iter().any(|c| c.context_type == state::ContextType::Tools) {
+        state.context.insert(5.min(state.context.len()), state::ContextElement {
+            id: "P6".to_string(),
+            context_type: state::ContextType::Tools,
+            name: "Tools".to_string(),
+            token_count: tool_defs::estimate_tools_tokens(&state.tools),
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
         });
     }
 
@@ -118,8 +282,8 @@ fn main() -> io::Result<()> {
             }
         }
 
-        // Handle tool use after stream is done and typewriter is empty
-        if state.is_streaming && pending_done.is_some() && typewriter.pending_chars.is_empty() && !pending_tools.is_empty() {
+        // Handle tool use after stream is done and typewriter is empty (works for both streaming and cleaning)
+        if (state.is_streaming || state.is_cleaning_context) && pending_done.is_some() && typewriter.pending_chars.is_empty() && !pending_tools.is_empty() {
             let tools = std::mem::take(&mut pending_tools);
             let mut tool_results: Vec<ToolResult> = Vec::new();
 
@@ -211,40 +375,59 @@ fn main() -> io::Result<()> {
 
             save_state(&state);
 
-            // Continue conversation with tool results
-            refresh_glob_results(&mut state);
-            let file_context = get_context_files(&state);
-            let glob_context = get_glob_context(&state);
-            let directory_tree = generate_directory_tree(&mut state);
-            let messages: Vec<_> = state.messages.iter()
-                .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
-                .cloned()
-                .collect();
+            // Refresh all contexts and continue streaming/cleaning
+            let ctx = prepare_stream_context(&mut state, true);
 
             typewriter.reset();
             pending_done = None;
-            // Tool results are now stored in messages, no need to pass separately
-            start_streaming(messages, file_context, glob_context, directory_tree, None, tx.clone());
+
+            if state.is_cleaning_context {
+                // Continue cleaning
+                let cleaner_tools = context_cleaner::get_cleaner_tools();
+                start_cleaning(
+                    ctx.messages,
+                    ctx.file_context,
+                    ctx.glob_context,
+                    ctx.tmux_context,
+                    ctx.todo_context,
+                    ctx.memory_context,
+                    ctx.overview_context,
+                    ctx.directory_tree,
+                    cleaner_tools,
+                    &state,
+                    tx.clone(),
+                );
+            } else {
+                start_streaming(ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context, ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree, ctx.tools, None, tx.clone());
+            }
         }
 
-        // Finalize stream (only if no pending tools and still streaming)
-        if state.is_streaming {
+        // Finalize stream (only if no pending tools and still streaming or cleaning)
+        if state.is_streaming || state.is_cleaning_context {
             if let Some((input_tokens, output_tokens)) = pending_done {
                 if typewriter.pending_chars.is_empty() && pending_tools.is_empty() {
+                    // Reset cleaning flag if we were cleaning
+                    let was_cleaning = state.is_cleaning_context;
+                    if was_cleaning {
+                        state.is_cleaning_context = false;
+                    }
+
                     match apply_action(&mut state, Action::StreamDone { _input_tokens: input_tokens, output_tokens }) {
                         ActionResult::SaveMessage(id) => {
-                            // Find message and trigger TL;DR for assistant messages
-                            let tldr_info = state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                                save_message(msg);
-                                if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
-                                    Some((msg.id.clone(), msg.content.clone()))
-                                } else {
-                                    None
+                            // Find message and trigger TL;DR for assistant messages (skip for cleaning)
+                            if !was_cleaning {
+                                let tldr_info = state.messages.iter().find(|m| m.id == id).and_then(|msg| {
+                                    save_message(msg);
+                                    if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
+                                        Some((msg.id.clone(), msg.content.clone()))
+                                    } else {
+                                        None
+                                    }
+                                });
+                                if let Some((msg_id, content)) = tldr_info {
+                                    state.pending_tldrs += 1;
+                                    generate_tldr(msg_id, content, tldr_tx.clone());
                                 }
-                            });
-                            if let Some((msg_id, content)) = tldr_info {
-                                state.pending_tldrs += 1;
-                                generate_tldr(msg_id, content, tldr_tx.clone());
                             }
                             save_state(&state);
                         }
@@ -290,19 +473,9 @@ fn main() -> io::Result<()> {
                             generate_tldr(user_msg.id.clone(), user_msg.content.clone(), tldr_tx.clone());
                         }
                     }
-                    // Check for file changes and update hashes/token counts
-                    refresh_file_hashes(&mut state);
-                    // Refresh glob results
-                    refresh_glob_results(&mut state);
-                    let file_context = get_context_files(&state);
-                    let glob_context = get_glob_context(&state);
-                    let directory_tree = generate_directory_tree(&mut state);
-                    let messages = state.messages.iter()
-                        .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
-                        .take(state.messages.len().saturating_sub(1))
-                        .cloned()
-                        .collect();
-                    start_streaming(messages, file_context, glob_context, directory_tree, None, tx.clone());
+                    // Refresh all contexts and start streaming
+                    let ctx = prepare_stream_context(&mut state, false);
+                    start_streaming(ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context, ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree, ctx.tools, None, tx.clone());
                     save_state(&state);
                 }
                 ActionResult::StopStream => {
@@ -336,6 +509,27 @@ fn main() -> io::Result<()> {
                         state.pending_tldrs += 1;
                         generate_tldr(msg_id, content, tldr_tx.clone());
                     }
+                    save_state(&state);
+                }
+                ActionResult::StartCleaning => {
+                    // Start context cleaning
+                    typewriter.reset();
+                    pending_tools.clear();
+                    let ctx = prepare_stream_context(&mut state, true);
+                    let cleaner_tools = context_cleaner::get_cleaner_tools();
+                    start_cleaning(
+                        ctx.messages,
+                        ctx.file_context,
+                        ctx.glob_context,
+                        ctx.tmux_context,
+                        ctx.todo_context,
+                        ctx.memory_context,
+                        ctx.overview_context,
+                        ctx.directory_tree,
+                        cleaner_tools,
+                        &state,
+                        tx.clone(),
+                    );
                     save_state(&state);
                 }
                 ActionResult::Nothing => {}
