@@ -1,11 +1,11 @@
 use crate::state::State;
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
 
-/// Maximum context size in tokens
-pub const MAX_CONTEXT_TOKENS: usize = 200_000;
+/// Maximum context size in tokens (matches Claude's effective context window)
+pub const MAX_CONTEXT_TOKENS: usize = 100_000;
 
 /// Threshold percentage to trigger context cleaning
-pub const CLEANING_THRESHOLD: f32 = 0.70;
+pub const CLEANING_THRESHOLD: f32 = 0.10; // TODO: Set back to 0.70 after testing
 
 /// Tool IDs that are allowed for context cleaning
 const CLEANER_TOOL_IDS: &[&str] = &[

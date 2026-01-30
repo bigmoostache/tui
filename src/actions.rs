@@ -394,8 +394,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
         }
         Action::StartContextCleaning => {
-            // Don't start if already streaming or cleaning
-            if state.is_streaming || state.is_cleaning_context {
+            // Don't start if already cleaning (streaming is OK - cleaning runs independently)
+            if state.is_cleaning_context {
                 ActionResult::Nothing
             } else {
                 state.is_cleaning_context = true;

@@ -28,7 +28,7 @@ impl ContextType {
             ContextType::Todo => "☐",
             ContextType::Memory => "◈",
             ContextType::Overview => "◎",
-            ContextType::Tools => "⚙",
+            ContextType::Tools => "☰",
         }
     }
 }

@@ -1290,3 +1290,364 @@ Got summary: The assistant confirmed storing basic project obse
 Send result: true
 Received TL;DR for message A4
 Saved TL;DR for message A4
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 23
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 402
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal UI codi
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 998
+Calling LLM for summary...
+Got summary: Context Pilot is a TUI chat application with Claud
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 754
+Calling LLM for summary...
+Got summary: **Code review finds solid architecture (clear sepa
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 24
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 418
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal UI codi
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 112
+Calling LLM for summary...
+Got summary: The assistant recognizes the project as **Context 
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 55
+Calling LLM for summary...
+Got summary: The message indicates that "blqblqbqlbl" isn't rec
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 344
+Calling LLM for summary...
+Got summary: **Summary:** Context Pilot is a Rust-based TUI app
+Send result: true
+Received TL;DR for message A6
+Saved TL;DR for message A6
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 24
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 562
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal AI codi
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 1
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 92
+Calling LLM for summary...
+Got summary: The message confirms the user found the help usefu
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 21
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 507
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal AI codi
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 45
+Calling LLM for summary...
+Got summary: The user requested to see the state.rs file after 
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 362
+Calling LLM for summary...
+Got summary: The message describes `state.rs`, which defines co
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 1
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 48
+Calling LLM for summary...
+Got summary: The user has loaded the Context Pilot project (a R
+Send result: true
+Received TL;DR for message A6
+Saved TL;DR for message A6
+Token count: 1
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 44
+Calling LLM for summary...
+Got summary: **Summary:** The sender is available to help with 
+Send result: true
+Received TL;DR for message A7
+Saved TL;DR for message A7
+Token count: 6
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 8
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U1
+Saved TL;DR for message U1
+Token count: 27
+Calling LLM for summary...
+Got summary: The user plans to examine the project's key files 
+Send result: true
+Received TL;DR for message A1
+Saved TL;DR for message A1
+Token count: 405
+Calling LLM for summary...
+Got summary: Context Pilot is a Rust-based terminal UI coding a
+Send result: true
+Received TL;DR for message A2
+Saved TL;DR for message A2
+Token count: 13
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U2
+Saved TL;DR for message U2
+Token count: 378
+Calling LLM for summary...
+Got summary: Context Pilot is a terminal-based AI coding assist
+Send result: true
+Received TL;DR for message A3
+Saved TL;DR for message A3
+Token count: 7
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U3
+Saved TL;DR for message U3
+Token count: 19
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A4
+Saved TL;DR for message A4
+Token count: 1578
+Calling LLM for summary...
+Got summary: The message provides a comprehensive code architec
+Send result: true
+Received TL;DR for message A5
+Saved TL;DR for message A5
+Token count: 3
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U4
+Saved TL;DR for message U4
+Token count: 314
+Calling LLM for summary...
+Got summary: The user praises Context Pilot's craftsmanship, hi
+Send result: true
+Received TL;DR for message A6
+Saved TL;DR for message A6
+Token count: 10
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U5
+Saved TL;DR for message U5
+Token count: 28
+Calling LLM for summary...
+Got summary: The sender needs to open more files to reach a 60%
+Send result: true
+Received TL;DR for message A7
+Saved TL;DR for message A7
+Token count: 20
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A8
+Saved TL;DR for message A8
+Token count: 226
+Calling LLM for summary...
+Got summary: Context is at ~60% capacity (~66K tokens) with the
+Send result: true
+Received TL;DR for message A9
+Saved TL;DR for message A9
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U6
+Saved TL;DR for message U6
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A10
+Saved TL;DR for message A10
+Token count: 239
+Calling LLM for summary...
+Got summary: The user has loaded 24 files (~76K tokens, ~75-80%
+Send result: true
+Received TL;DR for message A11
+Saved TL;DR for message A11
+Token count: 5
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U7
+Saved TL;DR for message U7
+Token count: 4
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A12
+Saved TL;DR for message A12
+Token count: 255
+Calling LLM for summary...
+Got summary: The entire Rust codebase (39 files, ~85K tokens) i
+Send result: true
+Received TL;DR for message A13
+Saved TL;DR for message A13
+Token count: 9
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U8
+Saved TL;DR for message U8
+Token count: 2
+Using content directly (short message)
+Send result: true
+Received TL;DR for message A14
+Saved TL;DR for message A14
+Token count: 74
+Calling LLM for summary...
+Got summary: The assistant found 68 message files in the messag
+Send result: true
+Received TL;DR for message A15
+Saved TL;DR for message A15
+Token count: 289
+Calling LLM for summary...
+Got summary: The message explains YAML structure for persisting
+Send result: true
+Received TL;DR for message A16
+Saved TL;DR for message A16
+Token count: 8
+Using content directly (short message)
+Send result: true
+Received TL;DR for message U9
+Saved TL;DR for message U9
+Token count: 2123
+Calling LLM for summary...
+Got summary: Claude tells an elaborate fantasy story about "The
+Send result: true
+Received TL;DR for message A17
+Saved TL;DR for message A17
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 21
+Using content directly (short message)
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 447
+Calling LLM for summary...
+Got summary: The assistant searched for state.rs and found it a
+Send result: true
+Token count: 225
+Calling LLM for summary...
+Got summary: The `src/state.rs` file defines the app's data str
+Send result: true
+Token count: 106
+Calling LLM for summary...
+Got summary: The user wants to use Rust edition 2024 despite be
+Send result: true
+Token count: 61
+Calling LLM for summary...
+Got summary: The user confirmed changing to Rust 2024 edition, 
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 14
+Using content directly (short message)
+Send result: true
+Token count: 62
+Calling LLM for summary...
+Got summary: The assistant encountered a tmux tool issue when t
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 139
+Calling LLM for summary...
+Got summary: The assistant opened 4 key files (tool dispatcher,
+Send result: true
