@@ -13,16 +13,6 @@ pub enum ParamType {
 }
 
 impl ParamType {
-    pub fn as_str(&self) -> String {
-        match self {
-            ParamType::String => "string".to_string(),
-            ParamType::Integer => "integer".to_string(),
-            ParamType::Boolean => "boolean".to_string(),
-            ParamType::Array(inner) => format!("{}[]", inner.as_str()),
-            ParamType::Object(_) => "object".to_string(),
-        }
-    }
-
     fn to_json_schema(&self) -> Value {
         match self {
             ParamType::String => json!({"type": "string"}),
@@ -157,28 +147,6 @@ pub enum ToolCategory {
     Tmux,
     Tasks,
     Memory,
-}
-
-impl ToolCategory {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ToolCategory::FileSystem => "File System",
-            ToolCategory::Context => "Context",
-            ToolCategory::Tmux => "Tmux",
-            ToolCategory::Tasks => "Tasks",
-            ToolCategory::Memory => "Memory",
-        }
-    }
-
-    pub fn icon(&self) -> &'static str {
-        match self {
-            ToolCategory::FileSystem => "◇",
-            ToolCategory::Context => "◎",
-            ToolCategory::Tmux => "▣",
-            ToolCategory::Tasks => "☐",
-            ToolCategory::Memory => "◈",
-        }
-    }
 }
 
 /// Get all available tool definitions
@@ -530,28 +498,4 @@ pub fn build_api_tools(tools: &[ToolDefinition]) -> Value {
         .collect();
 
     Value::Array(enabled)
-}
-
-/// Estimate token count for all tools
-pub fn estimate_tools_tokens(tools: &[ToolDefinition]) -> usize {
-    let mut total = 0;
-    for tool in tools.iter().filter(|t| t.enabled) {
-        total += (tool.name.len() + tool.description.len()) / 4;
-        for param in &tool.params {
-            total += estimate_param_tokens(param);
-        }
-    }
-    total
-}
-
-fn estimate_param_tokens(param: &ToolParam) -> usize {
-    let mut tokens = (param.name.len() + param.description.as_ref().map(|d| d.len()).unwrap_or(0)) / 4;
-    if let ParamType::Array(inner) = &param.param_type {
-        if let ParamType::Object(nested) = inner.as_ref() {
-            for p in nested {
-                tokens += estimate_param_tokens(p);
-            }
-        }
-    }
-    tokens + 2
 }

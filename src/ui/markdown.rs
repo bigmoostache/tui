@@ -80,7 +80,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
 }
 
 /// Parse markdown text and return styled spans
-pub fn parse_markdown_line<'a>(line: &'a str, base_style: Style) -> Vec<Span<'a>> {
+pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> {
     let trimmed = line.trim_start();
 
     // Headers: # ## ### etc.

@@ -42,10 +42,6 @@ pub enum Action {
     InputBackspace,
     InputDelete,
     InputSubmit,
-    CursorLeft,
-    CursorRight,
-    CursorUp,
-    CursorDown,
     CursorWordLeft,
     CursorWordRight,
     CursorHome,
@@ -53,6 +49,8 @@ pub enum Action {
     ClearConversation,
     NewContext,
     SelectContext(usize),
+    SelectNextContext,
+    SelectPrevContext,
     AppendChars(String),
     StreamDone { _input_tokens: usize, output_tokens: usize },
     StreamError(String),
@@ -121,33 +119,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     .nth(1)
                     .map(|(i, _)| state.input_cursor + i)
                     .unwrap_or(state.input.len());
-            }
-            ActionResult::Nothing
-        }
-        Action::CursorUp => {
-            // Move to same column in previous line
-            let before_cursor = &state.input[..state.input_cursor];
-            if let Some(current_line_start) = before_cursor.rfind('\n') {
-                let col = state.input_cursor - current_line_start - 1;
-                let prev_content = &state.input[..current_line_start];
-                let prev_line_start = prev_content.rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let prev_line_len = current_line_start - prev_line_start;
-                state.input_cursor = prev_line_start + col.min(prev_line_len);
-            }
-            ActionResult::Nothing
-        }
-        Action::CursorDown => {
-            // Move to same column in next line
-            let before_cursor = &state.input[..state.input_cursor];
-            let current_line_start = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let col = state.input_cursor - current_line_start;
-            if let Some(next_newline) = state.input[state.input_cursor..].find('\n') {
-                let next_line_start = state.input_cursor + next_newline + 1;
-                let next_line_end = state.input[next_line_start..].find('\n')
-                    .map(|i| next_line_start + i)
-                    .unwrap_or(state.input.len());
-                let next_line_len = next_line_end - next_line_start;
-                state.input_cursor = next_line_start + col.min(next_line_len);
             }
             ActionResult::Nothing
         }
@@ -298,6 +269,26 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::SelectContext(index) => {
             if index < state.context.len() {
                 state.selected_context = index;
+                state.scroll_offset = 0.0;
+                state.user_scrolled = false;
+            }
+            ActionResult::Nothing
+        }
+        Action::SelectNextContext => {
+            if !state.context.is_empty() {
+                state.selected_context = (state.selected_context + 1) % state.context.len();
+                state.scroll_offset = 0.0;
+                state.user_scrolled = false;
+            }
+            ActionResult::Nothing
+        }
+        Action::SelectPrevContext => {
+            if !state.context.is_empty() {
+                state.selected_context = if state.selected_context == 0 {
+                    state.context.len() - 1
+                } else {
+                    state.selected_context - 1
+                };
                 state.scroll_offset = 0.0;
                 state.user_scrolled = false;
             }

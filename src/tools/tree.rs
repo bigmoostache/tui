@@ -8,6 +8,60 @@ use sha2::{Sha256, Digest};
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextType, State, TreeFileDescription};
 
+/// Generate tree string without mutating state (for read-only rendering)
+pub fn generate_tree_string(
+    tree_filter: &str,
+    tree_open_folders: &[String],
+    tree_descriptions: &[TreeFileDescription],
+) -> String {
+    let root = PathBuf::from(".");
+
+    // Build gitignore matcher from filter
+    let mut builder = GitignoreBuilder::new(&root);
+    for line in tree_filter.lines() {
+        let line = line.trim();
+        if !line.is_empty() && !line.starts_with('#') {
+            let _ = builder.add_line(None, line);
+        }
+    }
+    let gitignore = builder.build().ok();
+
+    // Build set of open folders for quick lookup
+    let open_set: HashSet<_> = tree_open_folders.iter().cloned().collect();
+
+    // Build map of descriptions for quick lookup
+    let desc_map: std::collections::HashMap<_, _> = tree_descriptions
+        .iter()
+        .map(|d| (d.path.clone(), d))
+        .collect();
+
+    let mut output = String::new();
+
+    // Root folder name
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Some(name) = cwd.file_name() {
+            output.push_str(&format!("{}/\n", name.to_string_lossy()));
+        } else {
+            output.push_str("./\n");
+        }
+    } else {
+        output.push_str("./\n");
+    }
+
+    // Build tree recursively
+    build_tree_new(
+        &root,
+        ".",
+        "",
+        &gitignore,
+        &open_set,
+        &desc_map,
+        &mut output,
+    );
+
+    output
+}
+
 /// Compute a short hash for a file's contents
 fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
@@ -253,52 +307,9 @@ fn count_children(dir: &Path, gitignore: &Option<ignore::gitignore::Gitignore>) 
         .count()
 }
 
-/// Generate a directory tree showing only open folders
+/// Generate a directory tree showing only open folders (updates token count in state)
 pub fn generate_directory_tree(state: &mut State) -> String {
-    let root = PathBuf::from(".");
-
-    // Build gitignore matcher from filter
-    let mut builder = GitignoreBuilder::new(&root);
-    for line in state.tree_filter.lines() {
-        let line = line.trim();
-        if !line.is_empty() && !line.starts_with('#') {
-            let _ = builder.add_line(None, line);
-        }
-    }
-    let gitignore = builder.build().ok();
-
-    // Build set of open folders for quick lookup
-    let open_set: HashSet<_> = state.tree_open_folders.iter().cloned().collect();
-
-    // Build map of descriptions for quick lookup
-    let desc_map: std::collections::HashMap<_, _> = state.tree_descriptions
-        .iter()
-        .map(|d| (d.path.clone(), d))
-        .collect();
-
-    let mut output = String::new();
-
-    // Root folder name
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Some(name) = cwd.file_name() {
-            output.push_str(&format!("{}/\n", name.to_string_lossy()));
-        } else {
-            output.push_str("./\n");
-        }
-    } else {
-        output.push_str("./\n");
-    }
-
-    // Build tree recursively
-    build_tree_new(
-        &root,
-        ".",
-        "",
-        &gitignore,
-        &open_set,
-        &desc_map,
-        &mut output,
-    );
+    let output = generate_tree_string(&state.tree_filter, &state.tree_open_folders, &state.tree_descriptions);
 
     // Update token count for Tree context element
     let token_count = estimate_tokens(&output);

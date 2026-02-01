@@ -1,11 +1,9 @@
-mod chars;
-mod conversation;
-mod helpers;
+pub mod chars;
+pub mod helpers;
 mod input;
-mod markdown;
-mod panels;
+pub mod markdown;
 mod sidebar;
-mod theme;
+pub mod theme;
 
 use ratatui::{
     prelude::*,
@@ -13,6 +11,7 @@ use ratatui::{
 };
 
 use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT, INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT};
+use crate::panels;
 use crate::state::{ContextType, State};
 
 
@@ -70,19 +69,10 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
-    let selected = state.context.get(state.selected_context);
+    let context_type = state.context.get(state.selected_context)
+        .map(|c| c.context_type)
+        .unwrap_or(ContextType::Conversation);
 
-    match selected.map(|c| c.context_type) {
-        Some(ContextType::Conversation) => conversation::render_conversation(frame, state, area),
-        Some(ContextType::File) => panels::render_file(frame, state, area),
-        Some(ContextType::Tree) => panels::render_tree(frame, state, area),
-        Some(ContextType::Glob) => panels::render_glob(frame, state, area),
-        Some(ContextType::Grep) => panels::render_grep(frame, state, area),
-        Some(ContextType::Tmux) => panels::render_tmux(frame, state, area),
-        Some(ContextType::Todo) => panels::render_todo(frame, state, area),
-        Some(ContextType::Memory) => panels::render_memory(frame, state, area),
-        Some(ContextType::Overview) => panels::render_overview(frame, state, area),
-        Some(ContextType::Tools) => panels::render_tools(frame, state, area),
-        None => conversation::render_conversation(frame, state, area),
-    }
+    let panel = panels::get_panel(context_type);
+    panel.render(frame, state, area);
 }

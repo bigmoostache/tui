@@ -2,7 +2,7 @@ use std::process::Command;
 
 use super::{ToolResult, ToolUse};
 use crate::constants::{TMUX_BG_SESSION, TMUX_SEND_DELAY_MS, SLEEP_DURATION_SECS};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{ContextElement, ContextType, State};
 
 /// Ensure the background tmux session exists
 fn ensure_bg_session() -> Result<(), String> {
@@ -304,44 +304,5 @@ pub fn capture_pane_content(pane_id: &str, lines: usize) -> String {
             String::from_utf8_lossy(&out.stdout).to_string()
         }
         _ => String::from("(failed to capture pane content)"),
-    }
-}
-
-/// Get tmux pane content for all tmux context elements (for API context)
-pub fn get_tmux_context(state: &State) -> Vec<(String, String)> {
-    state
-        .context
-        .iter()
-        .filter(|c| c.context_type == ContextType::Tmux)
-        .filter_map(|c| {
-            let pane_id = c.tmux_pane_id.as_ref()?;
-            let lines = c.tmux_lines.unwrap_or(50);
-            let content = capture_pane_content(pane_id, lines);
-
-            let mut header = format!("tmux pane {}", pane_id);
-            if let Some(desc) = &c.tmux_description {
-                header = format!("{} ({})", header, desc);
-            }
-            if let Some(last_keys) = &c.tmux_last_keys {
-                header = format!("{} [last: {}]", header, last_keys);
-            }
-
-            Some((header, content))
-        })
-        .collect()
-}
-
-/// Refresh token counts for all tmux context elements
-pub fn refresh_tmux_context(state: &mut State) {
-    for ctx in &mut state.context {
-        if ctx.context_type != ContextType::Tmux {
-            continue;
-        }
-
-        if let Some(pane_id) = &ctx.tmux_pane_id {
-            let lines = ctx.tmux_lines.unwrap_or(50);
-            let content = capture_pane_content(pane_id, lines);
-            ctx.token_count = estimate_tokens(&content);
-        }
     }
 }

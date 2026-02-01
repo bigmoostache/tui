@@ -55,13 +55,11 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 }
             }
 
-            // Ctrl+arrows for word navigation and scrolling
+            // Ctrl+arrows for word navigation in input
             if ctrl {
                 return Some(match key.code {
                     KeyCode::Left => Action::CursorWordLeft,
                     KeyCode::Right => Action::CursorWordRight,
-                    KeyCode::Up => Action::ScrollUp(SCROLL_ARROW_AMOUNT),
-                    KeyCode::Down => Action::ScrollDown(SCROLL_ARROW_AMOUNT),
                     KeyCode::Backspace => Action::CursorWordLeft, // TODO: delete word
                     _ => Action::None,
                 });
@@ -72,10 +70,10 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 KeyCode::Backspace => Action::InputBackspace,
                 KeyCode::Delete => Action::InputDelete,
                 KeyCode::Enter => Action::InputChar('\n'),
-                KeyCode::Left => Action::CursorLeft,
-                KeyCode::Right => Action::CursorRight,
-                KeyCode::Up => Action::CursorUp,
-                KeyCode::Down => Action::CursorDown,
+                KeyCode::Left => Action::SelectPrevContext,
+                KeyCode::Right => Action::SelectNextContext,
+                KeyCode::Up => Action::ScrollUp(SCROLL_ARROW_AMOUNT),
+                KeyCode::Down => Action::ScrollDown(SCROLL_ARROW_AMOUNT),
                 KeyCode::Home => Action::CursorHome,
                 KeyCode::End => Action::CursorEnd,
                 KeyCode::PageUp => Action::ScrollUp(SCROLL_PAGE_AMOUNT),

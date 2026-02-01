@@ -1,0 +1,91 @@
+use ratatui::prelude::*;
+
+use super::{ContextItem, Panel};
+use crate::state::{estimate_tokens, ContextType, State};
+use crate::tools::generate_tree_string;
+use crate::ui::{theme, helpers::*};
+
+pub struct TreePanel;
+
+impl Panel for TreePanel {
+    fn title(&self, _state: &State) -> String {
+        "Directory Tree".to_string()
+    }
+
+    fn refresh(&self, state: &mut State) {
+        let tree_content = generate_tree_string(
+            &state.tree_filter,
+            &state.tree_open_folders,
+            &state.tree_descriptions,
+        );
+        let token_count = estimate_tokens(&tree_content);
+
+        for ctx in &mut state.context {
+            if ctx.context_type == ContextType::Tree {
+                ctx.token_count = token_count;
+                break;
+            }
+        }
+    }
+
+    fn context(&self, state: &State) -> Vec<ContextItem> {
+        let tree_content = generate_tree_string(
+            &state.tree_filter,
+            &state.tree_open_folders,
+            &state.tree_descriptions,
+        );
+
+        if tree_content.is_empty() {
+            Vec::new()
+        } else {
+            vec![ContextItem::new("Directory Tree", tree_content)]
+        }
+    }
+
+    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
+        let tree_content = generate_tree_string(
+            &state.tree_filter,
+            &state.tree_open_folders,
+            &state.tree_descriptions,
+        );
+
+        let mut text: Vec<Line> = Vec::new();
+        for line in tree_content.lines() {
+            let mut spans: Vec<Span> = Vec::new();
+            spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::TEXT)));
+
+            // Check for description (after " - ")
+            let (main_line, description) = if let Some(desc_idx) = line.find(" - ") {
+                (&line[..desc_idx], Some(&line[desc_idx..]))
+            } else {
+                (line, None)
+            };
+
+            // Parse the main part
+            if let Some(size_start) = find_size_pattern(main_line) {
+                let (before_size, size_part) = main_line.split_at(size_start);
+                spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::TEXT)));
+                spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::ACCENT_DIM)));
+            } else if let Some((start, end)) = find_children_pattern(main_line) {
+                let before = &main_line[..start];
+                let children_part = &main_line[start..end];
+                let after = &main_line[end..];
+                spans.push(Span::styled(before.to_string(), Style::default().fg(theme::TEXT)));
+                spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::ACCENT)));
+                if !after.is_empty() {
+                    spans.push(Span::styled(after.to_string(), Style::default().fg(theme::TEXT)));
+                }
+            } else {
+                spans.push(Span::styled(main_line.to_string(), Style::default().fg(theme::TEXT)));
+            }
+
+            if let Some(desc) = description {
+                spans.push(Span::styled(desc.to_string(), Style::default().fg(theme::TEXT_MUTED)));
+            }
+
+            text.push(Line::from(spans));
+        }
+
+        text
+    }
+}

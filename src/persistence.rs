@@ -90,6 +90,7 @@ pub fn load_state() -> State {
                 next_memory_id: persisted.next_memory_id,
                 tools: merge_tools(persisted.tools),
                 is_cleaning_context: false,
+                dirty: true,
             };
         }
     }

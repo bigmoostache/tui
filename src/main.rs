@@ -7,6 +7,7 @@ mod core;
 mod events;
 mod highlight;
 mod mouse;
+mod panels;
 mod persistence;
 mod state;
 mod tool_defs;

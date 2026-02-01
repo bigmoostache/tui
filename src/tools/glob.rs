@@ -100,33 +100,3 @@ pub fn compute_glob_results(pattern: &str, search_path: &str) -> (String, usize)
 
     (output, count)
 }
-
-/// Refresh all glob context elements (recompute results and token counts)
-pub fn refresh_glob_results(state: &mut State) {
-    for ctx in &mut state.context {
-        if ctx.context_type != ContextType::Glob {
-            continue;
-        }
-
-        let Some(pattern) = &ctx.glob_pattern else { continue };
-        let search_path = ctx.glob_path.as_deref().unwrap_or(".");
-
-        let (results, _) = compute_glob_results(pattern, search_path);
-        ctx.token_count = estimate_tokens(&results);
-    }
-}
-
-/// Get glob results for all glob context elements (for API context)
-pub fn get_glob_context(state: &State) -> Vec<(String, String)> {
-    state
-        .context
-        .iter()
-        .filter(|c| c.context_type == ContextType::Glob)
-        .filter_map(|c| {
-            let pattern = c.glob_pattern.as_ref()?;
-            let search_path = c.glob_path.as_deref().unwrap_or(".");
-            let (results, _) = compute_glob_results(pattern, search_path);
-            Some((format!("glob:{}", pattern), results))
-        })
-        .collect()
-}

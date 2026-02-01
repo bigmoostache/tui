@@ -159,35 +159,3 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
 
     (output, count)
 }
-
-/// Refresh all grep context elements (recompute results and token counts)
-pub fn refresh_grep_results(state: &mut State) {
-    for ctx in &mut state.context {
-        if ctx.context_type != ContextType::Grep {
-            continue;
-        }
-
-        let Some(pattern) = &ctx.grep_pattern else { continue };
-        let search_path = ctx.grep_path.as_deref().unwrap_or(".");
-        let file_pattern = ctx.grep_file_pattern.as_deref();
-
-        let (results, _) = compute_grep_results(pattern, search_path, file_pattern);
-        ctx.token_count = estimate_tokens(&results);
-    }
-}
-
-/// Get grep results for all grep context elements (for API context)
-pub fn get_grep_context(state: &State) -> Vec<(String, String)> {
-    state
-        .context
-        .iter()
-        .filter(|c| c.context_type == ContextType::Grep)
-        .filter_map(|c| {
-            let pattern = c.grep_pattern.as_ref()?;
-            let search_path = c.grep_path.as_deref().unwrap_or(".");
-            let file_pattern = c.grep_file_pattern.as_deref();
-            let (results, _) = compute_grep_results(pattern, search_path, file_pattern);
-            Some((format!("grep:{}", pattern), results))
-        })
-        .collect()
-}

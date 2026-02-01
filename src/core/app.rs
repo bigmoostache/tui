@@ -64,8 +64,11 @@ impl App {
             self.finalize_stream(&tldr_tx, &clean_tx);
             self.update_mouse_capture()?;
 
-            // Render
-            terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+            // Only render when state has changed
+            if self.state.dirty {
+                terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                self.state.dirty = false;
+            }
 
             // Poll events
             if event::poll(Duration::from_millis(EVENT_POLL_MS))? {
@@ -88,6 +91,7 @@ impl App {
             if !self.state.is_streaming {
                 continue;
             }
+            self.state.dirty = true;
             match evt {
                 StreamEvent::Chunk(text) => {
                     self.typewriter.add_chunk(&text);
@@ -111,6 +115,7 @@ impl App {
         if self.state.is_streaming {
             if let Some(chars) = self.typewriter.take_chars() {
                 apply_action(&mut self.state, Action::AppendChars(chars));
+                self.state.dirty = true;
             }
         }
     }
@@ -147,6 +152,7 @@ impl App {
                 let _result = execute_tool(tool, &mut self.state);
             }
 
+            self.state.dirty = true;
             save_state(&self.state);
 
             let (_, usage_pct) = context_cleaner::calculate_context_usage(&self.state);
@@ -159,9 +165,7 @@ impl App {
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 self.cleaning_pending_done = None;
                 start_cleaning(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-                    ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-                    cleaner_tools, &self.state, clean_tx.clone(),
+                    ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                 );
             }
         }
@@ -178,6 +182,7 @@ impl App {
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
         while let Ok(tldr) = tldr_rx.try_recv() {
             self.state.pending_tldrs = self.state.pending_tldrs.saturating_sub(1);
+            self.state.dirty = true;
             if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
                 msg.tl_dr = Some(tldr.tl_dr);
                 msg.tl_dr_token_count = tldr.token_count;
@@ -191,6 +196,7 @@ impl App {
             return;
         }
 
+        self.state.dirty = true;
         let tools = std::mem::take(&mut self.pending_tools);
         let mut tool_results: Vec<ToolResult> = Vec::new();
 
@@ -287,9 +293,7 @@ impl App {
             let ctx = prepare_stream_context(&mut self.state, true);
             let cleaner_tools = context_cleaner::get_cleaner_tools();
             start_cleaning(
-                ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-                ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-                cleaner_tools, &self.state, clean_tx.clone(),
+                ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
             );
         }
 
@@ -298,9 +302,7 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
-            ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-            ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-            ctx.tools, None, tx.clone(),
+            ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
         );
     }
 
@@ -311,6 +313,7 @@ impl App {
 
         if let Some((input_tokens, output_tokens)) = self.pending_done {
             if self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
+                self.state.dirty = true;
                 match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens }) {
                     ActionResult::SaveMessage(id) => {
                         let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
@@ -342,9 +345,7 @@ impl App {
                     let ctx = prepare_stream_context(&mut self.state, true);
                     let cleaner_tools = context_cleaner::get_cleaner_tools();
                     start_cleaning(
-                        ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-                        ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-                        cleaner_tools, &self.state, clean_tx.clone(),
+                        ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                     );
                 }
             }
@@ -369,6 +370,8 @@ impl App {
         tldr_tx: &Sender<TlDrResult>,
         clean_tx: &Sender<StreamEvent>,
     ) {
+        // Any action triggers a re-render
+        self.state.dirty = true;
         match apply_action(&mut self.state, action) {
             ActionResult::StartStream => {
                 self.typewriter.reset();
@@ -383,9 +386,7 @@ impl App {
                 }
                 let ctx = prepare_stream_context(&mut self.state, false);
                 start_streaming(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-                    ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-                    ctx.tools, None, tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
                 );
                 save_state(&self.state);
             }
@@ -425,9 +426,7 @@ impl App {
                 let ctx = prepare_stream_context(&mut self.state, true);
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 start_cleaning(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
-                    ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
-                    cleaner_tools, &self.state, clean_tx.clone(),
+                    ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                 );
                 save_state(&self.state);
             }

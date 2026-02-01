@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::constants::icons;
-use crate::tool_defs::{ToolDefinition, get_all_tool_definitions, estimate_tools_tokens};
+use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -15,7 +15,6 @@ pub enum ContextType {
     Todo,
     Memory,
     Overview,
-    Tools,
 }
 
 impl ContextType {
@@ -26,8 +25,7 @@ impl ContextType {
             ContextType::Tree |
             ContextType::Todo |
             ContextType::Memory |
-            ContextType::Overview |
-            ContextType::Tools
+            ContextType::Overview
         )
     }
 
@@ -43,7 +41,6 @@ impl ContextType {
             ContextType::Todo => icons::CTX_TODO,
             ContextType::Memory => icons::CTX_MEMORY,
             ContextType::Overview => icons::CTX_OVERVIEW,
-            ContextType::Tools => icons::CTX_TOOLS,
         }
     }
 }
@@ -388,6 +385,8 @@ pub struct State {
     pub tools: Vec<ToolDefinition>,
     /// Whether context cleaning is in progress
     pub is_cleaning_context: bool,
+    /// Whether the UI needs to be redrawn
+    pub dirty: bool,
 }
 
 impl Default for State {
@@ -479,23 +478,6 @@ impl Default for State {
                     tmux_last_keys: None,
                     tmux_description: None,
                 },
-                ContextElement {
-                    id: "P6".to_string(),
-                    context_type: ContextType::Tools,
-                    name: "Tools".to_string(),
-                    token_count: estimate_tools_tokens(&get_all_tool_definitions()),
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                },
             ],
             messages: vec![],
             input: String::new(),
@@ -516,13 +498,14 @@ impl Default for State {
             next_assistant_id: 1,
             next_tool_id: 1,
             next_result_id: 1,
-            next_context_id: 7, // P1-P6 are defaults
+            next_context_id: 6, // P1-P5 are defaults
             todos: vec![],
             next_todo_id: 1,
             memories: vec![],
             next_memory_id: 1,
             tools: get_all_tool_definitions(),
             is_cleaning_context: false,
+            dirty: true, // Start dirty to ensure initial render
         }
     }
 }

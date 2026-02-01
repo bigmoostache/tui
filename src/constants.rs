@@ -183,7 +183,6 @@ pub mod icons {
 
     // Context panel types
     pub const CTX_CONVERSATION: &str = "💬";
-    pub const CTX_TOOLS: &str = "🪛";
     pub const CTX_TREE: &str = "📁";
     pub const CTX_TODO: &str = "✅";
     pub const CTX_MEMORY: &str = "🧠";

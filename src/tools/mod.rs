@@ -8,24 +8,18 @@ mod message_status;
 mod overview;
 mod tmux;
 mod todo;
-mod tree;
+pub mod tree;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::state::State;
+use crate::state::{estimate_tokens, ContextType, MessageStatus, State};
 
-// Re-export public items
-pub use file::{get_context_files, refresh_file_hashes};
-pub use glob::{compute_glob_results, get_glob_context, refresh_glob_results};
-pub use grep::{compute_grep_results, get_grep_context, refresh_grep_results};
-pub use memory::{get_memory_context, refresh_memory_context};
-pub use overview::{get_overview_context, refresh_overview_context};
-pub use tmux::{capture_pane_content, get_tmux_context, refresh_tmux_context};
-pub use todo::{get_todo_context, refresh_todo_context};
-pub use tree::generate_directory_tree;
-
-use crate::state::{estimate_tokens, ContextType, MessageStatus};
+// Re-export public items used by panels
+pub use glob::compute_glob_results;
+pub use grep::compute_grep_results;
+pub use tmux::capture_pane_content;
+pub use tree::{generate_directory_tree, generate_tree_string};
 
 /// Refresh token count for the Conversation context element
 pub fn refresh_conversation_context(state: &mut State) {
@@ -61,18 +55,6 @@ pub struct ToolResult {
     pub tool_use_id: String,
     pub content: String,
     pub is_error: bool,
-}
-
-/// Refresh the Tools context element's token count
-pub fn refresh_tools_context(state: &mut State) {
-    let token_count = crate::tool_defs::estimate_tools_tokens(&state.tools);
-
-    for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Tools {
-            ctx.token_count = token_count;
-            break;
-        }
-    }
 }
 
 /// Execute a tool and return the result

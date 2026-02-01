@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::constants::{MODEL_MAIN, MAX_RESPONSE_TOKENS, API_ENDPOINT, API_VERSION, prompts};
+use crate::panels::ContextItem;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::{ToolDefinition, build_api_tools};
 use crate::tools::{ToolResult, ToolUse};
@@ -80,64 +81,21 @@ struct StreamUsage {
     output_tokens: Option<usize>,
 }
 
-/// Converts our messages to API format, including file context and directory tree
+/// Converts our messages to API format, prepending context items to first user message
 /// If include_last_tool_uses is true, tool_use blocks from the last assistant message are included
 fn messages_to_api(
     messages: &[Message],
-    file_context: &[(String, String)],
-    glob_context: &[(String, String)],
-    grep_context: &[(String, String)],
-    tmux_context: &[(String, String)],
-    todo_context: &str,
-    memory_context: &str,
-    overview_context: &str,
-    directory_tree: &str,
+    context_items: &[ContextItem],
     include_last_tool_uses: bool,
 ) -> Vec<ApiMessage> {
     let mut api_messages: Vec<ApiMessage> = Vec::new();
 
-    // Build system context with tree, files, globs, tmux, and todos
-    let mut context_parts: Vec<String> = Vec::new();
-
-    // Add directory tree first
-    if !directory_tree.is_empty() {
-        context_parts.push(format!("=== Directory Tree ===\n{}\n=== End of Directory Tree ===", directory_tree));
-    }
-
-    // Add todo list
-    if !todo_context.is_empty() {
-        context_parts.push(format!("=== Todo List ===\n{}\n=== End of Todo List ===", todo_context));
-    }
-
-    // Add memories
-    if !memory_context.is_empty() && memory_context != "No memories" {
-        context_parts.push(format!("=== Memories ===\n{}\n=== End of Memories ===", memory_context));
-    }
-
-    // Add context overview (self-awareness of context usage)
-    if !overview_context.is_empty() {
-        context_parts.push(format!("=== Context Overview ===\n{}\n=== End of Context Overview ===", overview_context));
-    }
-
-    // Add open files
-    for (path, content) in file_context {
-        context_parts.push(format!("=== File: {} ===\n{}\n=== End of {} ===", path, content, path));
-    }
-
-    // Add glob results
-    for (name, results) in glob_context {
-        context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", name, results, name));
-    }
-
-    // Add grep results
-    for (name, results) in grep_context {
-        context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", name, results, name));
-    }
-
-    // Add tmux pane outputs
-    for (header, content) in tmux_context {
-        context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", header, content, header));
-    }
+    // Format all context items
+    let context_parts: Vec<String> = context_items
+        .iter()
+        .filter(|item| !item.content.is_empty() && item.content != "No memories" && item.content != "No todos")
+        .map(|item| item.format())
+        .collect();
 
     for (idx, msg) in messages.iter().enumerate() {
         // Skip deleted messages entirely
@@ -184,10 +142,16 @@ fn messages_to_api(
 
             if has_matching_tool_result {
                 for tool_use in &msg.tool_uses {
+                    // Ensure input is always an object, never null
+                    let input = if tool_use.input.is_null() {
+                        Value::Object(serde_json::Map::new())
+                    } else {
+                        tool_use.input.clone()
+                    };
                     content_blocks.push(ContentBlock::ToolUse {
                         id: tool_use.id.clone(),
                         name: tool_use.name.clone(),
-                        input: tool_use.input.clone(),
+                        input,
                     });
                 }
 
@@ -234,10 +198,16 @@ fn messages_to_api(
             let is_last = idx == messages.len().saturating_sub(1);
             if msg.role == "assistant" && include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
                 for tool_use in &msg.tool_uses {
+                    // Ensure input is always an object, never null
+                    let input = if tool_use.input.is_null() {
+                        Value::Object(serde_json::Map::new())
+                    } else {
+                        tool_use.input.clone()
+                    };
                     content_blocks.push(ContentBlock::ToolUse {
                         id: tool_use.id.clone(),
                         name: tool_use.name.clone(),
-                        input: tool_use.input.clone(),
+                        input,
                     });
                 }
             }
@@ -257,20 +227,13 @@ fn messages_to_api(
 /// Start streaming with optional tool results to continue
 pub fn start_streaming(
     messages: Vec<Message>,
-    file_context: Vec<(String, String)>,
-    glob_context: Vec<(String, String)>,
-    grep_context: Vec<(String, String)>,
-    tmux_context: Vec<(String, String)>,
-    todo_context: String,
-    memory_context: String,
-    overview_context: String,
-    directory_tree: String,
+    context_items: Vec<ContextItem>,
     tools: Vec<ToolDefinition>,
     tool_results: Option<Vec<ToolResult>>,
     tx: Sender<StreamEvent>,
 ) {
     thread::spawn(move || {
-        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &grep_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, None, tool_results.as_deref(), &tx) {
+        if let Err(e) = stream_response(&messages, &context_items, &tools, None, tool_results.as_deref(), &tx) {
             let _ = tx.send(StreamEvent::Error(e));
         }
     });
@@ -279,14 +242,7 @@ pub fn start_streaming(
 /// Start context cleaning with specialized prompt and limited tools
 pub fn start_cleaning(
     messages: Vec<Message>,
-    file_context: Vec<(String, String)>,
-    glob_context: Vec<(String, String)>,
-    grep_context: Vec<(String, String)>,
-    tmux_context: Vec<(String, String)>,
-    todo_context: String,
-    memory_context: String,
-    overview_context: String,
-    directory_tree: String,
+    context_items: Vec<ContextItem>,
     tools: Vec<ToolDefinition>,
     state: &crate::state::State,
     tx: Sender<StreamEvent>,
@@ -295,7 +251,7 @@ pub fn start_cleaning(
     let system_prompt = crate::context_cleaner::get_cleaner_system_prompt().to_string();
 
     thread::spawn(move || {
-        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &grep_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, Some((&system_prompt, &cleaner_context)), None, &tx) {
+        if let Err(e) = stream_response(&messages, &context_items, &tools, Some((&system_prompt, &cleaner_context)), None, &tx) {
             let _ = tx.send(StreamEvent::Error(e));
         }
     });
@@ -303,14 +259,7 @@ pub fn start_cleaning(
 
 fn stream_response(
     messages: &[Message],
-    file_context: &[(String, String)],
-    glob_context: &[(String, String)],
-    grep_context: &[(String, String)],
-    tmux_context: &[(String, String)],
-    todo_context: &str,
-    memory_context: &str,
-    overview_context: &str,
-    directory_tree: &str,
+    context_items: &[ContextItem],
     tools: &[ToolDefinition],
     cleaner_prompt: Option<(&str, &str)>, // (system_prompt, cleaner_context)
     tool_results: Option<&[ToolResult]>,
@@ -324,7 +273,7 @@ fn stream_response(
 
     // Include tool_uses in last assistant message only if we're sending tool_results
     let include_tool_uses = tool_results.is_some();
-    let mut api_messages = messages_to_api(messages, file_context, glob_context, grep_context, tmux_context, todo_context, memory_context, overview_context, directory_tree, include_tool_uses);
+    let mut api_messages = messages_to_api(messages, context_items, include_tool_uses);
 
     // If we have tool results, add them
     if let Some(results) = tool_results {
@@ -432,7 +381,9 @@ fn stream_response(
                 }
                 "content_block_stop" => {
                     if let Some((id, name, input_json)) = current_tool.take() {
-                        let input: Value = serde_json::from_str(&input_json).unwrap_or(Value::Null);
+                        // Fallback to empty object {} (not null) - API requires input to be a valid dictionary
+                        let input: Value = serde_json::from_str(&input_json)
+                            .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
                         let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                     }
                 }

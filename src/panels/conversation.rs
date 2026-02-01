@@ -3,47 +3,38 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
+use super::{ContextItem, Panel};
 use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
-use super::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
+use crate::ui::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
 
-pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
-    let base_style = Style::default().bg(theme::BG_SURFACE);
+pub struct ConversationPanel;
 
-    // Add margin around the panel
-    let inner_area = Rect::new(
-        area.x + 1,
-        area.y,
-        area.width.saturating_sub(2),
-        area.height
-    );
+impl Panel for ConversationPanel {
+    // Conversations are sent to the API as messages, not as context items
+    fn context(&self, _state: &State) -> Vec<ContextItem> {
+        Vec::new()
+    }
+    fn title(&self, state: &State) -> String {
+        if state.is_streaming {
+            "Conversation *".to_string()
+        } else {
+            "Conversation".to_string()
+        }
+    }
 
-    // Panel with rounded border
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(ratatui::widgets::BorderType::Rounded)
-        .border_style(Style::default().fg(theme::BORDER))
-        .style(base_style)
-        .title(Span::styled(
-            if state.is_streaming { " Conversation ● " } else { " Conversation " },
-            Style::default().fg(theme::ACCENT).bold()
-        ))
-        .title_alignment(Alignment::Left);
+    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let mut text: Vec<Line<'static>> = Vec::new();
 
-    let content_area = block.inner(inner_area);
-    frame.render_widget(block, inner_area);
+        if state.messages.is_empty() {
+            text.push(Line::from(""));
+            text.push(Line::from(""));
+            text.push(Line::from(vec![
+                Span::styled("  Start a conversation by typing below".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+            ]));
+            return text;
+        }
 
-    // Build conversation content
-    let mut text: Vec<Line> = Vec::new();
-
-    if state.messages.is_empty() {
-        // Empty state
-        text.push(Line::from(""));
-        text.push(Line::from(""));
-        text.push(Line::from(vec![
-            Span::styled("  Start a conversation by typing below", Style::default().fg(theme::TEXT_MUTED).italic()),
-        ]));
-    } else {
         for msg in &state.messages {
             if msg.status == MessageStatus::Deleted {
                 continue;
@@ -65,7 +56,6 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
             // Handle tool call messages
             if msg.message_type == MessageType::ToolCall {
                 for tool_use in &msg.tool_uses {
-                    // Build params string
                     let params: Vec<String> = tool_use.input.as_object()
                         .map(|obj| {
                             obj.iter().map(|(k, v)| {
@@ -89,8 +79,8 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                     text.push(Line::from(vec![
                         Span::styled(format!("{} ", icons::MSG_TOOL_CALL), Style::default().fg(theme::SUCCESS)),
                         Span::styled(padded_id.clone(), Style::default().fg(theme::SUCCESS).bold()),
-                        Span::styled(" ", base_style),
-                        Span::styled(&tool_use.name, Style::default().fg(theme::TEXT)),
+                        Span::styled(" ".to_string(), base_style),
+                        Span::styled(tool_use.name.clone(), Style::default().fg(theme::TEXT)),
                         Span::styled(params_str, Style::default().fg(theme::TEXT_MUTED)),
                     ]));
                 }
@@ -107,9 +97,9 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                         (icons::MSG_TOOL_RESULT, theme::SUCCESS)
                     };
 
-                    // Prefix: "✓ Rx   " - same width as tool calls "⚙ Tx   "
-                    let prefix_width = 8; // "✓ " + 4-char ID + " "
-                    let wrap_width = content_area.width.saturating_sub(prefix_width as u16 + 2) as usize;
+                    let prefix_width = 8;
+                    // Using fixed wrap width since we don't have content_area here
+                    let wrap_width = 80;
 
                     let mut is_first = true;
                     for line in result.content.lines() {
@@ -126,7 +116,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                                 text.push(Line::from(vec![
                                     Span::styled(format!("{} ", status_icon), Style::default().fg(status_color)),
                                     Span::styled(padded_id.clone(), Style::default().fg(status_color).bold()),
-                                    Span::styled(" ", base_style),
+                                    Span::styled(" ".to_string(), base_style),
                                     Span::styled(wrapped_line, Style::default().fg(theme::TEXT_SECONDARY)),
                                 ]));
                                 is_first = false;
@@ -150,51 +140,41 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                 (icons::MSG_ASSISTANT, theme::ASSISTANT)
             };
 
-            // Status icon
             let status_icon = match msg.status {
                 MessageStatus::Full => icons::STATUS_FULL,
                 MessageStatus::Summarized => icons::STATUS_SUMMARIZED,
                 MessageStatus::Deleted => icons::STATUS_DELETED,
             };
 
-            // Message content
             let content = match msg.status {
                 MessageStatus::Summarized => msg.tl_dr.as_deref().unwrap_or(&msg.content),
                 _ => &msg.content,
             };
 
-            // Fixed-width padded ID (4 chars)
             let padded_id = format!("{:<4}", msg.id);
-
-            // Calculate available width for text (after icon + id + status + spaces)
             let prefix = format!("{} {}{} ", role_icon, padded_id, status_icon);
             let prefix_width = prefix.chars().count();
-            let text_width = content_area.width.saturating_sub(2) as usize; // -2 for margins
-            let wrap_width = text_width.saturating_sub(prefix_width);
+            let wrap_width = 80;
 
             if content.trim().is_empty() {
                 if msg.role == "assistant" && state.is_streaming && state.messages.last().map(|m| m.id.clone()) == Some(msg.id.clone()) {
-                    // Show thinking indicator
                     text.push(Line::from(vec![
                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
-                        Span::styled(" ", base_style),
-                        Span::styled("...", Style::default().fg(theme::TEXT_MUTED).italic()),
+                        Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                        Span::styled(" ".to_string(), base_style),
+                        Span::styled("...".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
                     ]));
                 } else {
                     text.push(Line::from(vec![
                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
+                        Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
                     ]));
                 }
             } else {
-                // Process each paragraph (split by newlines)
                 let mut is_first_line = true;
                 let is_assistant = msg.role == "assistant";
-
-                // For assistant messages, pre-process to find and format tables
                 let lines: Vec<&str> = content.lines().collect();
                 let mut i = 0;
 
@@ -202,7 +182,6 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                     let line = lines[i];
 
                     if line.is_empty() {
-                        // Empty line - just add indent
                         text.push(Line::from(vec![
                             Span::styled(" ".repeat(prefix_width), base_style),
                         ]));
@@ -210,11 +189,8 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                         continue;
                     }
 
-                    // For assistant messages, check for tables and parse markdown
                     if is_assistant {
-                        // Check if this is a table row
                         if line.trim().starts_with('|') && line.trim().ends_with('|') {
-                            // Collect all consecutive table rows
                             let mut table_lines: Vec<&str> = vec![line];
                             let mut j = i + 1;
                             while j < lines.len() {
@@ -227,15 +203,14 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                                 }
                             }
 
-                            // Render the table with aligned columns
                             let table_spans = render_markdown_table(&table_lines, base_style);
                             for (idx, row_spans) in table_spans.into_iter().enumerate() {
                                 if is_first_line && idx == 0 {
                                     let mut line_spans = vec![
                                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
-                                        Span::styled(" ", base_style),
+                                        Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                        Span::styled(" ".to_string(), base_style),
                                     ];
                                     line_spans.extend(row_spans);
                                     text.push(Line::from(line_spans));
@@ -253,15 +228,14 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                             continue;
                         }
 
-                        // Regular markdown line
                         let md_spans = parse_markdown_line(line, base_style);
 
                         if is_first_line {
                             let mut line_spans = vec![
                                 Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
-                                Span::styled(" ", base_style),
+                                Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                Span::styled(" ".to_string(), base_style),
                             ];
                             line_spans.extend(md_spans);
                             text.push(Line::from(line_spans));
@@ -274,7 +248,6 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                             text.push(Line::from(line_spans));
                         }
                     } else {
-                        // User messages: plain text with word wrap
                         let wrapped = wrap_text(line, wrap_width);
 
                         for line_text in wrapped.iter() {
@@ -282,8 +255,8 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                                 text.push(Line::from(vec![
                                     Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                    Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
-                                    Span::styled(" ", base_style),
+                                    Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                    Span::styled(" ".to_string(), base_style),
                                     Span::styled(line_text.clone(), Style::default().fg(theme::TEXT)),
                                 ]));
                                 is_first_line = false;
@@ -299,62 +272,89 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                 }
             }
 
-            // Status badge on separate line if present
             if msg.status == MessageStatus::Summarized {
                 text.push(Line::from(vec![
                     Span::styled(" ".repeat(prefix_width), base_style),
-                    Span::styled(" TL;DR ", Style::default().fg(theme::BG_BASE).bg(theme::WARNING)),
+                    Span::styled(" TL;DR ".to_string(), Style::default().fg(theme::BG_BASE).bg(theme::WARNING)),
                 ]));
             }
 
             text.push(Line::from(""));
         }
+
+        // Padding at end for scroll
+        for _ in 0..3 {
+            text.push(Line::from(""));
+        }
+
+        text
     }
 
-    // Padding at end for scroll
-    for _ in 0..3 {
-        text.push(Line::from(""));
-    }
+    /// Override render to add scrollbar and auto-scroll behavior
+    fn render(&self, frame: &mut Frame, state: &mut State, area: Rect) {
+        let base_style = Style::default().bg(theme::BG_SURFACE);
+        let title = self.title(state);
 
-    // Calculate scroll with wrapped line count
-    let viewport_width = content_area.width as usize;
-    let viewport_height = content_area.height as usize;
-    let content_height: usize = text.iter()
-        .map(|line| count_wrapped_lines(line, viewport_width))
-        .sum();
-
-    let max_scroll = content_height.saturating_sub(viewport_height) as f32;
-    state.max_scroll = max_scroll;
-
-    if state.user_scrolled && state.scroll_offset >= max_scroll - 0.5 {
-        state.user_scrolled = false;
-    }
-    if !state.user_scrolled {
-        state.scroll_offset = max_scroll;
-    }
-    state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
-
-    let paragraph = Paragraph::new(text)
-        .style(base_style)
-        .wrap(Wrap { trim: false })
-        .scroll((state.scroll_offset.round() as u16, 0));
-
-    frame.render_widget(paragraph, content_area);
-
-    // Scrollbar
-    if content_height > viewport_height {
-        let scrollbar = Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .style(Style::default().fg(theme::BG_ELEVATED))
-            .thumb_style(Style::default().fg(theme::ACCENT_DIM));
-
-        let mut scrollbar_state = ScrollbarState::new(max_scroll as usize)
-            .position(state.scroll_offset.round() as usize);
-
-        frame.render_stateful_widget(
-            scrollbar,
-            inner_area.inner(Margin { horizontal: 0, vertical: 1 }),
-            &mut scrollbar_state
+        let inner_area = Rect::new(
+            area.x + 1,
+            area.y,
+            area.width.saturating_sub(2),
+            area.height
         );
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(theme::BORDER))
+            .style(base_style)
+            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::ACCENT).bold()));
+
+        let content_area = block.inner(inner_area);
+        frame.render_widget(block, inner_area);
+
+        let text = self.content(state, base_style);
+
+        // Calculate scroll with wrapped line count
+        let viewport_width = content_area.width as usize;
+        let viewport_height = content_area.height as usize;
+        let content_height: usize = text.iter()
+            .map(|line| count_wrapped_lines(line, viewport_width))
+            .sum();
+
+        let max_scroll = content_height.saturating_sub(viewport_height) as f32;
+        state.max_scroll = max_scroll;
+
+        // Auto-scroll to bottom when not manually scrolled
+        if state.user_scrolled && state.scroll_offset >= max_scroll - 0.5 {
+            state.user_scrolled = false;
+        }
+        if !state.user_scrolled {
+            state.scroll_offset = max_scroll;
+        }
+        state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+
+        let paragraph = Paragraph::new(text)
+            .style(base_style)
+            .wrap(Wrap { trim: false })
+            .scroll((state.scroll_offset.round() as u16, 0));
+
+        frame.render_widget(paragraph, content_area);
+
+        // Scrollbar
+        if content_height > viewport_height {
+            let scrollbar = Scrollbar::default()
+                .orientation(ScrollbarOrientation::VerticalRight)
+                .style(Style::default().fg(theme::BG_ELEVATED))
+                .thumb_style(Style::default().fg(theme::ACCENT_DIM));
+
+            let mut scrollbar_state = ScrollbarState::new(max_scroll as usize)
+                .position(state.scroll_offset.round() as usize);
+
+            frame.render_stateful_widget(
+                scrollbar,
+                inner_area.inner(Margin { horizontal: 0, vertical: 1 }),
+                &mut scrollbar_state
+            );
+        }
     }
 }
