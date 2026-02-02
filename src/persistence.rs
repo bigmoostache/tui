@@ -5,6 +5,7 @@ use std::process;
 use crate::constants::{STORE_DIR, STATE_FILE, MESSAGES_DIR};
 use crate::state::{Message, PersistedState, State};
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
+use crate::tools::MANAGE_TOOLS_ID;
 
 /// Get current process PID
 fn current_pid() -> u32 {
@@ -43,7 +44,8 @@ pub fn delete_message(id: &str) {
 fn build_tools_from_disabled(disabled_tools: &[String]) -> Vec<ToolDefinition> {
     let mut tools = get_all_tool_definitions();
     for tool in &mut tools {
-        if disabled_tools.contains(&tool.id) {
+        // manage_tools can never be disabled
+        if tool.id != MANAGE_TOOLS_ID && disabled_tools.contains(&tool.id) {
             tool.enabled = false;
         }
     }

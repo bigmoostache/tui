@@ -77,6 +77,17 @@ impl Panel for OverviewPanel {
             output.push_str(&format!("Memories: {}\n", state.memories.len()));
         }
 
+        // Tools table (markdown format for LLM)
+        let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
+        let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
+        output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
+        output.push_str("| Tool | Status | Description |\n");
+        output.push_str("|------|--------|-------------|\n");
+        for tool in &state.tools {
+            let status = if tool.enabled { "✓" } else { "✗" };
+            output.push_str(&format!("| {} | {} | {} |\n", tool.id, status, tool.short_desc));
+        }
+
         vec![ContextItem::new("Context Overview", output)]
     }
 
@@ -239,6 +250,57 @@ impl Panel for OverviewPanel {
                 Span::styled("Memories: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
                 Span::styled(format!("{}", total_memories), Style::default().fg(theme::TEXT).bold()),
                 Span::styled(format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low), Style::default().fg(theme::TEXT_MUTED)),
+            ]));
+        }
+
+        text.push(Line::from(""));
+        text.push(Line::from(vec![
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+        ]));
+        text.push(Line::from(""));
+
+        // Tools section
+        let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
+        let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
+
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled("TOOLS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled(format!("  ({} enabled, {} disabled)", enabled_count, disabled_count), Style::default().fg(theme::TEXT_MUTED)),
+        ]));
+        text.push(Line::from(""));
+
+        // Table header
+        let name_width = state.tools.iter().map(|t| t.id.len()).max().unwrap_or(10).max(10);
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            Span::styled("  ", base_style),
+            Span::styled("  ", base_style),
+            Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+        ]));
+
+        // Table separator
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled(format!("{}", chars::HORIZONTAL.repeat(name_width + 40)), Style::default().fg(theme::BORDER)),
+        ]));
+
+        // Table rows
+        for tool in &state.tools {
+            let (status_icon, status_color) = if tool.enabled {
+                ("✓", theme::SUCCESS)
+            } else {
+                ("✗", Color::Rgb(200, 80, 80)) // Red for disabled
+            };
+
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::TEXT)),
+                Span::styled("  ", base_style),
+                Span::styled(status_icon, Style::default().fg(status_color)),
+                Span::styled("  ", base_style),
+                Span::styled(tool.short_desc.clone(), Style::default().fg(theme::TEXT_MUTED)),
             ]));
         }
 

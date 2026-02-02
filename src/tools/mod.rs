@@ -1,14 +1,18 @@
 mod close_context;
+mod create;
 mod edit_file;
 mod file;
 mod glob;
 mod grep;
+mod manage_tools;
 mod memory;
 mod message_status;
 mod overview;
 mod tmux;
 mod todo;
 pub mod tree;
+
+pub use manage_tools::MANAGE_TOOLS_ID;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -61,6 +65,8 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "open_file" => file::execute_open(tool, state),
         "edit_file" => edit_file::execute_edit(tool, state),
         "create_file" => edit_file::execute_create(tool, state),
+        "create" => create::execute(tool, state),
+        "manage_tools" => manage_tools::execute(tool, state),
         "close_contexts" => close_context::execute(tool, state),
         "edit_tree_filter" => tree::execute_edit_filter(tool, state),
         "tree_toggle_folders" => tree::execute_toggle_folders(tool, state),

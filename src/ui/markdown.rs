@@ -1,6 +1,82 @@
 use ratatui::prelude::*;
 use super::theme;
 
+/// Calculate the display width of text after stripping markdown markers
+fn markdown_display_width(text: &str) -> usize {
+    let mut width = 0;
+    let mut chars = text.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '`' => {
+                // Skip to closing backtick, count content
+                while let Some(&next) = chars.peek() {
+                    if next == '`' {
+                        chars.next();
+                        break;
+                    }
+                    width += 1;
+                    chars.next();
+                }
+            }
+            '*' | '_' => {
+                // Check for double (bold) or single (italic)
+                if chars.peek() == Some(&c) {
+                    chars.next(); // consume second marker
+                    // Count until closing **
+                    while let Some(next) = chars.next() {
+                        if next == c && chars.peek() == Some(&c) {
+                            chars.next();
+                            break;
+                        }
+                        width += 1;
+                    }
+                } else {
+                    // Single marker (italic) - count until closing
+                    while let Some(next) = chars.next() {
+                        if next == c {
+                            break;
+                        }
+                        width += 1;
+                    }
+                }
+            }
+            '[' => {
+                // Link [text](url) - only count the text part
+                let mut link_text_len = 0;
+                let mut found_bracket = false;
+                while let Some(next) = chars.next() {
+                    if next == ']' {
+                        found_bracket = true;
+                        break;
+                    }
+                    link_text_len += 1;
+                }
+                if found_bracket && chars.peek() == Some(&'(') {
+                    chars.next(); // consume (
+                    while let Some(next) = chars.next() {
+                        if next == ')' {
+                            break;
+                        }
+                    }
+                    width += link_text_len;
+                } else {
+                    // Not a valid link
+                    width += 1 + link_text_len;
+                    if found_bracket {
+                        width += 1;
+                    }
+                }
+            }
+            _ => {
+                width += 1;
+            }
+        }
+    }
+
+    width
+}
+
 /// Render a markdown table with aligned columns
 pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
@@ -22,7 +98,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
         rows.push(cells);
     }
 
-    // Calculate max width for each column
+    // Calculate max width for each column (using display width, not raw length)
     let num_cols = rows.iter().map(|r| r.len()).max().unwrap_or(0);
     let mut col_widths: Vec<usize> = vec![0; num_cols];
 
@@ -32,7 +108,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
         }
         for (col, cell) in row.iter().enumerate() {
             if col < col_widths.len() {
-                col_widths[col] = col_widths[col].max(cell.chars().count());
+                col_widths[col] = col_widths[col].max(markdown_display_width(cell));
             }
         }
     }
@@ -62,15 +138,22 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
                 }
 
                 let cell = row.get(col).map(|s| s.as_str()).unwrap_or("");
-                let padded = format!("{:<width$}", cell, width = width);
+                let display_width = markdown_display_width(cell);
+                let padding_needed = width.saturating_sub(display_width);
 
-                let style = if is_header {
-                    Style::default().fg(theme::ACCENT).bold()
+                if is_header {
+                    // Headers: bold, no inline markdown parsing
+                    spans.push(Span::styled(cell.to_string(), Style::default().fg(theme::ACCENT).bold()));
                 } else {
-                    Style::default().fg(theme::TEXT)
-                };
+                    // Data cells: parse inline markdown
+                    let cell_spans = parse_inline_markdown(cell);
+                    spans.extend(cell_spans);
+                }
 
-                spans.push(Span::styled(padded, style));
+                // Add padding
+                if padding_needed > 0 {
+                    spans.push(Span::styled(" ".repeat(padding_needed), Style::default()));
+                }
             }
             result.push(spans);
         }

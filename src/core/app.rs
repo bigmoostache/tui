@@ -5,7 +5,7 @@ use std::time::Duration;
 use crossterm::event;
 use ratatui::prelude::*;
 
-use crate::actions::{apply_action, Action, ActionResult};
+use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
@@ -257,6 +257,8 @@ impl App {
         // Finalize current assistant message
         if let Some(msg) = self.state.messages.last_mut() {
             if msg.role == "assistant" {
+                // Clean any LLM ID prefixes before saving
+                msg.content = clean_llm_id_prefix(&msg.content);
                 save_message(msg);
                 if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
                     self.state.pending_tldrs += 1;

@@ -699,7 +699,7 @@ You are a senior code reviewer...
 ### Extension Settings
 
 | Setting | Description |
-|---------|-------------|
+|---------|-------  ------|
 | `claudeCode.autoConnect` | Auto-connect to IDE |
 | `claudeCode.disableLoginPrompt` | Skip login prompts |
 | `claudeCode.contextWindow` | Context sharing mode |

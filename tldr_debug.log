@@ -556,3 +556,182 @@ Send result: true
 Token count: 2
 Using content directly (short message)
 Send result: true
+Token count: 37
+Calling LLM for summary...
+Got summary: The message describes testing a multi-edit scenari
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 83
+Calling LLM for summary...
+Got summary: The message explains that file edits are applied s
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 65
+Calling LLM for summary...
+Got summary: The user discovered that when multiple edits are m
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 99
+Calling LLM for summary...
+Got summary: A single `create` tool call generated a test folde
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 14
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 32
+Calling LLM for summary...
+Got summary: The user discovered that a file operation worked w
+Send result: true
+Token count: 57
+Calling LLM for summary...
+Got summary: The user realized the file was already open (added
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 58
+Calling LLM for summary...
+Got summary: The tests/ folder was successfully deleted. The us
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 22
+Using content directly (short message)
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 52
+Calling LLM for summary...
+Got summary: Four tools (create/update memories and create/upda
+Send result: true
+Token count: 14
+Using content directly (short message)
+Send result: true
+Token count: 32
+Calling LLM for summary...
+Got summary: The `manage_tools` function cannot be disabled, wh
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 395
+Calling LLM for summary...
+Got summary: **tenx** is a Rust-based CLI coding assistant that
+Send result: true
+Token count: 37
+Calling LLM for summary...
+Got summary: **Summary:** The user is asking to actually read a
+Send result: true
+Token count: 36
+Calling LLM for summary...
+Got summary: The user notes that memory tools aren't available 
+Send result: true
+Token count: 14
+Using content directly (short message)
+Send result: true
+Token count: 21
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 99
+Calling LLM for summary...
+Got summary: The user examined the project's directory structur
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 75
+Calling LLM for summary...
+Got summary: The message examines a project's directory structu
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The speaker plans to thoroughly investigate a proj
+Send result: true
+Token count: 574
+Calling LLM for summary...
+Got summary: Context Pilot is a Rust-based terminal UI coding a
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 584
+Calling LLM for summary...
+Got summary: The message describes a Rust application's archite
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 115
+Calling LLM for summary...
+Got summary: The assistant received an empty message and is ask
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 362
+Calling LLM for summary...
+Got summary: The assistant describes desired capabilities: term
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 39
+Calling LLM for summary...
+Got summary: The user has Context Pilot (a Rust TUI for Claude)
+Send result: true

@@ -4,11 +4,18 @@ use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
 
-/// Remove LLM's mistaken ID prefixes like "[A84]: " from the start of responses
-fn clean_llm_id_prefix(content: &str) -> String {
-    // Pattern: one or more [A##]: or [A###]: at the start, with optional whitespace
-    let re = Regex::new(r"^(\s*\[A\d+\]:\s*)+").unwrap();
-    re.replace(content, "").to_string()
+/// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
+pub fn clean_llm_id_prefix(content: &str) -> String {
+    // First trim leading whitespace
+    let trimmed = content.trim_start();
+
+    // Pattern: one or more [A##]: or [A###]: at the start, with optional whitespace between
+    let re = Regex::new(r"^(\[A\d+\]:\s*)+").unwrap();
+    let cleaned = re.replace(trimmed, "").to_string();
+
+    // Also clean any [Axx]: that appears at the start of lines (multiline responses)
+    let re_multiline = Regex::new(r"(?m)^\[A\d+\]:\s*").unwrap();
+    re_multiline.replace_all(&cleaned, "").to_string()
 }
 
 /// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1

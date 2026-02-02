@@ -206,6 +206,29 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::FileSystem,
         },
         ToolDefinition {
+            id: "create".to_string(),
+            name: "Batch Create".to_string(),
+            short_desc: "Create files/folders".to_string(),
+            description: "Creates multiple files and/or folders in one call. Fails for items that already exist. Parent directories are created automatically.".to_string(),
+            params: vec![
+                ToolParam::new("items", ParamType::Array(Box::new(ParamType::Object(vec![
+                    ToolParam::new("type", ParamType::String)
+                        .desc("Item type: 'file' or 'folder'")
+                        .enum_vals(&["file", "folder"])
+                        .required(),
+                    ToolParam::new("path", ParamType::String)
+                        .desc("Path to create")
+                        .required(),
+                    ToolParam::new("content", ParamType::String)
+                        .desc("File content (only for type='file', optional)"),
+                ]))))
+                    .desc("Array of items to create")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::FileSystem,
+        },
+        ToolDefinition {
             id: "glob".to_string(),
             name: "Glob Search".to_string(),
             short_desc: "Find files by pattern".to_string(),
@@ -484,6 +507,29 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             ],
             enabled: true,
             category: ToolCategory::Memory,
+        },
+
+        // Meta tools
+        ToolDefinition {
+            id: "manage_tools".to_string(),
+            name: "Manage Tools".to_string(),
+            short_desc: "Enable/disable tools".to_string(),
+            description: "Enables or disables tools. This tool cannot be disabled. Use to customize available capabilities.".to_string(),
+            params: vec![
+                ToolParam::new("changes", ParamType::Array(Box::new(ParamType::Object(vec![
+                    ToolParam::new("tool", ParamType::String)
+                        .desc("Tool ID to change (e.g., 'edit_file', 'glob')")
+                        .required(),
+                    ToolParam::new("action", ParamType::String)
+                        .desc("Action to perform")
+                        .enum_vals(&["enable", "disable"])
+                        .required(),
+                ]))))
+                    .desc("Array of tool changes")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Context,
         },
     ]
 }
