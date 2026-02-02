@@ -833,3 +833,5 @@ Got summary: The user is working on implementing a tool to togg
 Send result: true
 Token count: 35
 Calling LLM for summary...
+Got summary: The grep search returned no matches, and the glob 
+Send result: true
