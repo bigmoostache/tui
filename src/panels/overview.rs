@@ -114,11 +114,11 @@ impl Panel for OverviewPanel {
         let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
         let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
         output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
-        output.push_str("| Tool | Status | Description |\n");
-        output.push_str("|------|--------|-------------|\n");
+        output.push_str("| Category | Tool | Status | Description |\n");
+        output.push_str("|----------|------|--------|-------------|\n");
         for tool in &state.tools {
             let status = if tool.enabled { "✓" } else { "✗" };
-            output.push_str(&format!("| {} | {} | {} |\n", tool.id, status, tool.short_desc));
+            output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category.short_name(), tool.id, status, tool.short_desc));
         }
 
         vec![ContextItem::new("Context Overview", output)]
@@ -455,9 +455,12 @@ impl Panel for OverviewPanel {
         text.push(Line::from(""));
 
         // Table header
+        let cat_width = 8;
         let name_width = state.tools.iter().map(|t| t.id.len()).max().unwrap_or(10).max(10);
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
+            Span::styled(format!("{:<width$}", "Category", width = cat_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            Span::styled("  ", base_style),
             Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
             Span::styled("  ", base_style),
             Span::styled("  ", base_style),
@@ -467,7 +470,7 @@ impl Panel for OverviewPanel {
         // Table separator
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled(format!("{}", chars::HORIZONTAL.repeat(name_width + 40)), Style::default().fg(theme::BORDER)),
+            Span::styled(format!("{}", chars::HORIZONTAL.repeat(cat_width + name_width + 44)), Style::default().fg(theme::BORDER)),
         ]));
 
         // Table rows
@@ -480,6 +483,8 @@ impl Panel for OverviewPanel {
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{:<width$}", tool.category.short_name(), width = cat_width), Style::default().fg(theme::ACCENT_DIM)),
+                Span::styled("  ", base_style),
                 Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::TEXT)),
                 Span::styled("  ", base_style),
                 Span::styled(status_icon, Style::default().fg(status_color)),

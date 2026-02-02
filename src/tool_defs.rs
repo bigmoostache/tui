@@ -150,6 +150,20 @@ pub enum ToolCategory {
     Git,
 }
 
+impl ToolCategory {
+    /// Short display name for the category
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            ToolCategory::FileSystem => "Files",
+            ToolCategory::Context => "Context",
+            ToolCategory::Tmux => "Tmux",
+            ToolCategory::Tasks => "Tasks",
+            ToolCategory::Memory => "Memory",
+            ToolCategory::Git => "Git",
+        }
+    }
+}
+
 /// Get all available tool definitions
 pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
     vec![
