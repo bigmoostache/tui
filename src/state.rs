@@ -15,6 +15,7 @@ pub enum ContextType {
     Todo,
     Memory,
     Overview,
+    Git,
 }
 
 impl ContextType {
@@ -25,7 +26,8 @@ impl ContextType {
             ContextType::Tree |
             ContextType::Todo |
             ContextType::Memory |
-            ContextType::Overview
+            ContextType::Overview |
+            ContextType::Git
         )
     }
 
@@ -41,6 +43,7 @@ impl ContextType {
             ContextType::Todo => icons::CTX_TODO,
             ContextType::Memory => icons::CTX_MEMORY,
             ContextType::Overview => icons::CTX_OVERVIEW,
+            ContextType::Git => icons::CTX_GIT,
         }
     }
 
@@ -439,6 +442,8 @@ pub struct GitFileChange {
     pub deletions: i32,
     /// Type of change
     pub change_type: GitChangeType,
+    /// Diff content for this file (unified diff format)
+    pub diff_content: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -562,6 +567,27 @@ impl Default for State {
                     last_refresh_ms: 0,
                     tmux_last_lines_hash: None,
                 },
+                ContextElement {
+                    id: "P6".to_string(),
+                    context_type: ContextType::Git,
+                    name: "Git".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
+                },
             ],
             messages: vec![],
             input: String::new(),
@@ -607,8 +633,8 @@ impl State {
             .filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok()))
             .collect();
 
-        // Find first available starting from 6 (P1-P5 are fixed defaults)
-        let id = (6..).find(|n| !used_ids.contains(n)).unwrap_or(6);
+        // Find first available starting from 7 (P1-P6 are fixed defaults)
+        let id = (7..).find(|n| !used_ids.contains(n)).unwrap_or(7);
         format!("P{}", id)
     }
 }

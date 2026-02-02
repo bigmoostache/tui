@@ -1,7 +1,7 @@
 use regex::Regex;
 
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
-use crate::persistence::{delete_message, save_message};
+use crate::persistence::{delete_message, log_error, save_message};
 use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
 
 /// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
@@ -384,9 +384,12 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             state.streaming_estimated_tokens = 0;
 
+            // Log error to file
+            let error_file = log_error(&e);
+
             if let Some(msg) = state.messages.last_mut() {
                 if msg.role == "assistant" {
-                    msg.content = format!("[Error: {}]", e);
+                    msg.content = format!("[Error occurred. See details in {}]", error_file);
                     let id = msg.id.clone();
                     return ActionResult::SaveMessage(id);
                 }

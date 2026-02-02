@@ -735,3 +735,101 @@ Token count: 39
 Calling LLM for summary...
 Got summary: The user has Context Pilot (a Rust TUI for Claude)
 Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 228
+Calling LLM for summary...
+Got summary: The user has a `git_commit` tool for staging files
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 43
+Calling LLM for summary...
+Got summary: The user clarifies that P6 is actually the `Cargo.
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 225
+Calling LLM for summary...
+Got summary: The user confirms they have git status info in P5 
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 52
+Calling LLM for summary...
+Got summary: The assistant committed changes (ffaf8d5) but excl
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 117
+Calling LLM for summary...
+Got summary: The git status overview updated successfully after
+Send result: true
+Token count: 23
+Using content directly (short message)
+Send result: true
+Token count: 254
+Calling LLM for summary...
+Got summary: The user prioritizes 4 git tools: (1) `git_diff` t
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 44
+Calling LLM for summary...
+Got summary: The sender notes the previous message was cut off 
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The user found that some contexts were already clo
+Send result: true
+Token count: 46
+Calling LLM for summary...
+Got summary: The user closed all remaining open files, leaving 
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 23
+Using content directly (short message)
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 78
+Calling LLM for summary...
+Got summary: You're working on a TUI project on the `clickable`
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 334
+Calling LLM for summary...
+Got summary: A Rust TUI project "Context Pilot" (Claude termina
+Send result: true
+Token count: 20
+Using content directly (short message)
+Send result: true
+Token count: 44
+Calling LLM for summary...
+Got summary: The user is working on implementing a tool to togg
+Send result: true
+Token count: 35
+Calling LLM for summary...

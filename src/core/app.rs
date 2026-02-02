@@ -644,18 +644,36 @@ impl App {
                     is_repo,
                     file_changes,
                 } => {
-                    use crate::state::GitFileChange;
+                    use crate::state::{GitFileChange, ContextType};
                     self.state.git_branch = branch;
                     self.state.git_is_repo = is_repo;
                     self.state.git_file_changes = file_changes.into_iter()
-                        .map(|(path, additions, deletions, change_type)| GitFileChange {
+                        .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
                             path,
                             additions,
                             deletions,
                             change_type,
+                            diff_content,
                         })
                         .collect();
                     self.state.git_last_refresh_ms = now_ms();
+
+                    // Calculate and update token count for Git panel
+                    // Count chars from all diff content plus overhead for table/formatting
+                    let mut total_chars: usize = 200; // Base overhead for branch, table headers
+                    for file in &self.state.git_file_changes {
+                        total_chars += file.path.len() + 50; // Table row overhead
+                        total_chars += file.diff_content.len();
+                    }
+                    // estimate_tokens uses ~4 chars per token
+                    let token_count = (total_chars + 3) / 4;
+
+                    for ctx in &mut self.state.context {
+                        if ctx.context_type == ContextType::Git {
+                            ctx.token_count = token_count;
+                            break;
+                        }
+                    }
                 }
             }
         }

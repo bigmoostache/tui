@@ -45,6 +45,7 @@ impl Panel for OverviewPanel {
                 ContextType::Todo => "todo",
                 ContextType::Memory => "memory",
                 ContextType::Overview => "overview",
+                ContextType::Git => "git",
             };
 
             let details = match ctx.context_type {
@@ -217,7 +218,7 @@ impl Panel for OverviewPanel {
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::SUCCESS).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", "-"), Style::default().fg(Color::Rgb(200, 80, 80)).bold()),
+                    Span::styled(format!("{:>6}", "-"), Style::default().fg(theme::ERROR).bold()),
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::TEXT_SECONDARY).bold()),
                 ]));
@@ -242,7 +243,7 @@ impl Panel for OverviewPanel {
                     // Type indicator
                     let (type_char, type_color) = match file.change_type {
                         GitChangeType::Added => ("A", theme::SUCCESS),
-                        GitChangeType::Deleted => ("D", Color::Rgb(200, 80, 80)),
+                        GitChangeType::Deleted => ("D", theme::ERROR),
                         GitChangeType::Modified => ("M", theme::WARNING),
                         GitChangeType::Renamed => ("R", theme::ACCENT),
                     };
@@ -258,7 +259,7 @@ impl Panel for OverviewPanel {
                     let net_color = if net > 0 {
                         theme::SUCCESS
                     } else if net < 0 {
-                        Color::Rgb(200, 80, 80)
+                        theme::ERROR
                     } else {
                         theme::TEXT_MUTED
                     };
@@ -276,7 +277,7 @@ impl Panel for OverviewPanel {
                         Span::styled("  ", base_style),
                         Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::SUCCESS)),
                         Span::styled("  ", base_style),
-                        Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(Color::Rgb(200, 80, 80))),
+                        Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(theme::ERROR)),
                         Span::styled("  ", base_style),
                         Span::styled(format!("{:>6}", net_str), Style::default().fg(net_color)),
                     ]));
@@ -293,7 +294,7 @@ impl Panel for OverviewPanel {
                 let total_net_color = if total_net > 0 {
                     theme::SUCCESS
                 } else if total_net < 0 {
-                    Color::Rgb(200, 80, 80)
+                    theme::ERROR
                 } else {
                     theme::TEXT_MUTED
                 };
@@ -309,7 +310,7 @@ impl Panel for OverviewPanel {
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::SUCCESS).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(Color::Rgb(200, 80, 80)).bold()),
+                    Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(theme::ERROR).bold()),
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:>6}", total_net_str), Style::default().fg(total_net_color).bold()),
                 ]));
@@ -343,6 +344,7 @@ impl Panel for OverviewPanel {
                 ContextType::Todo => "todo",
                 ContextType::Memory => "memory",
                 ContextType::Overview => "overview",
+                ContextType::Git => "git",
             };
 
             let details = match ctx.context_type {
@@ -473,7 +475,7 @@ impl Panel for OverviewPanel {
             let (status_icon, status_color) = if tool.enabled {
                 ("✓", theme::SUCCESS)
             } else {
-                ("✗", Color::Rgb(200, 80, 80)) // Red for disabled
+                ("✗", theme::ERROR) // Red for disabled
             };
 
             text.push(Line::from(vec![

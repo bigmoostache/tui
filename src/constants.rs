@@ -142,6 +142,7 @@ pub mod theme {
     pub const ACCENT_DIM: Color = Color::Rgb(178, 98, 69);     // Dimmed warm orange
     pub const SUCCESS: Color = Color::Rgb(134, 188, 111);      // Soft green
     pub const WARNING: Color = Color::Rgb(229, 192, 123);      // Warm amber
+    pub const ERROR: Color = Color::Rgb(200, 80, 80);          // Soft red for errors/deletions
 
     // Text colors
     pub const TEXT: Color = Color::Rgb(240, 240, 240);         // #f0f0f0 - primary text
@@ -196,6 +197,7 @@ pub mod icons {
     pub const CTX_GLOB: &str = "🔍";
     pub const CTX_GREP: &str = "🔎";
     pub const CTX_TMUX: &str = "🎮";
+    pub const CTX_GIT: &str = "🔀";
 
     // Message status
     pub const STATUS_FULL: &str = "●";

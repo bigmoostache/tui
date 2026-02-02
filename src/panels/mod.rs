@@ -18,6 +18,7 @@
 
 mod conversation;
 mod file;
+mod git;
 mod glob;
 mod grep;
 mod memory;
@@ -50,6 +51,7 @@ pub fn now_ms() -> u64 {
 // Re-export panels
 pub use conversation::ConversationPanel;
 pub use file::FilePanel;
+pub use git::GitPanel;
 pub use glob::GlobPanel;
 pub use grep::GrepPanel;
 pub use memory::MemoryPanel;
@@ -161,6 +163,7 @@ pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
         ContextType::Todo => Box::new(TodoPanel),
         ContextType::Memory => Box::new(MemoryPanel),
         ContextType::Overview => Box::new(OverviewPanel),
+        ContextType::Git => Box::new(GitPanel),
     }
 }
 

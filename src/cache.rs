@@ -51,7 +51,8 @@ pub enum CacheUpdate {
     GitStatus {
         branch: Option<String>,
         is_repo: bool,
-        file_changes: Vec<(String, i32, i32, crate::state::GitChangeType)>,
+        /// (path, additions, deletions, change_type, diff_content)
+        file_changes: Vec<(String, i32, i32, crate::state::GitChangeType, String)>,
     },
 }
 
@@ -384,9 +385,58 @@ fn refresh_git_status(tx: Sender<CacheUpdate>) {
         }
     }
 
+    // Fetch diff content for each file
+    let mut diff_contents: HashMap<String, String> = HashMap::new();
+
+    // Get combined diff (staged + unstaged)
+    if let Ok(output) = Command::new("git").args(["diff", "HEAD"]).output() {
+        if output.status.success() {
+            let diff_output = String::from_utf8_lossy(&output.stdout);
+            parse_diff_by_file(&diff_output, &mut diff_contents);
+        }
+    }
+
+    // For untracked files, create a pseudo-diff showing all lines as additions
+    for (path, (_, _, ct)) in &file_changes {
+        if *ct == GitChangeType::Added && !diff_contents.contains_key(path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                pseudo_diff.push_str("new file\n");
+                pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
+                pseudo_diff.push_str("@@ -0,0 +1 @@\n");
+                for line in content.lines() {
+                    pseudo_diff.push_str(&format!("+{}\n", line));
+                }
+                diff_contents.insert(path.clone(), pseudo_diff);
+            }
+        }
+    }
+
+    // For deleted files, create a pseudo-diff showing all lines as deletions
+    for (path, (_, _, ct)) in &file_changes {
+        if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path) {
+            if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
+                if output.status.success() {
+                    let content = String::from_utf8_lossy(&output.stdout);
+                    let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                    pseudo_diff.push_str("deleted file\n");
+                    pseudo_diff.push_str(&format!("--- a/{}\n+++ /dev/null\n", path));
+                    pseudo_diff.push_str("@@ -1 +0,0 @@\n");
+                    for line in content.lines() {
+                        pseudo_diff.push_str(&format!("-{}\n", line));
+                    }
+                    diff_contents.insert(path.clone(), pseudo_diff);
+                }
+            }
+        }
+    }
+
     // Convert to vec and sort by path
     let mut changes: Vec<_> = file_changes.into_iter()
-        .map(|(path, (add, del, ct))| (path, add, del, ct))
+        .map(|(path, (add, del, ct))| {
+            let diff = diff_contents.remove(&path).unwrap_or_default();
+            (path, add, del, ct, diff)
+        })
         .collect();
     changes.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -395,6 +445,41 @@ fn refresh_git_status(tx: Sender<CacheUpdate>) {
         is_repo: true,
         file_changes: changes,
     });
+}
+
+/// Parse unified diff output and group by file
+fn parse_diff_by_file(diff_output: &str, diff_contents: &mut std::collections::HashMap<String, String>) {
+    let mut current_file: Option<String> = None;
+    let mut current_diff = String::new();
+
+    for line in diff_output.lines() {
+        if line.starts_with("diff --git") {
+            // Save previous file's diff
+            if let Some(file) = current_file.take() {
+                if !current_diff.is_empty() {
+                    diff_contents.insert(file, current_diff.clone());
+                }
+            }
+            current_diff.clear();
+
+            // Extract file path from "diff --git a/path b/path"
+            if let Some(b_part) = line.split(" b/").nth(1) {
+                current_file = Some(b_part.to_string());
+            }
+            current_diff.push_str(line);
+            current_diff.push('\n');
+        } else if current_file.is_some() {
+            current_diff.push_str(line);
+            current_diff.push('\n');
+        }
+    }
+
+    // Save last file's diff
+    if let Some(file) = current_file {
+        if !current_diff.is_empty() {
+            diff_contents.insert(file, current_diff);
+        }
+    }
 }
 
 /// Parse git diff --numstat output and add to file_changes map

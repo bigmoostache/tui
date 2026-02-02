@@ -1,8 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process;
+use chrono::Local;
 
 use crate::constants::{STORE_DIR, STATE_FILE, MESSAGES_DIR};
+
+/// Errors directory name
+const ERRORS_DIR: &str = "errors";
 use crate::state::{Message, PersistedState, State};
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
 use crate::tools::MANAGE_TOOLS_ID;
@@ -164,4 +168,39 @@ pub fn check_ownership() -> bool {
 
     // If we can't read the file or there's no owner, assume we're still the owner
     true
+}
+
+/// Log an error to .context-pilot/errors/ and return the file path
+pub fn log_error(error: &str) -> String {
+    let errors_dir = PathBuf::from(STORE_DIR).join(ERRORS_DIR);
+    fs::create_dir_all(&errors_dir).ok();
+
+    // Count existing error files to determine next number
+    let error_count = fs::read_dir(&errors_dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().map(|ext| ext == "txt").unwrap_or(false))
+                .count()
+        })
+        .unwrap_or(0);
+
+    let error_num = error_count + 1;
+    let filename = format!("error_{}.txt", error_num);
+    let filepath = errors_dir.join(&filename);
+
+    // Create error log content with timestamp
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
+    let content = format!(
+        "Error Log #{}\n\
+         Timestamp: {}\n\
+         \n\
+         Error Details:\n\
+         {}\n",
+        error_num, timestamp, error
+    );
+
+    fs::write(&filepath, content).ok();
+
+    filepath.to_string_lossy().to_string()
 }
