@@ -121,7 +121,12 @@ impl Panel for OverviewPanel {
             output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category.short_name(), tool.id, status, tool.short_desc));
         }
 
-        vec![ContextItem::new("Context Overview", output)]
+        // Find the Overview context element to get its ID
+        let id = state.context.iter()
+            .find(|c| c.context_type == ContextType::Overview)
+            .map(|c| c.id.as_str())
+            .unwrap_or("P5");
+        vec![ContextItem::new(id, "Context Overview", output)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

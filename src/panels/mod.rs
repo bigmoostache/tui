@@ -63,6 +63,8 @@ pub use tree::TreePanel;
 /// A single context item to be sent to the LLM
 #[derive(Debug, Clone)]
 pub struct ContextItem {
+    /// Context element ID (e.g., "P7", "P8") for LLM reference
+    pub id: String,
     /// Header/title for this context (e.g., "File: src/main.rs" or "Todo List")
     pub header: String,
     /// The actual content
@@ -70,8 +72,9 @@ pub struct ContextItem {
 }
 
 impl ContextItem {
-    pub fn new(header: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<String>, header: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
+            id: id.into(),
             header: header.into(),
             content: content.into(),
         }
@@ -79,7 +82,8 @@ impl ContextItem {
 
     /// Format this context item for the LLM
     pub fn format(&self) -> String {
-        format!("=== {} ===\n{}\n=== End of {} ===", self.header, self.content, self.header)
+        format!("=== [{}] {} ===\n{}\n=== End of [{}] {} ===",
+            self.id, self.header, self.content, self.id, self.header)
     }
 }
 

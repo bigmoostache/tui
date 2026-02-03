@@ -66,7 +66,12 @@ impl Panel for MemoryPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_memories_for_context(state);
-        vec![ContextItem::new("Memories", content)]
+        // Find the Memory context element to get its ID
+        let id = state.context.iter()
+            .find(|c| c.context_type == ContextType::Memory)
+            .map(|c| c.id.as_str())
+            .unwrap_or("P4");
+        vec![ContextItem::new(id, "Memories", content)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

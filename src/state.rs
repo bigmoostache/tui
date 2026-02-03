@@ -1,7 +1,53 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
+use std::rc::Rc;
+
+use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::icons;
 use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
+
+/// Cached rendered lines for a message (using Rc to avoid clones)
+#[derive(Clone)]
+pub struct MessageRenderCache {
+    /// Pre-rendered lines for this message
+    pub lines: Rc<Vec<Line<'static>>>,
+    /// Hash of content that affects rendering
+    pub content_hash: u64,
+    /// Viewport width used for wrapping
+    pub viewport_width: u16,
+}
+
+/// Cached rendered lines for input area (using Rc to avoid clones)
+#[derive(Clone)]
+pub struct InputRenderCache {
+    /// Pre-rendered lines for input
+    pub lines: Rc<Vec<Line<'static>>>,
+    /// Hash of input + cursor position
+    pub input_hash: u64,
+    /// Viewport width used for wrapping
+    pub viewport_width: u16,
+}
+
+/// Top-level cache for entire conversation content
+#[derive(Clone)]
+pub struct FullContentCache {
+    /// Complete rendered output
+    pub lines: Rc<Vec<Line<'static>>>,
+    /// Hash of all inputs that affect rendering
+    pub content_hash: u64,
+}
+
+/// Hash helper for cache invalidation
+pub fn hash_values<T: Hash>(values: &[T]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    for v in values {
+        v.hash(&mut hasher);
+    }
+    hasher.finish()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -233,7 +279,7 @@ impl Default for MessageType {
 }
 
 /// Message status for context management
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageStatus {
     #[default]
@@ -445,6 +491,16 @@ pub struct State {
     pub git_status_hash: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
+
+    // === Render Cache (runtime-only) ===
+    /// Last viewport width (for pre-wrapping text)
+    pub last_viewport_width: u16,
+    /// Cached rendered lines per message ID
+    pub message_cache: HashMap<String, MessageRenderCache>,
+    /// Cached rendered lines for input area
+    pub input_cache: Option<InputRenderCache>,
+    /// Full content cache (entire conversation output)
+    pub full_content_cache: Option<FullContentCache>,
 }
 
 /// Represents a file change in git status
@@ -642,6 +698,11 @@ impl Default for State {
             git_status_hash: None,
             // API retry
             api_retry_count: 0,
+            // Render cache
+            last_viewport_width: 0,
+            message_cache: HashMap::new(),
+            input_cache: None,
+            full_content_cache: None,
         }
     }
 }

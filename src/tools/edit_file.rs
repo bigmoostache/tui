@@ -1,169 +1,246 @@
 use std::fs;
 use std::path::Path;
 
+use serde::Deserialize;
+
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 
-/// Result of applying a single edit
-enum EditResult {
-    Success { lines_changed: usize },
-    NoMatch,
-    MultipleMatches(usize),
+/// Edit operation from LLM
+#[derive(Debug, Deserialize)]
+pub struct EditOperation {
+    pub old_string: String,
+    pub new_string: String,
+}
+
+/// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
+fn normalize_for_match(s: &str) -> String {
+    s.replace("\r\n", "\n")
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Find the best match for `needle` in `haystack` using normalized comparison.
+/// Returns the actual substring from haystack that matches (preserving original whitespace).
+fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Option<&'a str> {
+    let norm_needle = normalize_for_match(needle);
+    let needle_lines: Vec<&str> = norm_needle.lines().collect();
+
+    if needle_lines.is_empty() {
+        return None;
+    }
+
+    // Split haystack into lines while tracking byte positions
+    let mut line_positions: Vec<(usize, usize)> = vec![]; // (start, end) for each line
+    let mut pos = 0;
+    for line in haystack.lines() {
+        let start = pos;
+        let end = pos + line.len();
+        line_positions.push((start, end));
+        pos = end + 1; // +1 for newline (might overshoot at EOF, that's ok)
+    }
+
+    let haystack_lines: Vec<&str> = haystack.lines().collect();
+    let haystack_lines_normalized: Vec<String> = haystack_lines
+        .iter()
+        .map(|l| l.trim_end().to_string())
+        .collect();
+
+    // Try to find needle_lines sequence in haystack_lines_normalized
+    'outer: for start_idx in 0..haystack_lines.len() {
+        if start_idx + needle_lines.len() > haystack_lines.len() {
+            break;
+        }
+
+        for (i, needle_line) in needle_lines.iter().enumerate() {
+            if haystack_lines_normalized[start_idx + i] != *needle_line {
+                continue 'outer;
+            }
+        }
+
+        // Found a match! Return the original substring from haystack
+        let match_start = line_positions[start_idx].0;
+        let match_end_idx = start_idx + needle_lines.len() - 1;
+        let match_end = line_positions[match_end_idx].1;
+
+        return Some(&haystack[match_start..match_end]);
+    }
+
+    None
+}
+
+/// Find closest match for error reporting (returns line number and preview)
+fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
+    let norm_needle = normalize_for_match(needle);
+    let first_needle_line = norm_needle.lines().next()?;
+
+    if first_needle_line.trim().is_empty() {
+        return None;
+    }
+
+    let haystack_lines: Vec<&str> = haystack.lines().collect();
+
+    // Find lines that partially match the first line of needle
+    let mut best_match: Option<(usize, usize, String)> = None; // (line_num, score, preview)
+
+    for (idx, line) in haystack_lines.iter().enumerate() {
+        let norm_line = line.trim_end();
+
+        // Simple similarity: count matching characters
+        let score = first_needle_line
+            .chars()
+            .zip(norm_line.chars())
+            .filter(|(a, b)| a == b)
+            .count();
+
+        // Also check if it contains the trimmed needle line
+        let contains_score = if norm_line.contains(first_needle_line.trim()) {
+            first_needle_line.len()
+        } else {
+            0
+        };
+
+        let total_score = score.max(contains_score);
+
+        if total_score > 0 {
+            if best_match.is_none() || total_score > best_match.as_ref().unwrap().1 {
+                let preview = if norm_line.len() > 60 {
+                    format!("{}...", &norm_line[..60])
+                } else {
+                    norm_line.to_string()
+                };
+                best_match = Some((idx + 1, total_score, preview));
+            }
+        }
+    }
+
+    best_match.map(|(line, _, preview)| (line, preview))
 }
 
 pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let path = match tool.input.get("path").and_then(|v| v.as_str()) {
+    let path_str = match tool.input.get("path").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'path' parameter".to_string(),
+                content: "Missing required parameter: path".to_string(),
                 is_error: true,
             }
         }
     };
-
-    let edits = match tool.input.get("edits").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'edits' parameter (expected array)".to_string(),
-                is_error: true,
-            }
-        }
-    };
-
-    if edits.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "No edits provided".to_string(),
-            is_error: true,
-        };
-    }
 
     // Check if file is open in context
     let is_open = state.context.iter().any(|c| {
-        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path)
+        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
     });
 
     if !is_open {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is not open in context. Use open_file first.", path),
+            content: format!("File '{}' is not open in context. Use open_file first.", path_str),
             is_error: true,
         };
     }
 
-    // Read the file
-    let mut content = match fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(e) => {
+    let edits: Vec<EditOperation> = match tool.input.get("edits") {
+        Some(edits_value) => match serde_json::from_value(edits_value.clone()) {
+            Ok(e) => e,
+            Err(e) => {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Invalid edits format: {}", e),
+                    is_error: true,
+                }
+            }
+        },
+        None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Failed to read file '{}': {}", path, e),
+                content: "Missing required parameter: edits".to_string(),
                 is_error: true,
             }
         }
     };
 
-    // Apply edits sequentially
-    let mut successes: Vec<String> = Vec::new();
-    let mut failures: Vec<String> = Vec::new();
-    let mut total_lines_changed = 0;
+    let path = Path::new(path_str);
 
-    for (i, edit) in edits.iter().enumerate() {
-        let old_string = match edit.get("old_string").and_then(|v| v.as_str()) {
-            Some(s) => s,
-            None => {
-                failures.push(format!("Edit {}: missing 'old_string'", i + 1));
-                continue;
+    // Read file
+    let mut content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Failed to read file: {}", e),
+                is_error: true,
             }
-        };
+        }
+    };
 
-        let new_string = match edit.get("new_string").and_then(|v| v.as_str()) {
-            Some(s) => s,
-            None => {
-                failures.push(format!("Edit {}: missing 'new_string'", i + 1));
-                continue;
-            }
-        };
+    let mut applied = 0;
+    let mut errors: Vec<String> = vec![];
 
-        // Apply this edit to the current content
-        match apply_single_edit(&content, old_string, new_string) {
-            EditResult::Success { lines_changed } => {
-                content = content.replacen(old_string, new_string, 1);
-                total_lines_changed += lines_changed;
-                successes.push(format!("Edit {}: ~{} lines", i + 1, lines_changed));
-            }
-            EditResult::NoMatch => {
-                failures.push(format!("Edit {}: no match found", i + 1));
-            }
-            EditResult::MultipleMatches(count) => {
-                failures.push(format!("Edit {}: {} matches (need unique)", i + 1, count));
-            }
+    for (idx, edit) in edits.iter().enumerate() {
+        let edit_num = idx + 1;
+
+        // Try normalized matching (handles trailing whitespace differences)
+        if let Some(actual_match) = find_normalized_match(&content, &edit.old_string) {
+            content = content.replacen(actual_match, &edit.new_string, 1);
+            applied += 1;
+        } else {
+            // Provide helpful error with closest match
+            let hint = if let Some((line, preview)) = find_closest_match(&content, &edit.old_string) {
+                format!(" (closest match at line {}: \"{}\")", line, preview)
+            } else {
+                String::new()
+            };
+
+            let needle_preview = if edit.old_string.len() > 50 {
+                format!("{}...", &edit.old_string[..50])
+            } else {
+                edit.old_string.clone()
+            };
+
+            errors.push(format!("Edit {}: no match for \"{}\"{}", edit_num, needle_preview, hint));
         }
     }
 
-    // Only write if at least one edit succeeded
-    if !successes.is_empty() {
+    // Write file if any edits applied
+    if applied > 0 {
         if let Err(e) = fs::write(path, &content) {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Failed to write file '{}': {}", path, e),
+                content: format!("Failed to write file: {}", e),
                 is_error: true,
             };
         }
 
         // Update the context element's token count
         if let Some(ctx) = state.context.iter_mut().find(|c| {
-            c.context_type == ContextType::File && c.file_path.as_deref() == Some(path)
+            c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
         }) {
             ctx.token_count = estimate_tokens(&content);
         }
     }
 
-    // Build result message
-    let total_edits = edits.len();
-    let success_count = successes.len();
-    let failure_count = failures.len();
+    // Count approximate lines changed
+    let lines_changed: usize = edits.iter().take(applied).map(|e| {
+        e.new_string.lines().count().max(e.old_string.lines().count())
+    }).sum();
 
-    if failure_count == 0 {
-        // All succeeded
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Edited '{}': {}/{} edits applied (~{} lines changed)",
-                path, success_count, total_edits, total_lines_changed),
-            is_error: false,
-        }
-    } else if success_count == 0 {
-        // All failed
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to edit '{}': {}", path, failures.join("; ")),
-            is_error: true,
-        }
+    let result_msg = if errors.is_empty() {
+        format!("Edited '{}': {}/{} edits applied (~{} lines changed)",
+                path_str, applied, edits.len(), lines_changed)
     } else {
-        // Partial success
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Partial edit '{}': {}/{} applied. Failed: {}",
-                path, success_count, total_edits, failures.join("; ")),
-            is_error: false, // Not a full error since some succeeded
-        }
-    }
-}
+        format!("Edited '{}': {}/{} applied; {}",
+                path_str, applied, edits.len(), errors.join("; "))
+    };
 
-fn apply_single_edit(content: &str, old_string: &str, new_string: &str) -> EditResult {
-    let match_count = content.matches(old_string).count();
-
-    if match_count == 0 {
-        EditResult::NoMatch
-    } else if match_count > 1 {
-        EditResult::MultipleMatches(match_count)
-    } else {
-        let lines_changed = old_string.lines().count().max(new_string.lines().count());
-        EditResult::Success { lines_changed }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: result_msg,
+        is_error: applied == 0 && !edits.is_empty(),
     }
 }
 
@@ -179,12 +256,13 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let contents = match tool.input.get("contents").and_then(|v| v.as_str()) {
+    // Accept both "contents" and "content" (LLMs sometimes use either)
+    let contents = match tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str()) {
         Some(c) => c,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'contents' parameter".to_string(),
+                content: "Missing 'content' parameter".to_string(),
                 is_error: true,
             }
         }
@@ -237,7 +315,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         name: file_name,
         token_count,
         file_path: Some(path.to_string()),
-        file_hash: None, // Will be computed by background cache
+        file_hash: None,
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -248,7 +326,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         cached_content: Some(contents.to_string()),
-        cache_deprecated: true, // Mark as deprecated so background computes hash
+        cache_deprecated: true,
         last_refresh_ms: 0,
         tmux_last_lines_hash: None,
     });
@@ -257,5 +335,40 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Created '{}' as {} ({} tokens)", path, context_id, token_count),
         is_error: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_for_match() {
+        assert_eq!(normalize_for_match("foo  \nbar\t\n"), "foo\nbar");
+        assert_eq!(normalize_for_match("foo\r\nbar"), "foo\nbar");
+    }
+
+    #[test]
+    fn test_find_normalized_match_exact() {
+        let haystack = "line1\nline2\nline3\n";
+        let needle = "line2";
+        assert_eq!(find_normalized_match(haystack, needle), Some("line2"));
+    }
+
+    #[test]
+    fn test_find_normalized_match_trailing_whitespace() {
+        let haystack = "line1  \nline2\t\nline3\n";
+        let needle = "line1\nline2";
+        assert_eq!(find_normalized_match(haystack, needle), Some("line1  \nline2\t"));
+    }
+
+    #[test]
+    fn test_find_normalized_match_multiline() {
+        let haystack = "fn foo() {\n    let x = 1;\n    let y = 2;\n}\n";
+        let needle = "    let x = 1;\n    let y = 2;";
+        let matched = find_normalized_match(haystack, needle);
+        assert!(matched.is_some());
+        assert!(matched.unwrap().contains("let x = 1"));
+        assert!(matched.unwrap().contains("let y = 2"));
     }
 }

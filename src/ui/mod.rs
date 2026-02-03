@@ -82,7 +82,7 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 
     // Overlay dimensions
     let overlay_width = 54u16;
-    let overlay_height = 16u16;
+    let overlay_height = 18u16;
 
     // Position in top-right
     let x = area.width.saturating_sub(overlay_width + 2);
@@ -104,6 +104,19 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
         Span::styled(format!(" FPS: {:.0}", fps), Style::default().fg(fps_color).bold()),
         Span::styled(format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms), Style::default().fg(theme::TEXT_MUTED)),
     ]));
+
+    // CPU and RAM line
+    let cpu_color = if snapshot.cpu_usage < 25.0 {
+        theme::SUCCESS
+    } else if snapshot.cpu_usage < 50.0 {
+        theme::WARNING
+    } else {
+        theme::ERROR
+    };
+    lines.push(Line::from(vec![
+        Span::styled(format!(" CPU: {:.1}%", snapshot.cpu_usage), Style::default().fg(cpu_color)),
+        Span::styled(format!("  RAM: {:.1} MB", snapshot.memory_mb), Style::default().fg(theme::TEXT_MUTED)),
+    ]));
     lines.push(Line::from(""));
 
     // Budget bars
@@ -123,11 +136,11 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
     lines.push(Line::from(vec![
         Span::styled(" ", Style::default()),
         Span::styled(format!("{:<26}", "Operation"), Style::default().fg(theme::TEXT_SECONDARY)),
-        Span::styled(format!("{:>10}", "Total"), Style::default().fg(theme::TEXT_SECONDARY)),
-        Span::styled(format!("{:>10}", "Max"), Style::default().fg(theme::TEXT_SECONDARY)),
+        Span::styled(format!("{:>10}", "Mean"), Style::default().fg(theme::TEXT_SECONDARY)),
+        Span::styled(format!("{:>10}", "Std"), Style::default().fg(theme::TEXT_SECONDARY)),
     ]));
 
-    // Calculate total for percentage
+    // Calculate total for percentage (use total time for hotspot detection)
     let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
 
     // Top operations
@@ -144,11 +157,22 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
             Style::default().fg(theme::TEXT)
         };
 
+        // Color mean based on frame time budget
+        let mean_color = frame_time_color(op.mean_ms);
+        // Color std based on variability (high std = orange/red)
+        let std_color = if op.std_ms < 1.0 {
+            theme::SUCCESS
+        } else if op.std_ms < 5.0 {
+            theme::WARNING
+        } else {
+            theme::ERROR
+        };
+
         lines.push(Line::from(vec![
             Span::styled(marker, Style::default().fg(theme::WARNING)),
             Span::styled(format!("{:<26}", name), name_style),
-            Span::styled(format!("{:>9.1}ms", op.total_ms), Style::default().fg(theme::ACCENT)),
-            Span::styled(format!("{:>9.2}ms", op.max_ms), Style::default().fg(frame_time_color(op.max_ms))),
+            Span::styled(format!("{:>9.2}ms", op.mean_ms), Style::default().fg(mean_color)),
+            Span::styled(format!("{:>9.2}ms", op.std_ms), Style::default().fg(std_color)),
         ]));
     }
 

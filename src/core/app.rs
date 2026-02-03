@@ -134,15 +134,11 @@ impl App {
             // Update spinner animation if there's active loading/streaming
             self.update_spinner_animation();
 
-            // Render if state changed from background processing (throttled during streaming)
-            if self.state.dirty {
-                let should_render = !self.state.is_streaming
-                    || current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS;
-                if should_render {
-                    terminal.draw(|frame| ui::render(frame, &mut self.state))?;
-                    self.state.dirty = false;
-                    self.last_render_ms = current_ms;
-                }
+            // Render if dirty and enough time has passed (capped at ~28fps)
+            if self.state.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
+                terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                self.state.dirty = false;
+                self.last_render_ms = current_ms;
             }
 
             // Wait for next event (with timeout to keep checking background channels)

@@ -130,7 +130,12 @@ impl Panel for GitPanel {
             })
             .unwrap_or_else(|| Self::format_git_for_context(state));
         
-        vec![ContextItem::new("Git Status", content)]
+        // Find the Git context element to get its ID
+        let id = state.context.iter()
+            .find(|c| c.context_type == ContextType::Git)
+            .map(|c| c.id.as_str())
+            .unwrap_or("P6");
+        vec![ContextItem::new(id, "Git Status", content)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

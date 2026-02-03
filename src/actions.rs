@@ -15,7 +15,10 @@ pub fn clean_llm_id_prefix(content: &str) -> String {
 
     // Also clean any [Axx]: that appears at the start of lines (multiline responses)
     let re_multiline = Regex::new(r"(?m)^\[A\d+\]:\s*").unwrap();
-    re_multiline.replace_all(&cleaned, "").to_string()
+    let result = re_multiline.replace_all(&cleaned, "").to_string();
+
+    // Strip leading/trailing whitespace and newlines after cleaning
+    result.trim().to_string()
 }
 
 /// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1

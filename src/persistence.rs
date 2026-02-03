@@ -119,6 +119,11 @@ pub fn load_state() -> State {
                 git_status_hash: None,
                 // API retry (runtime-only)
                 api_retry_count: 0,
+                // Render cache (runtime-only)
+                last_viewport_width: 0,
+                message_cache: std::collections::HashMap::new(),
+                input_cache: None,
+                full_content_cache: None,
             };
         }
     }

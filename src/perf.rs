@@ -11,6 +11,15 @@ use std::time::Instant;
 /// Number of recent samples to keep for trend analysis
 const SAMPLE_RING_SIZE: usize = 64;
 
+/// Main loop phases for timing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Phase {
+    EventPoll,
+    EventHandle,
+    Tick,
+    Render,
+}
+
 /// Frame budget for 60fps (milliseconds)
 pub const FRAME_BUDGET_60FPS: f64 = 16.67;
 
@@ -112,18 +121,66 @@ pub struct PerfMetrics {
     frame_start: RwLock<Option<Instant>>,
     /// Total frames counted
     pub frame_count: AtomicU64,
+    /// Last CPU measurement time and ticks
+    last_cpu_measure: RwLock<(Instant, u64)>,
+    /// Last stats refresh time
+    last_stats_refresh: RwLock<Instant>,
+    /// CPU usage percentage (0-100)
+    cpu_usage: RwLock<f32>,
+    /// Memory usage in bytes
+    memory_bytes: RwLock<u64>,
+    /// Phase timings (microseconds) - ring buffers per phase
+    phase_times: RwLock<HashMap<Phase, RingBuffer<u64>>>,
 }
 
 impl Default for PerfMetrics {
     fn default() -> Self {
+        let (cpu_ticks, mem_bytes) = read_proc_stat().unwrap_or((0, 0));
+        
+        let mut phase_times = HashMap::new();
+        phase_times.insert(Phase::EventPoll, RingBuffer::default());
+        phase_times.insert(Phase::EventHandle, RingBuffer::default());
+        phase_times.insert(Phase::Tick, RingBuffer::default());
+        phase_times.insert(Phase::Render, RingBuffer::default());
+        
         Self {
             enabled: AtomicBool::new(false),
             ops: RwLock::new(HashMap::new()),
             frame_times: RwLock::new(RingBuffer::default()),
             frame_start: RwLock::new(None),
             frame_count: AtomicU64::new(0),
+            last_cpu_measure: RwLock::new((Instant::now(), cpu_ticks)),
+            last_stats_refresh: RwLock::new(Instant::now()),
+            cpu_usage: RwLock::new(0.0),
+            memory_bytes: RwLock::new(mem_bytes),
+            phase_times: RwLock::new(phase_times),
         }
     }
+}
+
+/// Read CPU ticks and memory from /proc/self/stat and /proc/self/statm
+fn read_proc_stat() -> Option<(u64, u64)> {
+    // Read CPU ticks from /proc/self/stat
+    // Format: pid (comm) state ... utime stime ...
+    // Fields 14 and 15 (0-indexed: 13, 14) are utime and stime
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    let parts: Vec<&str> = stat.split_whitespace().collect();
+    if parts.len() < 15 {
+        return None;
+    }
+    let utime: u64 = parts[13].parse().ok()?;
+    let stime: u64 = parts[14].parse().ok()?;
+    let cpu_ticks = utime + stime;
+    
+    // Read memory from /proc/self/statm (in pages)
+    // First field is total program size, second is RSS
+    let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
+    let mem_parts: Vec<&str> = statm.split_whitespace().collect();
+    let rss_pages: u64 = mem_parts.get(1)?.parse().ok()?;
+    let page_size = 4096u64; // Standard page size
+    let mem_bytes = rss_pages * page_size;
+    
+    Some((cpu_ticks, mem_bytes))
 }
 
 lazy_static::lazy_static! {
@@ -165,6 +222,35 @@ impl PerfMetrics {
             self.frame_times.write().unwrap().push(frame_time);
             self.frame_count.fetch_add(1, Ordering::Relaxed);
         }
+
+        // Check if stats need refresh (time-based, not frame-based)
+        use crate::constants::PERF_STATS_REFRESH_MS;
+        let last_refresh = *self.last_stats_refresh.read().unwrap();
+        if last_refresh.elapsed().as_millis() >= PERF_STATS_REFRESH_MS as u128 {
+            self.refresh_system_stats();
+            *self.last_stats_refresh.write().unwrap() = Instant::now();
+        }
+    }
+
+    /// Refresh CPU and memory stats
+    fn refresh_system_stats(&self) {
+        if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
+            let mut last = self.last_cpu_measure.write().unwrap();
+            let now = Instant::now();
+            let elapsed = now.duration_since(last.0).as_secs_f32();
+            
+            if elapsed > 0.0 {
+                let tick_delta = cpu_ticks.saturating_sub(last.1);
+                // Convert ticks to seconds (usually 100 ticks/sec on Linux)
+                let cpu_seconds = tick_delta as f32 / 100.0;
+                // CPU percentage = (cpu_time / wall_time) * 100
+                let cpu_pct = (cpu_seconds / elapsed) * 100.0;
+                *self.cpu_usage.write().unwrap() = cpu_pct;
+            }
+            
+            *last = (now, cpu_ticks);
+            *self.memory_bytes.write().unwrap() = mem_bytes;
+        }
     }
 
     /// Get snapshot of metrics for display
@@ -176,11 +262,35 @@ impl PerfMetrics {
             .iter()
             .map(|(name, stats)| {
                 let samples = stats.samples.read().unwrap();
+                let recent = samples.recent(SAMPLE_RING_SIZE);
+                let count = recent.len();
+
+                // Calculate mean
+                let mean_us = if count > 0 {
+                    recent.iter().sum::<u64>() as f64 / count as f64
+                } else {
+                    0.0
+                };
+
+                // Calculate standard deviation
+                let std_us = if count > 1 {
+                    let variance = recent.iter()
+                        .map(|&x| {
+                            let diff = x as f64 - mean_us;
+                            diff * diff
+                        })
+                        .sum::<f64>() / (count - 1) as f64;
+                    variance.sqrt()
+                } else {
+                    0.0
+                };
+
                 OpSnapshot {
                     name,
                     count: stats.count.load(Ordering::Relaxed),
                     total_ms: stats.total_us.load(Ordering::Relaxed) as f64 / 1000.0,
-                    max_ms: stats.max_us.load(Ordering::Relaxed) as f64 / 1000.0,
+                    mean_ms: mean_us / 1000.0,
+                    std_ms: std_us / 1000.0,
                     p95_ms: samples.percentile_95().map(|us| us as f64 / 1000.0),
                 }
             })
@@ -211,6 +321,12 @@ impl PerfMetrics {
                 .map(|us| us as f64 / 1000.0)
                 .unwrap_or(0.0),
             frame_count: self.frame_count.load(Ordering::Relaxed),
+            cpu_usage: *self.cpu_usage.read().unwrap(),
+            memory_mb: *self.memory_bytes.read().unwrap() as f64 / (1024.0 * 1024.0),
+            phase_poll_ms: self.phase_avg_ms(Phase::EventPoll),
+            phase_handle_ms: self.phase_avg_ms(Phase::EventHandle),
+            phase_tick_ms: self.phase_avg_ms(Phase::Tick),
+            phase_render_ms: self.phase_avg_ms(Phase::Render),
         }
     }
 
@@ -227,8 +343,24 @@ impl PerfMetrics {
         self.enabled.store(new_state, Ordering::Relaxed);
         if new_state {
             self.reset();
+            // Do initial system stats refresh when enabling
+            self.refresh_system_stats();
         }
         new_state
+    }
+
+    /// Get average time for a phase in milliseconds
+    pub fn phase_avg_ms(&self, phase: Phase) -> f64 {
+        if let Some(ring) = self.phase_times.read().unwrap().get(&phase) {
+            let samples = ring.recent(SAMPLE_RING_SIZE);
+            if samples.is_empty() {
+                return 0.0;
+            }
+            let sum: u64 = samples.iter().sum();
+            (sum as f64 / samples.len() as f64) / 1000.0
+        } else {
+            0.0
+        }
     }
 }
 
@@ -239,7 +371,8 @@ pub struct OpSnapshot {
     pub name: &'static str,
     pub count: u64,
     pub total_ms: f64,
-    pub max_ms: f64,
+    pub mean_ms: f64,
+    pub std_ms: f64,
     pub p95_ms: Option<f64>,
 }
 
@@ -253,4 +386,11 @@ pub struct PerfSnapshot {
     pub frame_max_ms: f64,
     pub frame_p95_ms: f64,
     pub frame_count: u64,
+    pub cpu_usage: f32,
+    pub memory_mb: f64,
+    /// Phase timings (avg ms)
+    pub phase_poll_ms: f64,
+    pub phase_handle_ms: f64,
+    pub phase_tick_ms: f64,
+    pub phase_render_ms: f64,
 }
