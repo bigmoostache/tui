@@ -7,6 +7,9 @@ use crate::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::State;
 use super::{theme, chars, spinner, helpers::*};
 
+/// Maximum number of dynamic contexts (P7+) to show per page
+const MAX_DYNAMIC_PER_PAGE: usize = 10;
+
 pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar");
     let base_style = Style::default().bg(theme::BG_BASE);
@@ -38,7 +41,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     let spin = spinner::spinner(state.spinner_frame);
 
-    // Sort contexts by ID for display (P1, P2, P3, ...)
+    // Sort contexts by ID for display (P0, P1, P2, ...)
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
         let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
@@ -46,58 +49,54 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         id_a.cmp(&id_b)
     });
 
-    let mut prev_was_fixed = true;
-    for &i in &sorted_indices {
-        let ctx = &state.context[i];
-        let is_fixed = ctx.context_type.is_fixed();
+    // Separate fixed (P0-P6) and dynamic (P7+) contexts
+    let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
+        .into_iter()
+        .partition(|&i| state.context[i].context_type.is_fixed());
 
-        // Add separator when transitioning from fixed to dynamic contexts
-        if prev_was_fixed && !is_fixed {
+    // Render fixed contexts (always visible)
+    for &i in &fixed_indices {
+        let ctx = &state.context[i];
+        render_context_line(&mut lines, ctx, i, state, id_width, &spin, base_style);
+    }
+
+    // Calculate pagination for dynamic contexts
+    let total_dynamic = dynamic_indices.len();
+    let total_pages = if total_dynamic == 0 { 1 } else { (total_dynamic + MAX_DYNAMIC_PER_PAGE - 1) / MAX_DYNAMIC_PER_PAGE };
+
+    // Determine current page based on selected context
+    let current_page = if let Some(selected_pos) = dynamic_indices.iter().position(|&i| i == state.selected_context) {
+        selected_pos / MAX_DYNAMIC_PER_PAGE
+    } else {
+        0 // Default to first page if a fixed context is selected
+    };
+
+    // Get dynamic contexts for current page
+    let page_start = current_page * MAX_DYNAMIC_PER_PAGE;
+    let page_end = (page_start + MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
+    let page_indices: Vec<usize> = dynamic_indices[page_start..page_end].to_vec();
+
+    // Add separator if there are dynamic contexts
+    if total_dynamic > 0 {
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::BORDER_MUTED)),
+        ]));
+
+        // Render dynamic contexts for current page
+        for &i in &page_indices {
+            let ctx = &state.context[i];
+            render_context_line(&mut lines, ctx, i, state, id_width, &spin, base_style);
+        }
+
+        // Page indicator (only if more than one page)
+        if total_pages > 1 {
             lines.push(Line::from(vec![
-                Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::BORDER_MUTED)),
+                Span::styled(
+                    format!("  page {}/{}", current_page + 1, total_pages),
+                    Style::default().fg(theme::TEXT_MUTED),
+                ),
             ]));
         }
-        prev_was_fixed = is_fixed;
-
-        let is_selected = i == state.selected_context;
-        let icon = ctx.context_type.icon();
-
-        // Check if this context is loading (has no cached content but needs it)
-        let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
-
-        // Build the line with right-aligned ID
-        let shortcut = format!("{:>width$}", &ctx.id, width = id_width);
-        let name = truncate_string(&ctx.name, 18);
-
-        // Show spinner instead of token count when loading
-        let tokens_or_spinner = if is_loading {
-            format!("{:>6}", spin)
-        } else {
-            format_number(ctx.token_count)
-        };
-
-        let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
-
-        // Selected element: orange text, no background change
-        // Loading elements: dimmed
-        let name_color = if is_loading {
-            theme::TEXT_MUTED
-        } else if is_selected {
-            theme::ACCENT
-        } else {
-            theme::TEXT_SECONDARY
-        };
-        let indicator_color = if is_selected { theme::ACCENT } else { theme::BG_BASE };
-        let tokens_color = if is_loading { theme::WARNING } else { theme::ACCENT_DIM };
-
-        lines.push(Line::from(vec![
-            Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
-            Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::TEXT_MUTED)),
-            Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::ACCENT } else { theme::TEXT_MUTED })),
-            Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
-            Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
-            Span::styled(" ", base_style),
-        ]));
     }
 
     // Separator
@@ -132,11 +131,11 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled(" ", base_style),
-        Span::styled(&current, Style::default().fg(theme::TEXT).bold()),
+        Span::styled(current, Style::default().fg(theme::TEXT).bold()),
         Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(&threshold, Style::default().fg(theme::WARNING)),
+        Span::styled(threshold, Style::default().fg(theme::WARNING)),
         Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(&budget, Style::default().fg(theme::ACCENT)),
+        Span::styled(budget, Style::default().fg(theme::ACCENT)),
     ]));
 
     // Build bar with threshold marker
@@ -204,4 +203,55 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let help_paragraph = Paragraph::new(help_lines)
         .style(base_style);
     frame.render_widget(help_paragraph, sidebar_layout[1]);
+}
+
+/// Render a single context line
+fn render_context_line(
+    lines: &mut Vec<Line<'static>>,
+    ctx: &crate::state::ContextElement,
+    array_index: usize,
+    state: &State,
+    id_width: usize,
+    spin: &str,
+    base_style: Style,
+) {
+    let is_selected = array_index == state.selected_context;
+    let icon = ctx.context_type.icon();
+
+    // Check if this context is loading (has no cached content but needs it)
+    let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
+
+    // Build the line with right-aligned ID
+    let shortcut = format!("{:>width$}", &ctx.id, width = id_width);
+    let name = truncate_string(&ctx.name, 18);
+
+    // Show spinner instead of token count when loading
+    let tokens_or_spinner = if is_loading {
+        format!("{:>6}", spin)
+    } else {
+        format_number(ctx.token_count)
+    };
+
+    let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
+
+    // Selected element: orange text, no background change
+    // Loading elements: dimmed
+    let name_color = if is_loading {
+        theme::TEXT_MUTED
+    } else if is_selected {
+        theme::ACCENT
+    } else {
+        theme::TEXT_SECONDARY
+    };
+    let indicator_color = if is_selected { theme::ACCENT } else { theme::BG_BASE };
+    let tokens_color = if is_loading { theme::WARNING } else { theme::ACCENT_DIM };
+
+    lines.push(Line::from(vec![
+        Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
+        Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::ACCENT } else { theme::TEXT_MUTED })),
+        Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
+        Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
+        Span::styled(" ", base_style),
+    ]));
 }

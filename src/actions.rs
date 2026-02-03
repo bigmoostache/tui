@@ -251,8 +251,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             };
             save_message(&user_msg);
 
-            // Add user message tokens to context
-            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+            // Add user message tokens to Conversation context
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count += user_token_estimate;
             }
 
@@ -296,8 +296,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             state.messages.clear();
             state.input.clear();
-            // Reset token count for current context
-            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+            // Reset token count for Conversation context
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count = 0;
             }
             ActionResult::Save
@@ -379,7 +379,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
 
                     if added > 0 {
-                        if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                             ctx.token_count += added;
                         }
                         state.streaming_estimated_tokens = new_estimate;
@@ -391,8 +391,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StreamDone { _input_tokens, output_tokens } => {
             state.is_streaming = false;
 
-            // Correct the estimated tokens with actual output tokens
-            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+            // Correct the estimated tokens with actual output tokens on Conversation context
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 // Remove our estimate, add actual
                 ctx.token_count = ctx.token_count
                     .saturating_sub(state.streaming_estimated_tokens)
@@ -416,8 +416,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StreamError(e) => {
             state.is_streaming = false;
 
-            // Remove estimated tokens on error
-            if let Some(ctx) = state.context.get_mut(state.selected_context) {
+            // Remove estimated tokens on error from Conversation context
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
             }
             state.streaming_estimated_tokens = 0;
@@ -451,8 +451,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StopStreaming => {
             if state.is_streaming {
                 state.is_streaming = false;
-                // Remove estimated tokens on cancel
-                if let Some(ctx) = state.context.get_mut(state.selected_context) {
+                // Remove estimated tokens on cancel from Conversation context
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;
