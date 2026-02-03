@@ -130,6 +130,9 @@ pub fn load_state() -> State {
                 git_last_refresh_ms: 0,
                 git_show_diffs: persisted.git_show_diffs,
                 git_status_hash: None,
+                git_show_logs: false,
+                git_log_args: None,
+                git_log_content: None,
                 // API retry (runtime-only)
                 api_retry_count: 0,
                 // Render cache (runtime-only)

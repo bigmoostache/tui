@@ -548,6 +548,12 @@ pub struct State {
     pub git_show_diffs: bool,
     /// Hash of last git status --porcelain output (for change detection)
     pub git_status_hash: Option<String>,
+    /// Whether to show git log in Git panel
+    pub git_show_logs: bool,
+    /// Custom git log arguments (e.g., "-5 --oneline")
+    pub git_log_args: Option<String>,
+    /// Cached git log output
+    pub git_log_content: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
 
@@ -768,6 +774,9 @@ impl Default for State {
             git_last_refresh_ms: 0,
             git_show_diffs: true, // Show diffs by default
             git_status_hash: None,
+            git_show_logs: false,
+            git_log_args: None,
+            git_log_content: None,
             // API retry
             api_retry_count: 0,
             // Render cache

@@ -77,6 +77,15 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     ));
     spans.push(Span::styled(" ", base_style));
 
+    // Git branch (if available)
+    if let Some(branch) = &state.git_branch {
+        spans.push(Span::styled(
+            format!(" {} ", branch),
+            Style::default().fg(theme::BG_BASE).bg(theme::ACCENT)
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     // Right side info
     let char_count = state.input.chars().count();
     let right_info = if char_count > 0 {
