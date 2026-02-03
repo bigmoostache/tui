@@ -102,60 +102,13 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute reload_tui tool - restarts the TUI application
-fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
+fn execute_reload_tui(_tool: &ToolUse, state: &mut State) -> ToolResult {
     use std::fs;
     use std::io::stdout;
     use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
-    use crate::persistence::{save_message, save_state};
-    use crate::state::{Message, MessageType, MessageStatus, ToolUseRecord, ToolResultRecord};
+    use crate::persistence::save_state;
     
     let state_path = ".context-pilot/state.json";
-    
-    // Create tool call message
-    let tool_id = format!("T{}", state.next_tool_id);
-    state.next_tool_id += 1;
-    let tool_msg = Message {
-        id: tool_id.clone(),
-        role: "assistant".to_string(),
-        message_type: MessageType::ToolCall,
-        content: String::new(),
-        content_token_count: 0,
-        tl_dr: None,
-        tl_dr_token_count: 0,
-        status: MessageStatus::Full,
-        tool_uses: vec![ToolUseRecord {
-            id: tool.id.clone(),
-            name: tool.name.clone(),
-            input: tool.input.clone(),
-        }],
-        tool_results: Vec::new(),
-        input_tokens: 0,
-    };
-    save_message(&tool_msg);
-    state.messages.push(tool_msg);
-    
-    // Create tool result message
-    let result_id = format!("R{}", state.next_result_id);
-    state.next_result_id += 1;
-    let result_msg = Message {
-        id: result_id,
-        role: "user".to_string(),
-        message_type: MessageType::ToolResult,
-        content: String::new(),
-        content_token_count: 0,
-        tl_dr: None,
-        tl_dr_token_count: 0,
-        status: MessageStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: vec![ToolResultRecord {
-            tool_use_id: tool.id.clone(),
-            content: "Called reload successfully, restarting app now...".to_string(),
-            is_error: false,
-        }],
-        input_tokens: 0,
-    };
-    save_message(&result_msg);
-    state.messages.push(result_msg);
     
     // Save state before exiting
     save_state(state);
