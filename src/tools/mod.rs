@@ -85,10 +85,43 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "update_memories" => memory::execute_update(tool, state),
         "git_commit" => git::execute_commit(tool, state),
         "toggle_git_details" => git::execute_toggle_details(tool, state),
+        "reload_tui" => execute_reload_tui(tool),
         _ => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Unknown tool: {}", tool.name),
             is_error: true,
         },
+    }
+}
+
+/// Execute reload_tui tool - restarts the TUI application
+fn execute_reload_tui(tool: &ToolUse) -> ToolResult {
+    use std::os::unix::process::CommandExt;
+    use std::process::Command;
+    use std::env;
+    
+    // Get the current executable path
+    let exe = match env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Failed to get executable path: {}", e),
+                is_error: true,
+            };
+        }
+    };
+    
+    // Get current args (skip the program name)
+    let args: Vec<String> = env::args().skip(1).collect();
+    
+    // Use exec to replace current process - this never returns on success
+    let err = Command::new(&exe).args(&args).exec();
+    
+    // If we get here, exec failed
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Failed to reload: {}", err),
+        is_error: true,
     }
 }
