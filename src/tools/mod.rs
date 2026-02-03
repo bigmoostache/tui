@@ -96,7 +96,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute reload_tui tool - restarts the TUI application
 fn execute_reload_tui(tool: &ToolUse, _state: &State) -> ToolResult {
-    use std::process::{Command, Stdio};
+    use std::process::Command;
     use std::env;
     use std::io::stdout;
     use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
@@ -113,35 +113,23 @@ fn execute_reload_tui(tool: &ToolUse, _state: &State) -> ToolResult {
         }
     };
     
-    // Spawn a detached shell process that:
-    // 1. Waits a moment for the current process to exit
-    // 2. Runs cargo run with --resume-stream
+    // Clean up terminal FIRST, before spawning
+    let _ = disable_raw_mode();
+    let _ = execute!(stdout(), LeaveAlternateScreen);
+    
+    // Use bash with background process
+    // The process runs in background, parent exits, child continues
     let shell_cmd = format!(
-        "sleep 0.2 && cd {} && cargo run --release -- --resume-stream",
+        "(sleep 0.5 && cd {} && cargo run --release -- --resume-stream) &",
         cwd.display()
     );
     
-    match Command::new("sh")
+    // Execute the command which backgrounds itself
+    let _ = Command::new("bash")
         .arg("-c")
         .arg(&shell_cmd)
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-    {
-        Ok(_) => {
-            // Clean up terminal before exiting
-            let _ = disable_raw_mode();
-            let _ = execute!(stdout(), LeaveAlternateScreen);
-            // Exit the current process - the spawned shell will start the new one
-            std::process::exit(0);
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to spawn reload process: {}", e),
-                is_error: true,
-            }
-        }
-    }
+        .status();
+    
+    // Exit immediately - the backgrounded process will start the new TUI
+    std::process::exit(0);
 }
