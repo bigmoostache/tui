@@ -85,7 +85,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "update_memories" => memory::execute_update(tool, state),
         "git_commit" => git::execute_commit(tool, state),
         "toggle_git_details" => git::execute_toggle_details(tool, state),
-        "reload_tui" => execute_reload_tui(tool),
+        "reload_tui" => execute_reload_tui(tool, state),
         _ => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Unknown tool: {}", tool.name),
@@ -95,7 +95,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute reload_tui tool - restarts the TUI application
-fn execute_reload_tui(tool: &ToolUse) -> ToolResult {
+fn execute_reload_tui(tool: &ToolUse, state: &State) -> ToolResult {
     use std::os::unix::process::CommandExt;
     use std::process::Command;
     use std::env;
@@ -113,7 +113,12 @@ fn execute_reload_tui(tool: &ToolUse) -> ToolResult {
     };
     
     // Get current args (skip the program name)
-    let args: Vec<String> = env::args().skip(1).collect();
+    let mut args: Vec<String> = env::args().skip(1).collect();
+    
+    // If currently streaming, add --resume-stream flag
+    if state.is_streaming && !args.iter().any(|a| a == "--resume-stream") {
+        args.push("--resume-stream".to_string());
+    }
     
     // Use exec to replace current process - this never returns on success
     let err = Command::new(&exe).args(&args).exec();

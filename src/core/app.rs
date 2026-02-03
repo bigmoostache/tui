@@ -46,10 +46,12 @@ pub struct App {
     last_render_ms: u64,
     /// Channel for API check results
     api_check_rx: Option<Receiver<crate::llms::ApiCheckResult>>,
+    /// Whether to auto-start streaming on first loop iteration
+    resume_stream: bool,
 }
 
 impl App {
-    pub fn new(state: State, cache_tx: Sender<CacheUpdate>) -> Self {
+    pub fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
 
         Self {
@@ -69,6 +71,7 @@ impl App {
             pending_retry_error: None,
             last_render_ms: 0,
             api_check_rx: None,
+            resume_stream,
         }
     }
 
@@ -89,6 +92,19 @@ impl App {
 
         // Claim ownership immediately
         save_state(&self.state);
+
+        // Auto-resume streaming if flag was set (e.g., after reload_tui during streaming)
+        if self.resume_stream {
+            self.resume_stream = false; // Only do this once
+            self.state.is_streaming = true;
+            self.state.dirty = true;
+            let ctx = prepare_stream_context(&mut self.state, true);
+            start_streaming(
+                self.state.llm_provider,
+                self.state.current_model(),
+                ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
+            );
+        }
 
         loop {
             let current_ms = now_ms();

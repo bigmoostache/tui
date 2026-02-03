@@ -35,6 +35,10 @@ use core::{ensure_default_contexts, App};
 use persistence::load_state;
 
 fn main() -> io::Result<()> {
+    // Parse CLI args
+    let args: Vec<String> = std::env::args().collect();
+    let resume_stream = args.iter().any(|a| a == "--resume-stream");
+
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -51,7 +55,7 @@ fn main() -> io::Result<()> {
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
-    let mut app = App::new(state, cache_tx);
+    let mut app = App::new(state, cache_tx, resume_stream);
     app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, clean_tx, clean_rx, cache_rx)?;
 
     // Cleanup
