@@ -463,6 +463,8 @@ fn get_commit_stats() -> Option<(usize, usize, usize)> {
 pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
     let result = Command::new("git")
         .args(["pull"])
+        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
+        .stdin(std::process::Stdio::null()) // No stdin
         .output();
 
     match result {
@@ -484,7 +486,7 @@ pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
             let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
                     "Pull failed: Git authentication required. Please configure git credentials.".to_string()
                 } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
                     "Pull failed: Network error or remote unreachable.".to_string()
@@ -510,6 +512,8 @@ pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
 pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
     let result = Command::new("git")
         .args(["push"])
+        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
+        .stdin(std::process::Stdio::null()) // No stdin
         .output();
 
     match result {
@@ -536,7 +540,7 @@ pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
             let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
                     "Push failed: Git authentication required. Please configure git credentials.".to_string()
                 } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
                     "Push failed: Network error or remote unreachable.".to_string()
@@ -564,6 +568,8 @@ pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
 pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
     let result = Command::new("git")
         .args(["fetch"])
+        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
+        .stdin(std::process::Stdio::null()) // No stdin
         .output();
 
     match result {
@@ -589,7 +595,7 @@ pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
             let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
                     "Fetch failed: Git authentication required. Please configure git credentials.".to_string()
                 } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
                     "Fetch failed: Network error or remote unreachable.".to_string()
