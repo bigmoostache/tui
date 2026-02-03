@@ -93,17 +93,13 @@ impl App {
         // Claim ownership immediately
         save_state(&self.state);
 
-        // Auto-resume streaming if flag was set (e.g., after reload_tui during streaming)
+        // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
-            self.resume_stream = false; // Only do this once
-            self.state.is_streaming = true;
-            self.state.dirty = true;
-            let ctx = prepare_stream_context(&mut self.state, true);
-            start_streaming(
-                self.state.llm_provider,
-                self.state.current_model(),
-                ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
-            );
+            self.resume_stream = false;
+            // Set input and trigger submit to start streaming
+            self.state.input = "/* automatic post-reload message */".to_string();
+            self.state.input_cursor = self.state.input.len();
+            self.handle_action(Action::InputSubmit, &tx, &tldr_tx, &clean_tx);
         }
 
         loop {
