@@ -81,7 +81,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     if let Some(branch) = &state.git_branch {
         spans.push(Span::styled(
             format!(" {} ", branch),
-            Style::default().fg(theme::BG_BASE).bg(theme::ACCENT)
+            Style::default().fg(theme::BG_BASE).bg(Color::Blue)
         ));
         spans.push(Span::styled(" ", base_style));
     }

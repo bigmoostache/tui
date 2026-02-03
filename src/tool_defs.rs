@@ -551,6 +551,20 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Git,
         },
         ToolDefinition {
+            id: "toggle_git_logs".to_string(),
+            name: "Toggle Git Logs".to_string(),
+            short_desc: "Show/hide git log".to_string(),
+            description: "Toggles whether the Git panel shows recent commit history. Can specify custom git log arguments.".to_string(),
+            params: vec![
+                ToolParam::new("show", ParamType::Boolean)
+                    .desc("Set true to show logs, false to hide. Omit to toggle."),
+                ToolParam::new("args", ParamType::String)
+                    .desc("Custom git log arguments (e.g., '-10 --oneline'). Defaults to '-10 --oneline'."),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
             id: "git_commit".to_string(),
             name: "Git Commit".to_string(),
             short_desc: "Commit changes".to_string(),

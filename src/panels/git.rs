@@ -326,6 +326,28 @@ impl Panel for GitPanel {
             ]));
         }
 
+        // Git log (if enabled)
+        if state.git_show_logs {
+            text.push(Line::from(""));
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(chars::HORIZONTAL.repeat(60), Style::default().fg(theme::BORDER)),
+            ]));
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled("Recent Commits:".to_string(), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            ]));
+            
+            if let Some(log_content) = &state.git_log_content {
+                for line in log_content.lines() {
+                    text.push(Line::from(vec![
+                        Span::styled(" ".to_string(), base_style),
+                        Span::styled(line.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                    ]));
+                }
+            }
+        }
+
         // Display diff content for each file
         for file in &state.git_file_changes {
             if file.diff_content.is_empty() {

@@ -32,6 +32,66 @@ pub fn execute_toggle_details(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+/// Execute toggle_git_logs tool
+pub fn execute_toggle_logs(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let show = tool.input.get("show")
+        .and_then(|v| v.as_bool());
+    let args = tool.input.get("args")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Toggle or set explicitly
+    let new_value = match show {
+        Some(v) => v,
+        None => !state.git_show_logs, // Toggle if not specified
+    };
+
+    state.git_show_logs = new_value;
+    
+    // Update args if provided
+    if args.is_some() {
+        state.git_log_args = args;
+    }
+
+    // Fetch git log if enabled
+    if new_value {
+        let log_args = state.git_log_args.as_deref().unwrap_or("-10 --oneline");
+        let args_vec: Vec<&str> = log_args.split_whitespace().collect();
+        
+        let mut cmd = Command::new("git");
+        cmd.arg("log");
+        for arg in args_vec {
+            cmd.arg(arg);
+        }
+        
+        match cmd.output() {
+            Ok(output) if output.status.success() => {
+                state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+            }
+            _ => {
+                state.git_log_content = Some("Failed to fetch git log".to_string());
+            }
+        }
+    } else {
+        state.git_log_content = None;
+    }
+
+    // Mark git context as needing refresh so content updates
+    for ctx in &mut state.context {
+        if ctx.context_type == crate::state::ContextType::Git {
+            ctx.cache_deprecated = true;
+            break;
+        }
+    }
+
+    let status = if new_value { "enabled" } else { "disabled" };
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Git logs {}", status),
+        is_error: false,
+    }
+}
+
 /// Execute git_commit tool
 pub fn execute_commit(tool: &ToolUse, _state: &mut State) -> ToolResult {
     let message = match tool.input.get("message").and_then(|v| v.as_str()) {
