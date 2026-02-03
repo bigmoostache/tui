@@ -95,7 +95,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute reload_tui tool - restarts the TUI application
-fn execute_reload_tui(tool: &ToolUse, state: &State) -> ToolResult {
+fn execute_reload_tui(tool: &ToolUse, _state: &State) -> ToolResult {
     use std::os::unix::process::CommandExt;
     use std::process::Command;
     use std::env;
@@ -115,8 +115,8 @@ fn execute_reload_tui(tool: &ToolUse, state: &State) -> ToolResult {
     // Get current args (skip the program name)
     let mut args: Vec<String> = env::args().skip(1).collect();
     
-    // If currently streaming, add --resume-stream flag
-    if state.is_streaming && !args.iter().any(|a| a == "--resume-stream") {
+    // Always add --resume-stream so AI continues where it left off
+    if !args.iter().any(|a| a == "--resume-stream") {
         args.push("--resume-stream".to_string());
     }
     
