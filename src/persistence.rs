@@ -175,6 +175,7 @@ pub fn save_state(state: &State) {
         cleaning_threshold: state.cleaning_threshold,
         cleaning_target_proportion: state.cleaning_target_proportion,
         context_budget: state.context_budget,
+        reload_requested: false, // Always clear on save
     };
 
     let path = dir.join(STATE_FILE);

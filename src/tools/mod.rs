@@ -95,41 +95,36 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute reload_tui tool - restarts the TUI application
-fn execute_reload_tui(tool: &ToolUse, _state: &State) -> ToolResult {
-    use std::process::Command;
-    use std::env;
+fn execute_reload_tui(_tool: &ToolUse, _state: &State) -> ToolResult {
+    use std::fs;
     use std::io::stdout;
     use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
     
-    // Get the current working directory
-    let cwd = match env::current_dir() {
-        Ok(path) => path,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to get current directory: {}", e),
-                is_error: true,
-            };
-        }
-    };
+    let state_path = ".context-pilot/state.json";
     
-    // Clean up terminal FIRST, before spawning
+    // Read current state, set reload_requested to true, and save
+    match fs::read_to_string(state_path) {
+        Ok(json) => {
+            // Simple string replacement to set reload_requested: true
+            let updated = if json.contains("\"reload_requested\":") {
+                json.replace("\"reload_requested\": false", "\"reload_requested\": true")
+                    .replace("\"reload_requested\":false", "\"reload_requested\":true")
+            } else {
+                // Add the field before the final }
+                json.trim_end().trim_end_matches('}').to_string() 
+                    + ",\n  \"reload_requested\": true\n}"
+            };
+            let _ = fs::write(state_path, updated);
+        }
+        Err(_) => {
+            // If we can't read state, just try to reload anyway
+        }
+    }
+    
+    // Clean up terminal
     let _ = disable_raw_mode();
     let _ = execute!(stdout(), LeaveAlternateScreen);
     
-    // Use bash with background process
-    // The process runs in background, parent exits, child continues
-    let shell_cmd = format!(
-        "(sleep 0.5 && cd {} && cargo run --release -- --resume-stream) &",
-        cwd.display()
-    );
-    
-    // Execute the command which backgrounds itself
-    let _ = Command::new("bash")
-        .arg("-c")
-        .arg(&shell_cmd)
-        .status();
-    
-    // Exit immediately - the backgrounded process will start the new TUI
+    // Exit - the run.sh supervisor will see reload_requested and restart
     std::process::exit(0);
 }

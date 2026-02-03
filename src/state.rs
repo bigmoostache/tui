@@ -425,6 +425,9 @@ pub struct PersistedState {
     /// Context budget in tokens (None = use model's full context window)
     #[serde(default)]
     pub context_budget: Option<usize>,
+    /// Reload requested flag - checked by run.sh supervisor
+    #[serde(default)]
+    pub reload_requested: bool,
 }
 
 fn default_cleaning_threshold() -> f32 {
