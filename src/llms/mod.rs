@@ -306,7 +306,7 @@ pub fn start_cleaning(
     let client = get_client(provider);
 
     let cleaner_context = crate::context_cleaner::build_cleaner_context(state);
-    let system_prompt = crate::context_cleaner::get_cleaner_system_prompt().to_string();
+    let system_prompt = crate::context_cleaner::get_cleaner_system_prompt(state);
 
     std::thread::spawn(move || {
         let request = LlmRequest {

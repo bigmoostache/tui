@@ -1,6 +1,32 @@
-use crate::constants::{prompts, icons};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+
+use chrono::Local;
+
+use crate::constants::{prompts, icons, STORE_DIR};
 use crate::state::State;
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
+
+/// Log directory for cleaner
+const CLEANER_LOG_DIR: &str = "cleaner-logs";
+
+/// Log a cleaner event to file
+pub fn log_cleaner(message: &str) {
+    let log_dir = format!("{}/{}", STORE_DIR, CLEANER_LOG_DIR);
+    let _ = fs::create_dir_all(&log_dir);
+    
+    let timestamp = Local::now().format("%Y-%m-%d");
+    let log_file = format!("{}/{}.log", log_dir, timestamp);
+    
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)
+    {
+        let time = Local::now().format("%H:%M:%S");
+        let _ = writeln!(file, "[{}] {}", time, message);
+    }
+}
 
 /// Tool IDs that are allowed for context cleaning
 const CLEANER_TOOL_IDS: &[&str] = &[
@@ -162,7 +188,14 @@ pub fn build_cleaner_context(state: &State) -> String {
 }
 
 /// Get the system prompt for the cleaner
-pub fn get_cleaner_system_prompt() -> &'static str {
+pub fn get_cleaner_system_prompt(state: &State) -> String {
+    let (current_tokens, _) = calculate_context_usage(state);
+    let target_tokens = state.cleaning_target_tokens();
+    let tokens_to_remove = current_tokens.saturating_sub(target_tokens);
+    
     prompts::CLEANER_SYSTEM
+        .replace("{current_tokens}", &current_tokens.to_string())
+        .replace("{target_tokens}", &target_tokens.to_string())
+        .replace("{tokens_to_remove}", &tokens_to_remove.to_string())
 }
 

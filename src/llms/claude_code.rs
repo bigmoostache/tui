@@ -167,6 +167,24 @@ impl LlmClient for ClaudeCodeClient {
         let mut first_user_message = true;
         let include_tool_uses = request.tool_results.is_some();
 
+        // First pass: collect tool_use IDs that have matching results (will be included)
+        let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for (idx, msg) in request.messages.iter().enumerate() {
+            if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
+                continue;
+            }
+            let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
+            let has_result = request.messages[idx + 1..]
+                .iter()
+                .filter(|m| m.status != MessageStatus::Deleted && m.message_type == MessageType::ToolResult)
+                .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
+            if has_result {
+                for id in tool_use_ids {
+                    included_tool_use_ids.insert(id.to_string());
+                }
+            }
+        }
+
         for (idx, msg) in request.messages.iter().enumerate() {
             if msg.status == MessageStatus::Deleted {
                 continue;
@@ -175,15 +193,17 @@ impl LlmClient for ClaudeCodeClient {
                 continue;
             }
 
-            // Handle tool results
+            // Handle tool results - only include if tool_use was included
             if msg.message_type == MessageType::ToolResult {
-                let tool_results: Vec<Value> = msg.tool_results.iter().map(|r| {
-                    serde_json::json!({
-                        "type": "tool_result",
-                        "tool_use_id": r.tool_use_id,
-                        "content": format!("[{}]: {}", msg.id, r.content)
-                    })
-                }).collect();
+                let tool_results: Vec<Value> = msg.tool_results.iter()
+                    .filter(|r| included_tool_use_ids.contains(&r.tool_use_id))
+                    .map(|r| {
+                        serde_json::json!({
+                            "type": "tool_result",
+                            "tool_use_id": r.tool_use_id,
+                            "content": format!("[{}]: {}", msg.id, r.content)
+                        })
+                    }).collect();
 
                 if !tool_results.is_empty() {
                     json_messages.push(serde_json::json!({
@@ -194,16 +214,11 @@ impl LlmClient for ClaudeCodeClient {
                 continue;
             }
 
-            // Handle tool calls
+            // Handle tool calls - only include if has matching result
             if msg.message_type == MessageType::ToolCall {
-                let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
-                let has_result = request.messages[idx + 1..]
-                    .iter()
-                    .filter(|m| m.status != MessageStatus::Deleted && m.message_type == MessageType::ToolResult)
-                    .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
-
-                if has_result {
-                    let tool_uses: Vec<Value> = msg.tool_uses.iter().map(|tu| {
+                let tool_uses: Vec<Value> = msg.tool_uses.iter()
+                    .filter(|tu| included_tool_use_ids.contains(&tu.id))
+                    .map(|tu| {
                         serde_json::json!({
                             "type": "tool_use",
                             "id": tu.id,
@@ -212,6 +227,7 @@ impl LlmClient for ClaudeCodeClient {
                         })
                     }).collect();
 
+                if !tool_uses.is_empty() {
                     // Append to last assistant message or create new one
                     if let Some(last) = json_messages.last_mut() {
                         if last["role"] == "assistant" {
