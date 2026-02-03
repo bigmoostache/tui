@@ -236,15 +236,8 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let enter = tool.input.get("enter")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
-
-    // Send keys to the pane
-    let mut args = vec!["send-keys".to_string(), "-t".to_string(), pane_id.clone(), keys.to_string()];
-    if enter {
-        args.push("Enter".to_string());
-    }
+    // Send keys to the pane (always followed by Enter)
+    let args = vec!["send-keys".to_string(), "-t".to_string(), pane_id.clone(), keys.to_string(), "Enter".to_string()];
 
     let output = Command::new("tmux")
         .args(&args)
