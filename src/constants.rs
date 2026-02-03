@@ -197,7 +197,7 @@ pub mod icons {
     pub const CTX_GIT: &str = "🔀";
 
     // Message status
-    pub const STATUS_FULL: &str = "●";
+    pub const STATUS_FULL: &str = "";
     pub const STATUS_SUMMARIZED: &str = "◐";
     pub const STATUS_DELETED: &str = "○";
 
