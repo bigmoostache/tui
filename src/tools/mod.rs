@@ -96,37 +96,52 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute reload_tui tool - restarts the TUI application
 fn execute_reload_tui(tool: &ToolUse, _state: &State) -> ToolResult {
-    use std::os::unix::process::CommandExt;
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     use std::env;
+    use std::io::stdout;
+    use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
     
-    // Get the current executable path
-    let exe = match env::current_exe() {
+    // Get the current working directory
+    let cwd = match env::current_dir() {
         Ok(path) => path,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Failed to get executable path: {}", e),
+                content: format!("Failed to get current directory: {}", e),
                 is_error: true,
             };
         }
     };
     
-    // Get current args (skip the program name)
-    let mut args: Vec<String> = env::args().skip(1).collect();
+    // Spawn a detached shell process that:
+    // 1. Waits a moment for the current process to exit
+    // 2. Runs cargo run with --resume-stream
+    let shell_cmd = format!(
+        "sleep 0.2 && cd {} && cargo run --release -- --resume-stream",
+        cwd.display()
+    );
     
-    // Always add --resume-stream so AI continues where it left off
-    if !args.iter().any(|a| a == "--resume-stream") {
-        args.push("--resume-stream".to_string());
-    }
-    
-    // Use exec to replace current process - this never returns on success
-    let err = Command::new(&exe).args(&args).exec();
-    
-    // If we get here, exec failed
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Failed to reload: {}", err),
-        is_error: true,
+    match Command::new("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+    {
+        Ok(_) => {
+            // Clean up terminal before exiting
+            let _ = disable_raw_mode();
+            let _ = execute!(stdout(), LeaveAlternateScreen);
+            // Exit the current process - the spawned shell will start the new one
+            std::process::exit(0);
+        }
+        Err(e) => {
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Failed to spawn reload process: {}", e),
+                is_error: true,
+            }
+        }
     }
 }
