@@ -117,13 +117,7 @@ pub fn hash_content(content: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// Get the last N lines of content and hash them
-pub fn hash_last_lines(content: &str, n: usize) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    let start = lines.len().saturating_sub(n);
-    let last_lines = lines[start..].join("\n");
-    hash_content(&last_lines)
-}
+
 
 /// Process a cache request in the background
 pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {

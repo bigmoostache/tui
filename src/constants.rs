@@ -197,7 +197,7 @@ pub mod icons {
     pub const CTX_FILE: &str = "💾";
     pub const CTX_GLOB: &str = "🔭";
     pub const CTX_GREP: &str = "👓";
-    pub const CTX_TMUX: &str = "🕹️";
+    pub const CTX_TMUX: &str = "💻";
     pub const CTX_GIT: &str = "🐙";
     pub const CTX_SCRATCHPAD: &str = "🪶";
 
