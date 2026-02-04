@@ -189,13 +189,14 @@ pub mod icons {
     pub const CTX_CONVERSATION: &str = "📜";
     pub const CTX_TREE: &str = "🌲";
     pub const CTX_TODO: &str = "🪓";
-    pub const CTX_MEMORY: &str = "💎";
+    pub const CTX_MEMORY: &str = "🗝️";
     pub const CTX_OVERVIEW: &str = "🌍";
     pub const CTX_FILE: &str = "💾";
     pub const CTX_GLOB: &str = "🔭";
     pub const CTX_GREP: &str = "👓";
     pub const CTX_TMUX: &str = "🕹️";
     pub const CTX_GIT: &str = "🐙";
+    pub const CTX_SCRATCHPAD: &str = "🪶";
 
     // Message status
     pub const STATUS_FULL: &str = "";
@@ -211,6 +212,36 @@ pub mod icons {
     pub const SIZE_LARGE: &str = "🔴";
     pub const SIZE_MEDIUM: &str = "🟡";
     pub const SIZE_SMALL: &str = "🟢";
+}
+
+// =============================================================================
+// TOOL CATEGORY DESCRIPTIONS
+// =============================================================================
+
+pub mod tool_categories {
+    /// Description for File tools category
+    pub const FILE_DESC: &str = "Read, write, and search files in the project";
+    
+    /// Description for Tree tools category
+    pub const TREE_DESC: &str = "Navigate and annotate the directory structure";
+    
+    /// Description for Console tools category
+    pub const CONSOLE_DESC: &str = "Execute commands and monitor terminal output";
+    
+    /// Description for Context tools category
+    pub const CONTEXT_DESC: &str = "Manage conversation context and system prompts";
+    
+    /// Description for Todo tools category
+    pub const TODO_DESC: &str = "Track tasks and progress during the session";
+    
+    /// Description for Memory tools category
+    pub const MEMORY_DESC: &str = "Store persistent notes across the conversation";
+    
+    /// Description for Git tools category
+    pub const GIT_DESC: &str = "Version control operations and repository management";
+    
+    /// Description for Scratchpad tools category
+    pub const SCRATCHPAD_DESC: &str = "Temporary storage for notes and code snippets";
 }
 
 // =============================================================================

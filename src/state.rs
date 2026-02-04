@@ -64,6 +64,7 @@ pub enum ContextType {
     Memory,
     Overview,
     Git,
+    Scratchpad,
 }
 
 impl ContextType {
@@ -76,7 +77,8 @@ impl ContextType {
             ContextType::Todo |
             ContextType::Memory |
             ContextType::Overview |
-            ContextType::Git
+            ContextType::Git |
+            ContextType::Scratchpad
         )
     }
 
@@ -94,6 +96,7 @@ impl ContextType {
             ContextType::Memory => icons::CTX_MEMORY,
             ContextType::Overview => icons::CTX_OVERVIEW,
             ContextType::Git => icons::CTX_GIT,
+            ContextType::Scratchpad => icons::CTX_SCRATCHPAD,
         }
     }
 
@@ -270,6 +273,17 @@ pub struct SystemItem {
     pub content: String,
 }
 
+/// A scratchpad cell for storing temporary notes/data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScratchpadCell {
+    /// Cell ID (C1, C2, ...)
+    pub id: String,
+    /// Cell title
+    pub title: String,
+    /// Cell content
+    pub content: String,
+}
+
 /// A file description in the tree
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeFileDescription {
@@ -420,6 +434,12 @@ pub struct PersistedState {
     /// Active system ID (None = default)
     #[serde(default)]
     pub active_system_id: Option<String>,
+    /// Scratchpad cells
+    #[serde(default)]
+    pub scratchpad_cells: Vec<ScratchpadCell>,
+    /// Next scratchpad cell ID
+    #[serde(default = "default_one")]
+    pub next_scratchpad_id: usize,
     /// Disabled tool IDs (tools not in this list are enabled)
     #[serde(default)]
     pub disabled_tools: Vec<String>,
@@ -530,6 +550,10 @@ pub struct State {
     pub next_system_id: usize,
     /// Active system ID (None = default)
     pub active_system_id: Option<String>,
+    /// Scratchpad cells
+    pub scratchpad_cells: Vec<ScratchpadCell>,
+    /// Next scratchpad cell ID (C1, C2, ...)
+    pub next_scratchpad_id: usize,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Whether context cleaning is in progress
@@ -780,6 +804,27 @@ impl Default for State {
                     last_refresh_ms: 0,
                     tmux_last_lines_hash: None,
                 },
+                ContextElement {
+                    id: "P7".to_string(),
+                    context_type: ContextType::Scratchpad,
+                    name: "Scratch".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
+                },
             ],
             messages: vec![],
             input: String::new(),
@@ -806,6 +851,8 @@ impl Default for State {
             systems: vec![],
             next_system_id: 0,
             active_system_id: None,
+            scratchpad_cells: vec![],
+            next_scratchpad_id: 1,
             tools: get_all_tool_definitions(),
             is_cleaning_context: false,
             dirty: true, // Start dirty to ensure initial render
@@ -854,8 +901,8 @@ impl State {
             .filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok()))
             .collect();
 
-        // Find first available starting from 7 (P1-P6 are fixed defaults)
-        let id = (7..).find(|n| !used_ids.contains(n)).unwrap_or(7);
+        // Find first available starting from 8 (P0-P7 are fixed defaults)
+        let id = (8..).find(|n| !used_ids.contains(n)).unwrap_or(8);
         format!("P{}", id)
     }
 

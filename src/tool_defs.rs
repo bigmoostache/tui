@@ -142,50 +142,68 @@ impl ToolDefinition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolCategory {
-    FileSystem,
+    File,
+    Tree,
+    Console,
     Context,
-    Tmux,
-    Tasks,
+    Todo,
     Memory,
     Git,
+    Scratchpad,
 }
 
 impl ToolCategory {
     /// Short display name for the category
     pub fn short_name(&self) -> &'static str {
         match self {
-            ToolCategory::FileSystem => "Files",
+            ToolCategory::File => "File",
+            ToolCategory::Tree => "Tree",
+            ToolCategory::Console => "Console",
             ToolCategory::Context => "Context",
-            ToolCategory::Tmux => "Tmux",
-            ToolCategory::Tasks => "Tasks",
+            ToolCategory::Todo => "Todo",
             ToolCategory::Memory => "Memory",
             ToolCategory::Git => "Git",
+            ToolCategory::Scratchpad => "Scratch",
         }
+    }
+
+    /// Get all categories in display order
+    pub fn all() -> &'static [ToolCategory] {
+        &[
+            ToolCategory::File,
+            ToolCategory::Tree,
+            ToolCategory::Console,
+            ToolCategory::Context,
+            ToolCategory::Todo,
+            ToolCategory::Memory,
+            ToolCategory::Git,
+            ToolCategory::Scratchpad,
+        ]
     }
 }
 
 /// Get all available tool definitions
 pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
     vec![
-        // File System tools
+        // File tools
         ToolDefinition {
-            id: "open_file".to_string(),
+            id: "file_open".to_string(),
             name: "Open File".to_string(),
             short_desc: "Read file into context".to_string(),
-            description: "Opens a file and adds it to context so you can see its content. ALWAYS use this BEFORE edit_file to see current content - you need exact text for edits.".to_string(),
+            description: "Opens a file and adds it to context so you can see its content. ALWAYS use this BEFORE file_edit to see current content - you need exact text for edits.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path to the file to open")
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
         ToolDefinition {
-            id: "edit_file".to_string(),
+            id: "file_edit".to_string(),
             name: "Edit File".to_string(),
             short_desc: "Modify file content".to_string(),
-            description: "Edits a file by replacing exact text. IMPORTANT: 1) Use open_file FIRST to see current content. 2) old_string must be EXACT text from file (copy from context) - empty string will fail. 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
+            description: "Edits a file by replacing exact text. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context) - empty string will fail. 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path to the file to edit")
@@ -202,13 +220,13 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
         ToolDefinition {
-            id: "create_file".to_string(),
+            id: "file_create".to_string(),
             name: "Create File".to_string(),
             short_desc: "Create new file".to_string(),
-            description: "Creates a NEW file. Fails if file exists - use edit_file to modify existing files.".to_string(),
+            description: "Creates a NEW file. Fails if file exists - use file_edit to modify existing files.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path for the new file")
@@ -218,10 +236,10 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
         ToolDefinition {
-            id: "create".to_string(),
+            id: "file_batch_create".to_string(),
             name: "Batch Create".to_string(),
             short_desc: "Create files/folders".to_string(),
             description: "Creates multiple files and/or folders in one call. Fails for items that already exist. Parent directories are created automatically.".to_string(),
@@ -241,7 +259,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
         ToolDefinition {
             id: "file_glob".to_string(),
@@ -257,7 +275,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .default_val("."),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
         ToolDefinition {
             id: "file_grep".to_string(),
@@ -275,11 +293,13 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .desc("Glob pattern to filter files (e.g., '*.rs', '*.ts')"),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::File,
         },
+
+        // Tree tools
         ToolDefinition {
-            id: "edit_tree_filter".to_string(),
-            name: "Edit Tree Filter".to_string(),
+            id: "tree_filter".to_string(),
+            name: "Tree Filter".to_string(),
             short_desc: "Configure directory filter".to_string(),
             description: "Edits the gitignore-style filter for the directory tree view.".to_string(),
             params: vec![
@@ -288,11 +308,11 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::Tree,
         },
         ToolDefinition {
-            id: "tree_toggle_folders".to_string(),
-            name: "Toggle Tree Folders".to_string(),
+            id: "tree_toggle".to_string(),
+            name: "Tree Toggle".to_string(),
             short_desc: "Open/close folders".to_string(),
             description: "Opens or closes folders in the directory tree view. Closed folders show child count, open folders show contents.".to_string(),
             params: vec![
@@ -305,11 +325,11 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .default_val("toggle"),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::Tree,
         },
         ToolDefinition {
-            id: "tree_describe_files".to_string(),
-            name: "Describe Tree Items".to_string(),
+            id: "tree_describe".to_string(),
+            name: "Tree Describe".to_string(),
             short_desc: "Add file/folder descriptions".to_string(),
             description: "Adds or updates descriptions for files and folders in the tree. Descriptions appear next to items. A [!] marker indicates the file changed since description was written.".to_string(),
             params: vec![
@@ -326,12 +346,12 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::FileSystem,
+            category: ToolCategory::Tree,
         },
 
         // Context tools
         ToolDefinition {
-            id: "close_contexts".to_string(),
+            id: "context_close".to_string(),
             name: "Close Contexts".to_string(),
             short_desc: "Remove items from context".to_string(),
             description: "Closes context elements by their IDs (e.g., P6, P7). Cannot close core elements (P1-P6).".to_string(),
@@ -344,8 +364,8 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Context,
         },
         ToolDefinition {
-            id: "set_message_status".to_string(),
-            name: "Set Message Status".to_string(),
+            id: "context_message_status".to_string(),
+            name: "Message Status".to_string(),
             short_desc: "Manage message visibility".to_string(),
             description: "Changes message status to control what's sent to the LLM. Batched.".to_string(),
             params: vec![
@@ -366,33 +386,33 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Context,
         },
 
-        // Tmux tools
+        // Console tools
         ToolDefinition {
-            id: "create_tmux_pane".to_string(),
-            name: "Create Tmux Pane".to_string(),
+            id: "console_create".to_string(),
+            name: "Create Console".to_string(),
             short_desc: "Add terminal to context".to_string(),
-            description: "Creates a tmux pane context element to monitor terminal output.".to_string(),
+            description: "Creates a console context element to monitor terminal output.".to_string(),
             params: vec![
                 ToolParam::new("pane_id", ParamType::String)
-                    .desc("Tmux pane ID (e.g., %0, %1)")
+                    .desc("Console pane ID (e.g., %0, %1)")
                     .required(),
                 ToolParam::new("lines", ParamType::Integer)
                     .desc("Number of lines to capture")
                     .default_val("50"),
                 ToolParam::new("description", ParamType::String)
-                    .desc("Description of what this pane is for"),
+                    .desc("Description of what this console is for"),
             ],
             enabled: true,
-            category: ToolCategory::Tmux,
+            category: ToolCategory::Console,
         },
         ToolDefinition {
-            id: "edit_tmux_config".to_string(),
-            name: "Edit Tmux Config".to_string(),
-            short_desc: "Update pane settings".to_string(),
-            description: "Updates configuration for an existing tmux pane context.".to_string(),
+            id: "console_edit".to_string(),
+            name: "Edit Console".to_string(),
+            short_desc: "Update console settings".to_string(),
+            description: "Updates configuration for an existing console context.".to_string(),
             params: vec![
                 ToolParam::new("context_id", ParamType::String)
-                    .desc("Context ID of the tmux pane (e.g., P7)")
+                    .desc("Context ID of the console (e.g., P7)")
                     .required(),
                 ToolParam::new("lines", ParamType::Integer)
                     .desc("Number of lines to capture"),
@@ -400,37 +420,37 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .desc("New description"),
             ],
             enabled: true,
-            category: ToolCategory::Tmux,
+            category: ToolCategory::Console,
         },
         ToolDefinition {
-            id: "tmux_send_keys".to_string(),
-            name: "Tmux Send Keys".to_string(),
+            id: "console_send_keys".to_string(),
+            name: "Console Send Keys".to_string(),
             short_desc: "Send keys to terminal".to_string(),
-            description: "Sends keystrokes to a tmux pane. Use for running commands or interacting with terminal apps.".to_string(),
+            description: "Sends keystrokes to a console. Use for running commands or interacting with terminal apps.".to_string(),
             params: vec![
                 ToolParam::new("context_id", ParamType::String)
-                    .desc("Context ID of the tmux pane (e.g., P7)")
+                    .desc("Context ID of the console (e.g., P7)")
                     .required(),
                 ToolParam::new("keys", ParamType::String)
                     .desc("Keys to send (e.g., 'ls -la' or 'Enter' or 'C-c')")
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::Tmux,
+            category: ToolCategory::Console,
         },
         ToolDefinition {
-            id: "sleep".to_string(),
-            name: "Sleep".to_string(),
+            id: "console_sleep".to_string(),
+            name: "Console Sleep".to_string(),
             short_desc: "Wait 2 seconds".to_string(),
             description: "Pauses execution for 2 seconds. Useful for waiting for terminal output or processes to complete.".to_string(),
             params: vec![],
             enabled: true,
-            category: ToolCategory::Tmux,
+            category: ToolCategory::Console,
         },
 
-        // Task tools
+        // Todo tools
         ToolDefinition {
-            id: "create_todos".to_string(),
+            id: "todo_create".to_string(),
             name: "Create Todos".to_string(),
             short_desc: "Add task items".to_string(),
             description: "Creates one or more todo items. Supports nesting via parent_id.".to_string(),
@@ -448,10 +468,10 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::Tasks,
+            category: ToolCategory::Todo,
         },
         ToolDefinition {
-            id: "update_todos".to_string(),
+            id: "todo_update".to_string(),
             name: "Update Todos".to_string(),
             short_desc: "Modify task items".to_string(),
             description: "Updates existing todos: change status, name, description, or delete. Use delete:true to remove a todo.".to_string(),
@@ -476,12 +496,12 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::Tasks,
+            category: ToolCategory::Todo,
         },
 
         // Memory tools
         ToolDefinition {
-            id: "create_memories".to_string(),
+            id: "memory_create".to_string(),
             name: "Create Memories".to_string(),
             short_desc: "Store persistent notes".to_string(),
             description: "Creates memory items for important information to remember across the conversation.".to_string(),
@@ -502,7 +522,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Memory,
         },
         ToolDefinition {
-            id: "update_memories".to_string(),
+            id: "memory_update".to_string(),
             name: "Update Memories".to_string(),
             short_desc: "Modify stored notes".to_string(),
             description: "Updates or deletes existing memory items.".to_string(),
@@ -528,7 +548,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
 
         // System Prompt tools
         ToolDefinition {
-            id: "create_system".to_string(),
+            id: "system_create".to_string(),
             name: "Create System".to_string(),
             short_desc: "Create system prompt".to_string(),
             description: "Creates a new system prompt with a name, description, and content. System prompts define the agent's identity and behavior.".to_string(),
@@ -546,7 +566,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Context,
         },
         ToolDefinition {
-            id: "edit_system".to_string(),
+            id: "system_edit".to_string(),
             name: "Edit System".to_string(),
             short_desc: "Edit system prompt".to_string(),
             description: "Edits an existing system prompt. Can update name, description, or content.".to_string(),
@@ -565,7 +585,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Context,
         },
         ToolDefinition {
-            id: "delete_system".to_string(),
+            id: "system_delete".to_string(),
             name: "Delete System".to_string(),
             short_desc: "Delete system prompt".to_string(),
             description: "Deletes a system prompt. If the deleted prompt was active, reverts to default.".to_string(),
@@ -578,7 +598,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Context,
         },
         ToolDefinition {
-            id: "load_system".to_string(),
+            id: "system_load".to_string(),
             name: "Load System".to_string(),
             short_desc: "Activate system prompt".to_string(),
             description: "Loads/activates a system prompt. Pass empty id to revert to default system prompt.".to_string(),
@@ -592,7 +612,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
 
         // System tools
         ToolDefinition {
-            id: "reload_tui".to_string(),
+            id: "system_reload".to_string(),
             name: "Reload TUI".to_string(),
             short_desc: "Restart the TUI".to_string(),
             description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
@@ -603,7 +623,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
 
         // Git tools
         ToolDefinition {
-            id: "toggle_git_details".to_string(),
+            id: "git_toggle_details".to_string(),
             name: "Toggle Git Details".to_string(),
             short_desc: "Show/hide diff content".to_string(),
             description: "Toggles whether the Git panel shows full diff content or just a summary. When disabled, only shows file names and line counts. Useful for reducing context size.".to_string(),
@@ -615,7 +635,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Git,
         },
         ToolDefinition {
-            id: "toggle_git_logs".to_string(),
+            id: "git_toggle_logs".to_string(),
             name: "Toggle Git Logs".to_string(),
             short_desc: "Show/hide git log".to_string(),
             description: "Toggles whether the Git panel shows recent commit history. Can specify custom git log arguments.".to_string(),
@@ -644,7 +664,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Git,
         },
         ToolDefinition {
-            id: "git_create_branch".to_string(),
+            id: "git_branch_create".to_string(),
             name: "Git Create Branch".to_string(),
             short_desc: "Create new branch".to_string(),
             description: "Creates a new git branch from the current branch and switches to it.".to_string(),
@@ -657,8 +677,8 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Git,
         },
         ToolDefinition {
-            id: "git_change_branch".to_string(),
-            name: "Git Change Branch".to_string(),
+            id: "git_branch_switch".to_string(),
+            name: "Git Switch Branch".to_string(),
             short_desc: "Switch branch".to_string(),
             description: "Switches to another git branch. Fails if there are uncommitted or unstaged changes.".to_string(),
             params: vec![
@@ -712,7 +732,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
 
         // Meta tools
         ToolDefinition {
-            id: "manage_tools".to_string(),
+            id: "tool_manage".to_string(),
             name: "Manage Tools".to_string(),
             short_desc: "Enable/disable tools".to_string(),
             description: "Enables or disables tools. This tool cannot be disabled. Use to customize available capabilities.".to_string(),
@@ -731,6 +751,54 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             ],
             enabled: true,
             category: ToolCategory::Context,
+        },
+
+        // Scratchpad tools
+        ToolDefinition {
+            id: "scratchpad_create_cell".to_string(),
+            name: "Create Scratchpad Cell".to_string(),
+            short_desc: "Add scratchpad cell".to_string(),
+            description: "Creates a new scratchpad cell for storing temporary notes, code snippets, or data during the conversation.".to_string(),
+            params: vec![
+                ToolParam::new("cell_title", ParamType::String)
+                    .desc("Title for the cell")
+                    .required(),
+                ToolParam::new("cell_contents", ParamType::String)
+                    .desc("Content to store in the cell")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Scratchpad,
+        },
+        ToolDefinition {
+            id: "scratchpad_edit_cell".to_string(),
+            name: "Edit Scratchpad Cell".to_string(),
+            short_desc: "Modify scratchpad cell".to_string(),
+            description: "Edits an existing scratchpad cell. Can update title and/or contents.".to_string(),
+            params: vec![
+                ToolParam::new("cell_id", ParamType::String)
+                    .desc("Cell ID to edit (e.g., C1)")
+                    .required(),
+                ToolParam::new("cell_title", ParamType::String)
+                    .desc("New title (omit to keep current)"),
+                ToolParam::new("cell_contents", ParamType::String)
+                    .desc("New contents (omit to keep current)"),
+            ],
+            enabled: true,
+            category: ToolCategory::Scratchpad,
+        },
+        ToolDefinition {
+            id: "scratchpad_wipe".to_string(),
+            name: "Wipe Scratchpad".to_string(),
+            short_desc: "Delete scratchpad cells".to_string(),
+            description: "Deletes scratchpad cells by their IDs. Pass an empty array to wipe all cells.".to_string(),
+            params: vec![
+                ToolParam::new("cell_ids", ParamType::Array(Box::new(ParamType::String)))
+                    .desc("Cell IDs to delete (e.g., ['C1', 'C2']). Empty array deletes all cells.")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Scratchpad,
         },
     ]
 }

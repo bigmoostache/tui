@@ -23,6 +23,7 @@ mod glob;
 mod grep;
 mod memory;
 mod overview;
+mod scratchpad;
 mod system;
 mod tmux;
 mod todo;
@@ -57,6 +58,7 @@ pub use glob::GlobPanel;
 pub use grep::GrepPanel;
 pub use memory::MemoryPanel;
 pub use overview::OverviewPanel;
+pub use scratchpad::ScratchpadPanel;
 pub use system::SystemPanel;
 pub use tmux::TmuxPanel;
 pub use todo::TodoPanel;
@@ -182,6 +184,7 @@ pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
         ContextType::Memory => Box::new(MemoryPanel),
         ContextType::Overview => Box::new(OverviewPanel),
         ContextType::Git => Box::new(GitPanel),
+        ContextType::Scratchpad => Box::new(ScratchpadPanel),
     }
 }
 

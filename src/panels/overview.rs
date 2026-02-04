@@ -48,6 +48,7 @@ impl Panel for OverviewPanel {
                 ContextType::Memory => "notes",
                 ContextType::Overview => "world",
                 ContextType::Git => "changes",
+                ContextType::Scratchpad => "scratch",
             };
 
             let details = match ctx.context_type {
@@ -386,6 +387,7 @@ impl Panel for OverviewPanel {
                 ContextType::Memory => "memory",
                 ContextType::Overview => "overview",
                 ContextType::Git => "git",
+                ContextType::Scratchpad => "scratchpad",
             };
 
             let details = match ctx.context_type {
@@ -558,7 +560,7 @@ impl Panel for OverviewPanel {
         ]));
         text.push(Line::from(""));
 
-        // Tools section
+        // Tools section - grouped by category
         let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
         let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
 
@@ -569,43 +571,66 @@ impl Panel for OverviewPanel {
         ]));
         text.push(Line::from(""));
 
-        // Table header
-        let cat_width = 8;
-        let name_width = state.tools.iter().map(|t| t.id.len()).max().unwrap_or(10).max(10);
-        text.push(Line::from(vec![
-            Span::styled(" ".to_string(), base_style),
-            Span::styled(format!("{:<width$}", "Category", width = cat_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
-            Span::styled("  ", base_style),
-            Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
-            Span::styled("  ", base_style),
-            Span::styled("  ", base_style),
-            Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY).bold()),
-        ]));
+        use crate::constants::tool_categories;
+        use crate::tool_defs::ToolCategory;
 
-        // Table separator
-        text.push(Line::from(vec![
-            Span::styled(" ".to_string(), base_style),
-            Span::styled(format!("{}", chars::HORIZONTAL.repeat(cat_width + name_width + 44)), Style::default().fg(theme::BORDER)),
-        ]));
+        // Iterate through each category
+        for category in ToolCategory::all() {
+            let category_tools: Vec<_> = state.tools.iter()
+                .filter(|t| &t.category == category)
+                .collect();
+            
+            if category_tools.is_empty() {
+                continue;
+            }
 
-        // Table rows
-        for tool in &state.tools {
-            let (status_icon, status_color) = if tool.enabled {
-                ("✓", theme::SUCCESS)
-            } else {
-                ("✗", theme::ERROR) // Red for disabled
+            // Category header with description
+            let (cat_name, cat_desc) = match category {
+                ToolCategory::File => ("FILE", tool_categories::FILE_DESC),
+                ToolCategory::Tree => ("TREE", tool_categories::TREE_DESC),
+                ToolCategory::Console => ("CONSOLE", tool_categories::CONSOLE_DESC),
+                ToolCategory::Context => ("CONTEXT", tool_categories::CONTEXT_DESC),
+                ToolCategory::Todo => ("TODO", tool_categories::TODO_DESC),
+                ToolCategory::Memory => ("MEMORY", tool_categories::MEMORY_DESC),
+                ToolCategory::Git => ("GIT", tool_categories::GIT_DESC),
+                ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::SCRATCHPAD_DESC),
             };
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(format!("{:<width$}", tool.category.short_name(), width = cat_width), Style::default().fg(theme::ACCENT_DIM)),
-                Span::styled("  ", base_style),
-                Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::TEXT)),
-                Span::styled("  ", base_style),
-                Span::styled(status_icon, Style::default().fg(status_color)),
-                Span::styled("  ", base_style),
-                Span::styled(tool.short_desc.clone(), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled(cat_name.to_string(), Style::default().fg(theme::ACCENT).bold()),
+                Span::styled(format!("  {}", cat_desc), Style::default().fg(theme::TEXT_MUTED)),
             ]));
+
+            // Table header for this category
+            let name_width = category_tools.iter().map(|t| t.id.len()).max().unwrap_or(10).max(10);
+            text.push(Line::from(vec![
+                Span::styled("   ".to_string(), base_style),
+                Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::TEXT_SECONDARY)),
+                Span::styled("  ", base_style),
+                Span::styled("  ", base_style),
+                Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY)),
+            ]));
+
+            // Tool rows for this category
+            for tool in &category_tools {
+                let (status_icon, status_color) = if tool.enabled {
+                    ("✓", theme::SUCCESS)
+                } else {
+                    ("✗", theme::ERROR)
+                };
+
+                text.push(Line::from(vec![
+                    Span::styled("   ".to_string(), base_style),
+                    Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::TEXT)),
+                    Span::styled("  ", base_style),
+                    Span::styled(status_icon, Style::default().fg(status_color)),
+                    Span::styled("  ", base_style),
+                    Span::styled(tool.short_desc.clone(), Style::default().fg(theme::TEXT_MUTED)),
+                ]));
+            }
+
+            text.push(Line::from(""));
         }
 
         text
