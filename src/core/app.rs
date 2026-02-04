@@ -940,11 +940,9 @@ impl App {
                     match id.as_str() {
                         "quit" => return None, // Signal quit
                         "reload" => {
-                            // Set reload flag and quit to trigger reload
-                            self.state.dirty = true;
-                            // Use persistence to signal reload
-                            crate::persistence::save_state(&self.state);
-                            return None;
+                            // Perform reload (sets reload_requested flag and exits)
+                            perform_reload(&mut self.state);
+                            return None; // Won't reach here, but needed for type system
                         }
                         "config" => return Some(Action::ToggleConfigView),
                         _ if id.starts_with('P') => {
