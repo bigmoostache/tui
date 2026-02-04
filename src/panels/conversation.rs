@@ -591,7 +591,8 @@ fn detect_list_action(input: &str) -> Option<ListAction> {
         if after.is_empty() {
             // Check if it's a valid marker (numeric or alphabetic)
             let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
-            let is_alpha = marker.chars().all(|c| c.is_ascii_alphabetic())
+            let is_alpha = marker.len() == 1
+                && marker.chars().all(|c| c.is_ascii_alphabetic())
                 && (marker.chars().all(|c| c.is_ascii_lowercase())
                     || marker.chars().all(|c| c.is_ascii_uppercase()));
             if is_numeric || is_alpha {
@@ -620,8 +621,8 @@ fn detect_list_action(input: &str) -> Option<ListAction> {
             }
         }
 
-        // Alphabetic: a, b, c, ... or A, B, C, ...
-        if marker.chars().all(|c| c.is_ascii_alphabetic()) {
+        // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)
+        if marker.len() == 1 && marker.chars().all(|c| c.is_ascii_alphabetic()) {
             let all_lower = marker.chars().all(|c| c.is_ascii_lowercase());
             let all_upper = marker.chars().all(|c| c.is_ascii_uppercase());
             if all_lower || all_upper {
@@ -650,12 +651,6 @@ impl Panel for ConversationPanel {
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let alt = key.modifiers.contains(KeyModifiers::ALT);
-
-        // Alt+Enter = newline
-        if alt && key.code == KeyCode::Enter {
-            return Some(Action::InputChar('\n'));
-        }
 
         // Ctrl+Backspace for delete word
         if ctrl && key.code == KeyCode::Backspace {
@@ -670,11 +665,21 @@ impl Panel for ConversationPanel {
             KeyCode::Left => Some(Action::CursorWordLeft),
             KeyCode::Right => Some(Action::CursorWordRight),
             KeyCode::Enter => {
-                // Smart Enter: handle list continuation
-                match detect_list_action(&state.input) {
-                    Some(ListAction::Continue(text)) => Some(Action::InsertText(text)),
-                    Some(ListAction::RemoveItem) => Some(Action::RemoveListItem),
-                    None => Some(Action::InputSubmit),
+                // Send if: cursor at end AND (input empty OR ends with empty line)
+                let at_end = state.input_cursor >= state.input.len();
+                let ends_with_empty_line = state.input.ends_with('\n')
+                    || state.input.lines().last().map(|l| l.trim().is_empty()).unwrap_or(true);
+
+                if at_end && ends_with_empty_line {
+                    // Send message
+                    Some(Action::InputSubmit)
+                } else {
+                    // Check for list continuation, otherwise add newline
+                    match detect_list_action(&state.input) {
+                        Some(ListAction::Continue(text)) => Some(Action::InsertText(text)),
+                        Some(ListAction::RemoveItem) => Some(Action::RemoveListItem),
+                        None => Some(Action::InputChar('\n')),
+                    }
                 }
             }
             KeyCode::Home => Some(Action::CursorHome),

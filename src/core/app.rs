@@ -16,7 +16,7 @@ use crate::help::CommandPalette;
 use crate::panels::now_ms;
 use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
-use crate::tools::{execute_tool, ToolResult, ToolUse};
+use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
 use crate::ui;
 use crate::watcher::{FileWatcher, WatchEvent};
@@ -433,6 +433,12 @@ impl App {
         };
         save_message(&result_msg);
         self.state.messages.push(result_msg);
+
+        // Check if reload was requested - perform it after tool result is saved
+        if self.state.reload_pending {
+            perform_reload(&mut self.state);
+            // Note: perform_reload calls std::process::exit(0), so we won't reach here
+        }
 
         // Create new assistant message
         let assistant_id = format!("A{}", self.state.next_assistant_id);

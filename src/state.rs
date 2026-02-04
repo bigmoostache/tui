@@ -614,6 +614,8 @@ pub struct State {
     pub git_log_content: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
+    /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
+    pub reload_pending: bool,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width (for pre-wrapping text)
@@ -884,6 +886,7 @@ impl Default for State {
             git_log_content: None,
             // API retry
             api_retry_count: 0,
+            reload_pending: false,
             // Render cache
             last_viewport_width: 0,
             message_cache: HashMap::new(),

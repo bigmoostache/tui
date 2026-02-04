@@ -170,11 +170,6 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Enter", Style::default().fg(theme::ACCENT)),
-            Span::styled(" send", Style::default().fg(theme::TEXT_MUTED)),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
             Span::styled("Tab", Style::default().fg(theme::ACCENT)),
             Span::styled(" next panel", Style::default().fg(theme::TEXT_MUTED)),
         ]),

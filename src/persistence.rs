@@ -157,6 +157,7 @@ pub fn load_state() -> State {
                 git_log_content: None,
                 // API retry (runtime-only)
                 api_retry_count: 0,
+                reload_pending: false,
                 // Render cache (runtime-only)
                 last_viewport_width: 0,
                 message_cache: std::collections::HashMap::new(),

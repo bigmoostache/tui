@@ -132,18 +132,30 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-/// Execute reload_tui tool - restarts the TUI application
-fn execute_reload_tui(_tool: &ToolUse, state: &mut State) -> ToolResult {
+/// Execute reload_tui tool - sets flag to trigger reload after tool result is saved
+fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
+    // Set flag - actual reload happens in app.rs after tool result is saved
+    state.reload_pending = true;
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: "Reload initiated. Restarting TUI...".to_string(),
+        is_error: false,
+    }
+}
+
+/// Perform the actual TUI reload (called from app.rs after tool result is saved)
+pub fn perform_reload(state: &mut State) {
     use std::fs;
     use std::io::stdout;
     use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
     use crate::persistence::save_state;
-    
+
     let state_path = ".context-pilot/state.json";
-    
+
     // Save state before exiting
     save_state(state);
-    
+
     // Read current state, set reload_requested to true, and save
     match fs::read_to_string(state_path) {
         Ok(json) => {
@@ -153,7 +165,7 @@ fn execute_reload_tui(_tool: &ToolUse, state: &mut State) -> ToolResult {
                     .replace("\"reload_requested\":false", "\"reload_requested\":true")
             } else {
                 // Add the field before the final }
-                json.trim_end().trim_end_matches('}').to_string() 
+                json.trim_end().trim_end_matches('}').to_string()
                     + ",\n  \"reload_requested\": true\n}"
             };
             let _ = fs::write(state_path, updated);
@@ -162,11 +174,11 @@ fn execute_reload_tui(_tool: &ToolUse, state: &mut State) -> ToolResult {
             // If we can't read state, just try to reload anyway
         }
     }
-    
+
     // Clean up terminal
     let _ = disable_raw_mode();
     let _ = execute!(stdout(), LeaveAlternateScreen);
-    
+
     // Exit - the run.sh supervisor will see reload_requested and restart
     std::process::exit(0);
 }

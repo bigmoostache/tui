@@ -40,7 +40,11 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             }
 
             // Enter or Space on context pattern (p1, P2, etc.) submits immediately
-            if key.code == KeyCode::Enter || key.code == KeyCode::Char(' ') {
+            // But not if modifier keys are held (Ctrl/Shift/Alt+Enter = newline)
+            let has_modifier = key.modifiers.contains(KeyModifiers::CONTROL)
+                || key.modifiers.contains(KeyModifiers::SHIFT)
+                || key.modifiers.contains(KeyModifiers::ALT);
+            if (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ') {
                 if let Some(id) = parse_context_pattern(&state.input) {
                     if find_context_by_id(state, &id).is_some() {
                         return Some(Action::InputSubmit);
