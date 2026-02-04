@@ -251,7 +251,7 @@ impl App {
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
                 );
                 self.state.dirty = true;
             }
@@ -490,7 +490,7 @@ impl App {
         start_streaming(
             self.state.llm_provider,
             self.state.current_model(),
-            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
+            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
         );
     }
 
@@ -570,7 +570,7 @@ impl App {
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
                 );
                 save_state(&self.state);
             }

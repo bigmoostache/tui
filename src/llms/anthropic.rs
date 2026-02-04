@@ -90,7 +90,7 @@ impl LlmClient for AnthropicClient {
         // Build API messages
         let include_tool_uses = request.tool_results.is_some();
         let mut api_messages =
-            messages_to_api(&request.messages, &request.context_items, include_tool_uses);
+            messages_to_api(&request.messages, &request.context_items, include_tool_uses, request.seed_content.as_deref());
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
@@ -327,6 +327,7 @@ fn messages_to_api(
     messages: &[Message],
     context_items: &[crate::panels::ContextItem],
     include_last_tool_uses: bool,
+    seed_content: Option<&str>,
 ) -> Vec<ApiMessage> {
     let mut api_messages: Vec<ApiMessage> = Vec::new();
     let current_ms = now_ms();
@@ -388,6 +389,22 @@ fn messages_to_api(
                 content: crate::constants::prompts::PANEL_FOOTER_ACK.to_string(),
             }],
         });
+
+        // Re-inject seed/system prompt after panels (before conversation messages)
+        if let Some(seed) = seed_content {
+            api_messages.push(ApiMessage {
+                role: "user".to_string(),
+                content: vec![ContentBlock::Text {
+                    text: format!("System instructions (repeated for emphasis):\n\n{}", seed),
+                }],
+            });
+            api_messages.push(ApiMessage {
+                role: "assistant".to_string(),
+                content: vec![ContentBlock::Text {
+                    text: "Understood. I will follow these instructions.".to_string(),
+                }],
+            });
+        }
     }
 
     for (idx, msg) in messages.iter().enumerate() {

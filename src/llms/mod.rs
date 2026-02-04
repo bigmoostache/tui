@@ -230,6 +230,8 @@ pub struct LlmRequest {
     pub tool_results: Option<Vec<ToolResult>>,
     pub system_prompt: Option<String>,
     pub extra_context: Option<String>,
+    /// Seed/system prompt content to repeat after panels
+    pub seed_content: Option<String>,
 }
 
 /// Trait for LLM providers
@@ -273,6 +275,7 @@ pub fn start_streaming(
     tools: Vec<ToolDefinition>,
     tool_results: Option<Vec<ToolResult>>,
     system_prompt: String,
+    seed_content: Option<String>,
     tx: Sender<StreamEvent>,
 ) {
     let client = get_client(provider);
@@ -286,6 +289,7 @@ pub fn start_streaming(
             tool_results,
             system_prompt: Some(system_prompt),
             extra_context: None,
+            seed_content,
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
@@ -318,6 +322,7 @@ pub fn start_cleaning(
             tool_results: None,
             system_prompt: Some(system_prompt),
             extra_context: Some(cleaner_context),
+            seed_content: None,
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
