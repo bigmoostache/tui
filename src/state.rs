@@ -744,7 +744,7 @@ impl Default for State {
                 ContextElement {
                     id: "P4".to_string(),
                     context_type: ContextType::Memory,
-                    name: "Notes".to_string(),
+                    name: "Memories".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,

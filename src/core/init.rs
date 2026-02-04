@@ -51,7 +51,7 @@ pub fn get_active_seed_content(state: &State) -> String {
 
 /// Ensure all default context elements exist with correct IDs
 /// P0 = Seed (System), P1 = Chat (Conversation), P2 = Tree, P3 = WIP (Todo),
-/// P4 = Notes (Memory), P5 = World (Overview), P6 = Changes (Git)
+/// P4 = Memories, P5 = World (Overview), P6 = Changes (Git)
 pub fn ensure_default_contexts(state: &mut State) {
     // Ensure System context element exists (P0)
     if !state.context.iter().any(|c| c.context_type == ContextType::System) {
@@ -158,7 +158,7 @@ pub fn ensure_default_contexts(state: &mut State) {
         state.context.insert(4.min(state.context.len()), ContextElement {
             id: "P4".to_string(),
             context_type: ContextType::Memory,
-            name: "Notes".to_string(),
+            name: "Memories".to_string(),
             token_count: 0,
             file_path: None,
             file_hash: None,

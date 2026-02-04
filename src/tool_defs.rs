@@ -503,7 +503,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
         ToolDefinition {
             id: "memory_create".to_string(),
             name: "Create Memories".to_string(),
-            short_desc: "Store persistent notes".to_string(),
+            short_desc: "Store persistent memories".to_string(),
             description: "Creates memory items for important information to remember across the conversation.".to_string(),
             params: vec![
                 ToolParam::new("memories", ParamType::Array(Box::new(ParamType::Object(vec![

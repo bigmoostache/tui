@@ -45,7 +45,7 @@ impl Panel for OverviewPanel {
                 ContextType::Grep => "grep",
                 ContextType::Tmux => "tmux",
                 ContextType::Todo => "wip",
-                ContextType::Memory => "notes",
+                ContextType::Memory => "memories",
                 ContextType::Overview => "world",
                 ContextType::Git => "changes",
                 ContextType::Scratchpad => "scratch",

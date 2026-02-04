@@ -189,7 +189,7 @@ pub mod icons {
     pub const CTX_CONVERSATION: &str = "📜";
     pub const CTX_TREE: &str = "🌲";
     pub const CTX_TODO: &str = "🪓";
-    pub const CTX_MEMORY: &str = "🗝️";
+    pub const CTX_MEMORY: &str = "✨";
     pub const CTX_OVERVIEW: &str = "🌍";
     pub const CTX_FILE: &str = "💾";
     pub const CTX_GLOB: &str = "🔭";
@@ -235,13 +235,13 @@ pub mod tool_categories {
     pub const TODO_DESC: &str = "Track tasks and progress during the session";
     
     /// Description for Memory tools category
-    pub const MEMORY_DESC: &str = "Store persistent notes across the conversation";
+    pub const MEMORY_DESC: &str = "Store persistent memories across the conversation";
     
     /// Description for Git tools category
     pub const GIT_DESC: &str = "Version control operations and repository management";
     
     /// Description for Scratchpad tools category
-    pub const SCRATCHPAD_DESC: &str = "Temporary storage for notes and code snippets";
+    pub const SCRATCHPAD_DESC: &str = "A useful scratchpad for you to use however you like";
 }
 
 // =============================================================================
