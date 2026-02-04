@@ -298,39 +298,6 @@ pub fn start_streaming(
     });
 }
 
-/// Start context cleaning with specialized prompt
-pub fn start_cleaning(
-    provider: LlmProvider,
-    model: String,
-    messages: Vec<Message>,
-    context_items: Vec<ContextItem>,
-    tools: Vec<ToolDefinition>,
-    state: &crate::state::State,
-    tx: Sender<StreamEvent>,
-) {
-    let client = get_client(provider);
-
-    let cleaner_context = crate::context_cleaner::build_cleaner_context(state);
-    let system_prompt = crate::context_cleaner::get_cleaner_system_prompt(state);
-
-    std::thread::spawn(move || {
-        let request = LlmRequest {
-            model,
-            messages,
-            context_items,
-            tools,
-            tool_results: None,
-            system_prompt: Some(system_prompt),
-            extra_context: Some(cleaner_context),
-            seed_content: None,
-        };
-
-        if let Err(e) = client.stream(request, tx.clone()) {
-            let _ = tx.send(StreamEvent::Error(e));
-        }
-    });
-}
-
 // Re-export common types used by providers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]

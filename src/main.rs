@@ -3,7 +3,6 @@ mod api;
 mod background;
 mod cache;
 mod constants;
-mod context_cleaner;
 mod core;
 mod events;
 mod help;
@@ -53,12 +52,11 @@ fn main() -> io::Result<()> {
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (tldr_tx, tldr_rx) = mpsc::channel::<TlDrResult>();
-    let (clean_tx, clean_rx) = mpsc::channel::<StreamEvent>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, clean_tx, clean_rx, cache_rx)?;
+    app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, cache_rx)?;
 
     // Cleanup
     disable_raw_mode()?;

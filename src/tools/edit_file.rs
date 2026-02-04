@@ -1,17 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use serde::Deserialize;
-
 use super::{ToolResult, ToolUse};
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
-
-/// Edit operation from LLM
-#[derive(Debug, Deserialize)]
-pub struct EditOperation {
-    pub old_string: String,
-    pub new_string: String,
-}
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
 fn normalize_for_match(s: &str) -> String {
@@ -120,16 +111,46 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
 }
 
 pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let path_str = match tool.input.get("path").and_then(|v| v.as_str()) {
+    // Get file_path (required)
+    let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: path".to_string(),
+                content: "Missing required parameter: file_path".to_string(),
                 is_error: true,
             }
         }
     };
+
+    // Get old_string (required)
+    let old_string = match tool.input.get("old_string").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing required parameter: old_string".to_string(),
+                is_error: true,
+            }
+        }
+    };
+
+    // Get new_string (required)
+    let new_string = match tool.input.get("new_string").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing required parameter: new_string".to_string(),
+                is_error: true,
+            }
+        }
+    };
+
+    // Get replace_all (optional, default false)
+    let replace_all = tool.input.get("replace_all")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     // Check if file is open in context
     let is_open = state.context.iter().any(|c| {
@@ -139,30 +160,10 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !is_open {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is not open in context. Use open_file first.", path_str),
+            content: format!("File '{}' is not open in context. Use file_open first.", path_str),
             is_error: true,
         };
     }
-
-    let edits: Vec<EditOperation> = match tool.input.get("edits") {
-        Some(edits_value) => match serde_json::from_value(edits_value.clone()) {
-            Ok(e) => e,
-            Err(e) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Invalid edits format: {}", e),
-                    is_error: true,
-                }
-            }
-        },
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: edits".to_string(),
-                is_error: true,
-            }
-        }
-    };
 
     let path = Path::new(path_str);
 
@@ -178,69 +179,70 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let mut applied = 0;
-    let mut errors: Vec<String> = vec![];
-
-    for (idx, edit) in edits.iter().enumerate() {
-        let edit_num = idx + 1;
-
-        // Try normalized matching (handles trailing whitespace differences)
-        if let Some(actual_match) = find_normalized_match(&content, &edit.old_string) {
-            content = content.replacen(actual_match, &edit.new_string, 1);
-            applied += 1;
+    // Try normalized matching (handles trailing whitespace differences)
+    let replaced = if let Some(actual_match) = find_normalized_match(&content, old_string) {
+        if replace_all {
+            let count = content.matches(actual_match).count();
+            content = content.replace(actual_match, new_string);
+            count
         } else {
-            // Provide helpful error with closest match
-            let hint = if let Some((line, preview)) = find_closest_match(&content, &edit.old_string) {
-                format!(" (closest match at line {}: \"{}\")", line, preview)
-            } else {
-                String::new()
-            };
-
-            let needle_preview = if edit.old_string.len() > 50 {
-                format!("{}...", &edit.old_string[..50])
-            } else {
-                edit.old_string.clone()
-            };
-
-            errors.push(format!("Edit {}: no match for \"{}\"{}", edit_num, needle_preview, hint));
+            content = content.replacen(actual_match, new_string, 1);
+            1
         }
+    } else {
+        0
+    };
+
+    if replaced == 0 {
+        // Provide helpful error with closest match
+        let hint = if let Some((line, preview)) = find_closest_match(&content, old_string) {
+            format!(" (closest match at line {}: \"{}\")", line, preview)
+        } else {
+            String::new()
+        };
+
+        let needle_preview = if old_string.len() > 50 {
+            format!("{}...", &old_string[..50])
+        } else {
+            old_string.to_string()
+        };
+
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("No match found for \"{}\"{}", needle_preview, hint),
+            is_error: true,
+        };
     }
 
-    // Write file if any edits applied
-    if applied > 0 {
-        if let Err(e) = fs::write(path, &content) {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to write file: {}", e),
-                is_error: true,
-            };
-        }
+    // Write file
+    if let Err(e) = fs::write(path, &content) {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Failed to write file: {}", e),
+            is_error: true,
+        };
+    }
 
-        // Update the context element's token count
-        if let Some(ctx) = state.context.iter_mut().find(|c| {
-            c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
-        }) {
-            ctx.token_count = estimate_tokens(&content);
-        }
+    // Update the context element's token count
+    if let Some(ctx) = state.context.iter_mut().find(|c| {
+        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
+    }) {
+        ctx.token_count = estimate_tokens(&content);
     }
 
     // Count approximate lines changed
-    let lines_changed: usize = edits.iter().take(applied).map(|e| {
-        e.new_string.lines().count().max(e.old_string.lines().count())
-    }).sum();
+    let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
-    let result_msg = if errors.is_empty() {
-        format!("Edited '{}': {}/{} edits applied (~{} lines changed)",
-                path_str, applied, edits.len(), lines_changed)
+    let result_msg = if replace_all && replaced > 1 {
+        format!("Edited '{}': {} replacements (~{} lines changed each)", path_str, replaced, lines_changed)
     } else {
-        format!("Edited '{}': {}/{} applied; {}",
-                path_str, applied, edits.len(), errors.join("; "))
+        format!("Edited '{}': ~{} lines changed", path_str, lines_changed)
     };
 
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: result_msg,
-        is_error: applied == 0 && !edits.is_empty(),
+        is_error: false,
     }
 }
 

@@ -32,14 +32,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    if state.is_cleaning_context {
-        spans.push(Span::styled(
-            format!(" {} CLEANING ", spin),
-            Style::default().fg(theme::BG_BASE).bg(theme::ACCENT).bold()
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
     if state.pending_tldrs > 0 {
         spans.push(Span::styled(
             format!(" {} SUMMARIZING {} ", spin, state.pending_tldrs),
@@ -62,7 +54,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     // If nothing active, show READY
-    if !state.is_streaming && !state.is_cleaning_context && state.pending_tldrs == 0 && loading_count == 0 {
+    if !state.is_streaming && state.pending_tldrs == 0 && loading_count == 0 {
         spans.push(Span::styled(" READY ", Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()));
         spans.push(Span::styled(" ", base_style));
     }

@@ -21,9 +21,6 @@ pub const API_VERSION: &str = "2023-06-01";
 // CONTEXT & TOKEN MANAGEMENT
 // =============================================================================
 
-/// Maximum cleaning iterations before forcing stop
-pub const MAX_CLEANING_ITERATIONS: u32 = 10;
-
 /// Average characters per token for token estimation
 pub const CHARS_PER_TOKEN: f32 = 4.0;
 
@@ -210,11 +207,6 @@ pub mod icons {
     pub const TODO_PENDING: &str = "○";
     pub const TODO_IN_PROGRESS: &str = "◐";
     pub const TODO_DONE: &str = "●";
-
-    // Context size indicators
-    pub const SIZE_LARGE: &str = "🔴";
-    pub const SIZE_MEDIUM: &str = "🟡";
-    pub const SIZE_SMALL: &str = "🟢";
 }
 
 // =============================================================================
@@ -303,72 +295,4 @@ Current datetime: {current_datetime}"#;
 
     /// Text for panel footer tool result acknowledgment
     pub const PANEL_FOOTER_ACK: &str = "Panel display complete. Proceeding with conversation.";
-
-    /// Context cleaner system prompt
-    pub const CLEANER_SYSTEM: &str = r#"You are a context management assistant. Your ONLY job is to reduce context usage intelligently.
-
-## CURRENT STATUS
-- Current tokens: {current_tokens}
-- Target tokens: {target_tokens}
-- Tokens to remove: {tokens_to_remove}
-
-Follow this structured approach:
-
-## Phase 1: Understand Current Work
-First, identify what the user is currently working on by examining:
-- Recent messages (last 5-10 exchanges)
-- Open files and their relevance
-- Active todos
-- Recent tool calls
-
-Write a brief summary: "User is currently working on: ..."
-
-## Phase 2: Map Context Importance
-For EACH context element (P7+), assign an importance level relative to current work:
-
-| ID | Type | Tokens | Importance | Reason |
-|----|------|--------|------------|--------|
-| P7 | file | 1234 | IRRELEVANT | Old lookup, not related to current task |
-| P8 | glob | 567 | LOW | Search completed, found what was needed |
-| ... | ... | ... | ... | ... |
-
-Importance levels:
-- **CRITICAL**: Actively being edited/discussed, essential to current task
-- **HIGH**: Referenced recently, likely needed soon  
-- **MEDIUM**: Related to current work but not immediately needed
-- **LOW**: Tangentially related, opened for quick lookup
-- **IRRELEVANT**: No longer related to current work, old explorations
-
-## Phase 3: Calculate Reduction Strategy
-Based on the mapping, plan which elements to remove to reach target:
-
-"To remove {tokens_to_remove} tokens, I will:
-1. Close P7 (file, 1234 tokens) - IRRELEVANT
-2. Delete tool results T1-T5 (~500 tokens) - old executions
-3. Summarize messages A1-A3 (~800 tokens) - verbose explanations
-Total planned reduction: ~2534 tokens"
-
-## Phase 4: Execute Cleanup
-Make all necessary tool calls efficiently (batch when possible).
-
----
-
-## Quick Wins (Easy Token Savings):
-
-1. **Old tool calls (T#) and results (R#)** - DELETE these first via set_message_status, they're rarely needed after execution
-2. **Summarize older assistant messages** - Keep key decisions, remove verbose explanations
-3. **Close folders in P2 (Directory Tree)** - Use tree_toggle_folders to close irrelevant directories (saves tokens in tree output)
-4. **Close glob/grep searches (P7+)** - Once you found what you needed, close them
-5. **Close files opened for quick lookup** - If not actively editing, close it
-6. **Delete completed todos** - Done items waste tokens
-7. **Close tmux panes** - Terminal output is transient, close completed commands
-8. **Remove outdated memories** - Delete memories about completed tasks
-
-## Rules:
-- NEVER close P1-P6 (core context elements)
-- NEVER delete/summarize the last 5 messages (keep recent context)
-- Prefer deleting over summarizing when content is truly obsolete
-- Be aggressive with IRRELEVANT items, cautious with MEDIUM+
-- After cleaning, report: what was removed and estimated tokens saved
-"#;
 }

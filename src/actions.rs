@@ -78,7 +78,6 @@ pub enum Action {
     ScrollUp(f32),
     ScrollDown(f32),
     StopStreaming,
-    StartContextCleaning,
     TmuxSendKeys { pane_id: String, keys: String },
     TogglePerfMonitor,
     ToggleConfigView,
@@ -99,7 +98,6 @@ pub enum ActionResult {
     Nothing,
     StartStream,
     StopStream,
-    StartCleaning,
     StartApiCheck,
     Save,
     SaveMessage(String),
@@ -467,15 +465,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 ActionResult::StopStream
             } else {
                 ActionResult::Nothing
-            }
-        }
-        Action::StartContextCleaning => {
-            // Don't start if already cleaning (streaming is OK - cleaning runs independently)
-            if state.is_cleaning_context {
-                ActionResult::Nothing
-            } else {
-                state.is_cleaning_context = true;
-                ActionResult::StartCleaning
             }
         }
         Action::TmuxSendKeys { pane_id, keys } => {

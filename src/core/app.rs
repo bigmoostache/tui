@@ -6,11 +6,10 @@ use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
-use crate::api::{start_cleaning, start_streaming, StreamEvent};
+use crate::api::{start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
-use crate::context_cleaner;
+use crate::constants::{EVENT_POLL_MS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
 use crate::events::handle_event;
 use crate::help::CommandPalette;
 use crate::panels::now_ms;
@@ -29,9 +28,6 @@ pub struct App {
     typewriter: TypewriterBuffer,
     pending_done: Option<(usize, usize)>,
     pending_tools: Vec<ToolUse>,
-    cleaning_pending_done: Option<(usize, usize)>,
-    cleaning_pending_tools: Vec<ToolUse>,
-    cleaning_iterations: u32,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,
     /// Tracks which file paths are being watched
@@ -63,9 +59,6 @@ impl App {
             typewriter: TypewriterBuffer::new(),
             pending_done: None,
             pending_tools: Vec::new(),
-            cleaning_pending_done: None,
-            cleaning_pending_tools: Vec::new(),
-            cleaning_iterations: 0,
             cache_tx,
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
@@ -87,8 +80,6 @@ impl App {
         rx: Receiver<StreamEvent>,
         tldr_tx: Sender<TlDrResult>,
         tldr_rx: Receiver<TlDrResult>,
-        clean_tx: Sender<StreamEvent>,
-        clean_rx: Receiver<StreamEvent>,
         cache_rx: Receiver<CacheUpdate>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
@@ -104,7 +95,7 @@ impl App {
             // Set input and trigger submit to start streaming
             self.state.input = "/* automatic post-reload message */".to_string();
             self.state.input_cursor = self.state.input.len();
-            self.handle_action(Action::InputSubmit, &tx, &tldr_tx, &clean_tx);
+            self.handle_action(Action::InputSubmit, &tx, &tldr_tx);
         }
 
         loop {
@@ -118,7 +109,7 @@ impl App {
                 // Handle command palette events first if it's open
                 if self.command_palette.is_open {
                     if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+                        self.handle_action(action, &tx, &tldr_tx);
                     }
                     self.state.dirty = true;
 
@@ -144,7 +135,7 @@ impl App {
                     self.command_palette.open(&self.state);
                     self.state.dirty = true;
                 } else {
-                    self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+                    self.handle_action(action, &tx, &tldr_tx);
                 }
 
                 // Render immediately after input for instant feedback
@@ -162,13 +153,12 @@ impl App {
             self.process_stream_events(&rx);
             self.handle_retry(&tx);
             self.process_typewriter();
-            self.process_cleaning_events(&clean_rx, &clean_tx);
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx, &tldr_tx, &clean_tx, &cache_rx, terminal);
-            self.finalize_stream(&tldr_tx, &clean_tx);
+            self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
+            self.finalize_stream(&tldr_tx);
             self.process_api_check_results();
 
             // Check ownership periodically (every 1 second)
@@ -268,69 +258,6 @@ impl App {
         }
     }
 
-    fn process_cleaning_events(&mut self, clean_rx: &Receiver<StreamEvent>, clean_tx: &Sender<StreamEvent>) {
-        while let Ok(evt) = clean_rx.try_recv() {
-            if !self.state.is_cleaning_context {
-                continue;
-            }
-            match evt {
-                StreamEvent::Chunk(_text) => {
-                    // Ignore text output from cleaner
-                }
-                StreamEvent::ToolUse(tool) => {
-                    self.cleaning_pending_tools.push(tool);
-                }
-                StreamEvent::Done { input_tokens, output_tokens } => {
-                    self.cleaning_pending_done = Some((input_tokens, output_tokens));
-                }
-                StreamEvent::Error(_e) => {
-                    self.state.is_cleaning_context = false;
-                    self.cleaning_pending_tools.clear();
-                    self.cleaning_pending_done = None;
-                    self.state.dirty = true;
-                }
-            }
-        }
-
-        // Execute cleaning tools
-        if self.state.is_cleaning_context && self.cleaning_pending_done.is_some() && !self.cleaning_pending_tools.is_empty() {
-            let tools = std::mem::take(&mut self.cleaning_pending_tools);
-            self.cleaning_iterations += 1;
-
-            for tool in &tools {
-                let _result = execute_tool(tool, &mut self.state);
-            }
-
-            self.state.dirty = true;
-            save_state(&self.state);
-
-            let (_, usage_pct) = context_cleaner::calculate_context_usage(&self.state);
-            if usage_pct < self.state.cleaning_target() || self.cleaning_iterations >= MAX_CLEANING_ITERATIONS {
-                self.state.is_cleaning_context = false;
-                self.cleaning_pending_done = None;
-                self.cleaning_iterations = 0;
-            } else {
-                let ctx = prepare_stream_context(&mut self.state, true);
-                let cleaner_tools = context_cleaner::get_cleaner_tools();
-                self.cleaning_pending_done = None;
-                start_cleaning(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
-                );
-            }
-        }
-
-        // Finalize cleaning
-        if self.state.is_cleaning_context && self.cleaning_pending_done.is_some() && self.cleaning_pending_tools.is_empty() {
-            self.state.is_cleaning_context = false;
-            self.cleaning_pending_done = None;
-            self.cleaning_iterations = 0;
-            self.state.dirty = true;
-            save_state(&self.state);
-        }
-    }
-
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
         while let Ok(tldr) = tldr_rx.try_recv() {
             self.state.pending_tldrs = self.state.pending_tldrs.saturating_sub(1);
@@ -355,7 +282,7 @@ impl App {
         }
     }
 
-    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
             return;
         }
@@ -462,21 +389,6 @@ impl App {
         self.state.streaming_estimated_tokens = 0;
         save_state(&self.state);
 
-        // Check if automatic cleaning should start (before continuing streaming)
-        if context_cleaner::should_clean_context(&self.state) {
-            self.state.is_cleaning_context = true;
-            self.cleaning_pending_tools.clear();
-            self.cleaning_pending_done = None;
-            self.cleaning_iterations = 0;
-            let ctx = prepare_stream_context(&mut self.state, true);
-            let cleaner_tools = context_cleaner::get_cleaner_tools();
-            start_cleaning(
-                self.state.llm_provider,
-                self.state.current_model(),
-                ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
-            );
-        }
-
         // Wait for any dirty file panels to be loaded before continuing
         super::wait::wait_for_panels(&mut self.state, cache_rx, terminal, |state, rx| {
             Self::process_cache_updates_static(state, rx);
@@ -494,7 +406,7 @@ impl App {
         );
     }
 
-    fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>) {
+    fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming {
             return;
         }
@@ -525,21 +437,6 @@ impl App {
                 self.state.api_retry_count = 0;
                 self.typewriter.reset();
                 self.pending_done = None;
-
-                // Check if automatic cleaning should start
-                if context_cleaner::should_clean_context(&self.state) {
-                    self.state.is_cleaning_context = true;
-                    self.cleaning_pending_tools.clear();
-                    self.cleaning_pending_done = None;
-                    self.cleaning_iterations = 0;
-                    let ctx = prepare_stream_context(&mut self.state, true);
-                    let cleaner_tools = context_cleaner::get_cleaner_tools();
-                    start_cleaning(
-                        self.state.llm_provider,
-                        self.state.current_model(),
-                        ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
-                    );
-                }
             }
         }
     }
@@ -549,7 +446,6 @@ impl App {
         action: Action,
         tx: &Sender<StreamEvent>,
         tldr_tx: &Sender<TlDrResult>,
-        clean_tx: &Sender<StreamEvent>,
     ) {
         // Any action triggers a re-render
         self.state.dirty = true;
@@ -601,19 +497,6 @@ impl App {
                     self.state.pending_tldrs += 1;
                     generate_tldr(msg_id, content, tldr_tx.clone());
                 }
-                save_state(&self.state);
-            }
-            ActionResult::StartCleaning => {
-                self.cleaning_pending_tools.clear();
-                self.cleaning_pending_done = None;
-                self.cleaning_iterations = 0;
-                let ctx = prepare_stream_context(&mut self.state, true);
-                let cleaner_tools = context_cleaner::get_cleaner_tools();
-                start_cleaning(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
-                );
                 save_state(&self.state);
             }
             ActionResult::StartApiCheck => {
@@ -1019,7 +902,6 @@ impl App {
     fn update_spinner_animation(&mut self) {
         // Check if there's any active operation that needs spinner animation
         let has_active_spinner = self.state.is_streaming
-            || self.state.is_cleaning_context
             || self.state.pending_tldrs > 0
             || self.state.api_check_in_progress
             || self.state.context.iter().any(|c| {

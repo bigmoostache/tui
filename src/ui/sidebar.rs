@@ -185,11 +185,6 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+K", Style::default().fg(theme::ACCENT)),
-            Span::styled(" clean", Style::default().fg(theme::TEXT_MUTED)),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
             Span::styled("Ctrl+Q", Style::default().fg(theme::ACCENT)),
             Span::styled(" quit", Style::default().fg(theme::TEXT_MUTED)),
         ]),

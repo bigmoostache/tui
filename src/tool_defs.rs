@@ -203,21 +203,19 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "file_edit".to_string(),
             name: "Edit File".to_string(),
             short_desc: "Modify file content".to_string(),
-            description: "Edits a file by replacing exact text. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context) - empty string will fail. 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
+            description: "Edits a file by replacing exact text. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context). 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
             params: vec![
-                ToolParam::new("path", ParamType::String)
-                    .desc("Path to the file to edit")
+                ToolParam::new("file_path", ParamType::String)
+                    .desc("Absolute path to the file to edit")
                     .required(),
-                ToolParam::new("edits", ParamType::Array(Box::new(ParamType::Object(vec![
-                    ToolParam::new("old_string", ParamType::String)
-                        .desc("EXACT text to find (copy from file context, never empty or guessed)")
-                        .required(),
-                    ToolParam::new("new_string", ParamType::String)
-                        .desc("Text to replace with (to append: include old_string + new content)")
-                        .required(),
-                ]))))
-                    .desc("Array of edits to apply sequentially")
+                ToolParam::new("old_string", ParamType::String)
+                    .desc("Exact text to find and replace (copy from file context)")
                     .required(),
+                ToolParam::new("new_string", ParamType::String)
+                    .desc("Replacement text")
+                    .required(),
+                ToolParam::new("replace_all", ParamType::Boolean)
+                    .desc("Replace all occurrences (default: false)"),
             ],
             enabled: true,
             category: ToolCategory::File,

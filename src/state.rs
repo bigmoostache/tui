@@ -556,8 +556,6 @@ pub struct State {
     pub next_scratchpad_id: usize,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
-    /// Whether context cleaning is in progress
-    pub is_cleaning_context: bool,
     /// Whether the UI needs to be redrawn
     pub dirty: bool,
     /// Frame counter for spinner animations (wraps around)
@@ -858,7 +856,6 @@ impl Default for State {
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
             tools: get_all_tool_definitions(),
-            is_cleaning_context: false,
             dirty: true, // Start dirty to ensure initial render
             spinner_frame: 0,
             dev_mode: false,

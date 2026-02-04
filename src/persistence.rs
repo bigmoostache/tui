@@ -127,7 +127,6 @@ pub fn load_state() -> State {
                 scratchpad_cells: persisted.scratchpad_cells,
                 next_scratchpad_id: persisted.next_scratchpad_id,
                 tools: build_tools_from_disabled(&persisted.disabled_tools),
-                is_cleaning_context: false,
                 dirty: true,
                 spinner_frame: 0,
                 dev_mode: persisted.dev_mode,
