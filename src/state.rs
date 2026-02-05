@@ -564,6 +564,9 @@ pub struct PanelData {
     /// Token count (preserved across sessions)
     #[serde(default)]
     pub token_count: usize,
+    /// Last refresh timestamp in milliseconds (preserved across sessions)
+    #[serde(default)]
+    pub last_refresh_ms: u64,
 
     // === Conversation panel data ===
     /// Message UIDs for conversation panels

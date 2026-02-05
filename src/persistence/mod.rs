@@ -88,7 +88,8 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_description: panel.tmux_description.clone(),
         cached_content: None,
         cache_deprecated: true,  // Will be refreshed on load
-        last_refresh_ms: crate::panels::now_ms(),
+        // Use saved timestamp if available, otherwise current time for new panels
+        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::panels::now_ms() },
         tmux_last_lines_hash: None,
     }
 }
@@ -366,6 +367,7 @@ pub fn save_state(state: &State) {
                 panel_type: ctx.context_type,
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
+                last_refresh_ms: ctx.last_refresh_ms,
                 // Conversation panel gets message_uids
                 message_uids: if ctx.context_type == ContextType::Conversation {
                     state.messages.iter()
