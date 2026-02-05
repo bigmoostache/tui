@@ -34,6 +34,9 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         content: contents.clone(),
     });
 
+    // Update Scratchpad panel timestamp
+    state.touch_panel(crate::state::ContextType::Scratchpad);
+
     let preview = if contents.len() > 50 {
         format!("{}...", &contents[..47])
     } else {
@@ -83,6 +86,8 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                     is_error: true,
                 }
             } else {
+                // Update Scratchpad panel timestamp
+                state.touch_panel(crate::state::ContextType::Scratchpad);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Updated cell {}: {}", cell_id, changes.join(", ")),
@@ -115,6 +120,8 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     if cell_ids.is_empty() {
         let count = state.scratchpad_cells.len();
         state.scratchpad_cells.clear();
+        // Update Scratchpad panel timestamp
+        state.touch_panel(crate::state::ContextType::Scratchpad);
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Wiped all {} scratchpad cell(s)", count),
@@ -137,6 +144,11 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     if deleted_count < ids_to_delete.len() {
         let missing_count = ids_to_delete.len() - deleted_count;
         output.push_str(&format!(", {} not found", missing_count));
+    }
+
+    // Update Scratchpad panel timestamp if any cells were deleted
+    if deleted_count > 0 {
+        state.touch_panel(crate::state::ContextType::Scratchpad);
     }
 
     ToolResult {

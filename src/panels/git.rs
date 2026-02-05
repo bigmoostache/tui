@@ -39,6 +39,7 @@ impl GitPanel {
                 let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
                 let type_str = match file.change_type {
                     GitChangeType::Added => "A",
+                    GitChangeType::Untracked => "U",
                     GitChangeType::Deleted => "D",
                     GitChangeType::Modified => "M",
                     GitChangeType::Renamed => "R",
@@ -234,6 +235,7 @@ impl Panel for GitPanel {
             // Type indicator
             let (type_char, type_color) = match file.change_type {
                 GitChangeType::Added => ("A", theme::success()),
+                GitChangeType::Untracked => ("U", theme::success()),
                 GitChangeType::Deleted => ("D", theme::error()),
                 GitChangeType::Modified => ("M", theme::warning()),
                 GitChangeType::Renamed => ("R", theme::accent()),
@@ -309,12 +311,14 @@ impl Panel for GitPanel {
         // Summary stats
         text.push(Line::from(""));
         let added = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Added).count();
+        let untracked = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Untracked).count();
         let modified = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Modified).count();
         let deleted = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Deleted).count();
         let renamed = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Renamed).count();
 
         let mut summary_parts = Vec::new();
         if added > 0 { summary_parts.push(format!("{} added", added)); }
+        if untracked > 0 { summary_parts.push(format!("{} untracked", untracked)); }
         if modified > 0 { summary_parts.push(format!("{} modified", modified)); }
         if deleted > 0 { summary_parts.push(format!("{} deleted", deleted)); }
         if renamed > 0 { summary_parts.push(format!("{} renamed", renamed)); }
@@ -381,8 +385,8 @@ impl Panel for GitPanel {
                     // Meta info
                     (Style::default().fg(theme::text_muted()), line.to_string())
                 } else {
-                    // Context line
-                    (Style::default().fg(theme::text_muted()), format!(" {}", line))
+                    // Context line (already has leading space in unified diff format)
+                    (Style::default().fg(theme::text_muted()), line.to_string())
                 };
 
                 text.push(Line::from(vec![

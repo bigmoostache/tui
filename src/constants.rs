@@ -114,11 +114,20 @@ pub const MAX_API_RETRIES: u32 = 3;
 /// Directory for storing state and messages
 pub const STORE_DIR: &str = "./.context-pilot";
 
-/// State file name
-pub const STATE_FILE: &str = "state.json";
-
 /// Messages subdirectory
 pub const MESSAGES_DIR: &str = "messages";
+
+/// Shared config file name (new multi-worker format)
+pub const CONFIG_FILE: &str = "config.json";
+
+/// Worker states subdirectory
+pub const STATES_DIR: &str = "states";
+
+/// Panel data subdirectory (for dynamic panels)
+pub const PANELS_DIR: &str = "panels";
+
+/// Default worker ID
+pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
 // =============================================================================
 // TMUX

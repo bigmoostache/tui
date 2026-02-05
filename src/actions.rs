@@ -232,12 +232,15 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input_cursor = 0;
             let user_token_estimate = estimate_tokens(&content);
 
-            // Assign user ID
+            // Assign user display ID and UID
             let user_id = format!("U{}", state.next_user_id);
+            let user_uid = format!("UID_{}_U", state.global_next_uid);
             state.next_user_id += 1;
+            state.global_next_uid += 1;
 
             let user_msg = Message {
                 id: user_id,
+                uid: Some(user_uid),
                 role: "user".to_string(),
                 message_type: MessageType::TextMessage,
                 content,
@@ -252,9 +255,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             };
             save_message(&user_msg);
 
-            // Add user message tokens to Conversation context
+            // Add user message tokens to Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count += user_token_estimate;
+                ctx.last_refresh_ms = crate::panels::now_ms();
             }
 
             // During streaming: insert BEFORE the streaming assistant message
@@ -263,17 +267,20 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 // Insert before the last message (the streaming assistant message)
                 let insert_pos = state.messages.len().saturating_sub(1);
                 state.messages.insert(insert_pos, user_msg);
-                return ActionResult::SaveMessage(state.messages[insert_pos].id.clone());
+                return ActionResult::SaveMessage(state.messages[insert_pos].uid.clone().unwrap_or_else(|| state.messages[insert_pos].id.clone()));
             }
 
             state.messages.push(user_msg);
 
             // Create assistant message and start streaming
             let assistant_id = format!("A{}", state.next_assistant_id);
+            let assistant_uid = format!("UID_{}_A", state.global_next_uid);
             state.next_assistant_id += 1;
+            state.global_next_uid += 1;
 
             let assistant_msg = Message {
                 id: assistant_id,
+                uid: Some(assistant_uid),
                 role: "assistant".to_string(),
                 message_type: MessageType::TextMessage,
                 content: String::new(),
@@ -294,13 +301,16 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ClearConversation => {
             for msg in &state.messages {
-                delete_message(&msg.id);
+                // Delete by UID if available, otherwise by id
+                let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                delete_message(file_id);
             }
             state.messages.clear();
             state.input.clear();
-            // Reset token count for Conversation context
+            // Reset token count for Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count = 0;
+                ctx.last_refresh_ms = crate::panels::now_ms();
             }
             ActionResult::Save
         }
@@ -308,6 +318,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             let context_id = state.next_available_context_id();
             state.context.push(ContextElement {
                 id: context_id,
+                uid: None, // UIDs for dynamic panels assigned separately
                 context_type: ContextType::Conversation,
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
@@ -324,7 +335,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_description: None,
                 cached_content: None,
                 cache_deprecated: false,
-                last_refresh_ms: 0,
+                last_refresh_ms: crate::panels::now_ms(),
                 tmux_last_lines_hash: None,
             });
             ActionResult::Save
@@ -393,12 +404,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StreamDone { _input_tokens, output_tokens } => {
             state.is_streaming = false;
 
-            // Correct the estimated tokens with actual output tokens on Conversation context
+            // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 // Remove our estimate, add actual
                 ctx.token_count = ctx.token_count
                     .saturating_sub(state.streaming_estimated_tokens)
                     .saturating_add(output_tokens);
+                ctx.last_refresh_ms = crate::panels::now_ms();
             }
             state.streaming_estimated_tokens = 0;
 

@@ -34,14 +34,17 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let search_path = path.as_deref().unwrap_or(".").to_string();
 
-    // Generate context ID (fills gaps)
+    // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();
+    let uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid += 1;
 
     // Create context element WITHOUT computing results
     // Background cache system will populate it
     let name = format!("glob:{}", pattern);
     state.context.push(ContextElement {
         id: context_id.clone(),
+        uid: Some(uid),
         context_type: ContextType::Glob,
         name,
         token_count: 0, // Will be updated by cache
@@ -58,7 +61,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_description: None,
         cached_content: None, // Background will populate
         cache_deprecated: true, // Trigger background refresh
-        last_refresh_ms: 0,
+        last_refresh_ms: crate::panels::now_ms(),
         tmux_last_lines_hash: None,
     });
 

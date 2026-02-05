@@ -83,13 +83,16 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
             .output();
     }
 
-    // Generate context ID (fills gaps)
+    // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();
+    let uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid += 1;
 
     // Add to context (cache will be populated by background system)
     let name = format!("tmux:{}", pane_id);
     state.context.push(ContextElement {
         id: context_id.clone(),
+        uid: Some(uid),
         context_type: ContextType::Tmux,
         name,
         token_count: 0,
@@ -106,7 +109,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_description: Some(description.clone()),
         cached_content: None,
         cache_deprecated: true, // Mark as deprecated so background refresh runs
-        last_refresh_ms: 0,
+        last_refresh_ms: crate::panels::now_ms(),
         tmux_last_lines_hash: None,
     });
 

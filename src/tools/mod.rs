@@ -151,13 +151,13 @@ pub fn perform_reload(state: &mut State) {
     use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
     use crate::persistence::save_state;
 
-    let state_path = ".context-pilot/state.json";
+    let config_path = ".context-pilot/config.json";
 
     // Save state before exiting
     save_state(state);
 
-    // Read current state, set reload_requested to true, and save
-    match fs::read_to_string(state_path) {
+    // Read config, set reload_requested to true, and save
+    match fs::read_to_string(config_path) {
         Ok(json) => {
             // Simple string replacement to set reload_requested: true
             let updated = if json.contains("\"reload_requested\":") {
@@ -168,10 +168,10 @@ pub fn perform_reload(state: &mut State) {
                 json.trim_end().trim_end_matches('}').to_string()
                     + ",\n  \"reload_requested\": true\n}"
             };
-            let _ = fs::write(state_path, updated);
+            let _ = fs::write(config_path, updated);
         }
         Err(_) => {
-            // If we can't read state, just try to reload anyway
+            // If we can't read config, just try to reload anyway
         }
     }
 

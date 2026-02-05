@@ -36,6 +36,9 @@ pub fn create_system(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.systems.push(system);
 
+    // Update System panel timestamp
+    state.touch_panel(crate::state::ContextType::System);
+
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Created system prompt '{}' with ID {}", name, id),
@@ -92,6 +95,9 @@ pub fn edit_system(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
+    // Update System panel timestamp
+    state.touch_panel(crate::state::ContextType::System);
+
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Updated system prompt '{}': {}", id, changes.join(", ")),
@@ -139,6 +145,9 @@ pub fn delete_system(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.active_system_id = Some(prompts::default_seed_id().to_string());
     }
 
+    // Update System panel timestamp
+    state.touch_panel(crate::state::ContextType::System);
+
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Deleted system prompt '{}' ({})", system.name, id),
@@ -153,6 +162,8 @@ pub fn load_system(tool: &ToolUse, state: &mut State) -> ToolResult {
     // If id is None or empty, switch to default seed
     if id.is_none() || id.map(|s| s.is_empty()).unwrap_or(true) {
         state.active_system_id = Some(prompts::default_seed_id().to_string());
+        // Update System panel timestamp
+        state.touch_panel(crate::state::ContextType::System);
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Switched to default seed ({})", prompts::default_seed_id()),
@@ -172,6 +183,9 @@ pub fn load_system(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     state.active_system_id = Some(id.to_string());
+
+    // Update System panel timestamp
+    state.touch_panel(crate::state::ContextType::System);
 
     let name = state.systems.iter()
         .find(|s| s.id == id)

@@ -11,15 +11,6 @@ use std::time::Instant;
 /// Number of recent samples to keep for trend analysis
 const SAMPLE_RING_SIZE: usize = 64;
 
-/// Main loop phases for timing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Phase {
-    EventPoll,
-    EventHandle,
-    Tick,
-    Render,
-}
-
 /// Frame budget for 60fps (milliseconds)
 pub const FRAME_BUDGET_60FPS: f64 = 16.67;
 
@@ -52,10 +43,6 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.data[..self.len].iter()
-    }
-
     pub fn recent(&self, count: usize) -> Vec<T> {
         if self.len == 0 {
             return Vec::new();
@@ -72,17 +59,6 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
             result.push(self.data[idx]);
         }
         result
-    }
-
-    /// Calculate p95 from recent samples
-    pub fn percentile_95(&self) -> Option<T> {
-        if self.len == 0 {
-            return None;
-        }
-        let mut sorted: Vec<T> = self.iter().copied().collect();
-        sorted.sort();
-        let idx = (self.len * 95) / 100;
-        Some(sorted[idx.min(self.len - 1)])
     }
 }
 
@@ -129,20 +105,12 @@ pub struct PerfMetrics {
     cpu_usage: RwLock<f32>,
     /// Memory usage in bytes
     memory_bytes: RwLock<u64>,
-    /// Phase timings (microseconds) - ring buffers per phase
-    phase_times: RwLock<HashMap<Phase, RingBuffer<u64>>>,
 }
 
 impl Default for PerfMetrics {
     fn default() -> Self {
         let (cpu_ticks, mem_bytes) = read_proc_stat().unwrap_or((0, 0));
-        
-        let mut phase_times = HashMap::new();
-        phase_times.insert(Phase::EventPoll, RingBuffer::default());
-        phase_times.insert(Phase::EventHandle, RingBuffer::default());
-        phase_times.insert(Phase::Tick, RingBuffer::default());
-        phase_times.insert(Phase::Render, RingBuffer::default());
-        
+
         Self {
             enabled: AtomicBool::new(false),
             ops: RwLock::new(HashMap::new()),
@@ -153,7 +121,6 @@ impl Default for PerfMetrics {
             last_stats_refresh: RwLock::new(Instant::now()),
             cpu_usage: RwLock::new(0.0),
             memory_bytes: RwLock::new(mem_bytes),
-            phase_times: RwLock::new(phase_times),
         }
     }
 }
@@ -287,11 +254,9 @@ impl PerfMetrics {
 
                 OpSnapshot {
                     name,
-                    count: stats.count.load(Ordering::Relaxed),
                     total_ms: stats.total_us.load(Ordering::Relaxed) as f64 / 1000.0,
                     mean_ms: mean_us / 1000.0,
                     std_ms: std_us / 1000.0,
-                    p95_ms: samples.percentile_95().map(|us| us as f64 / 1000.0),
                 }
             })
             .collect();
@@ -316,17 +281,8 @@ impl PerfMetrics {
             frame_times_ms: frame_samples.clone(),
             frame_avg_ms,
             frame_max_ms: frame_samples.iter().cloned().fold(0.0, f64::max),
-            frame_p95_ms: frame_times
-                .percentile_95()
-                .map(|us| us as f64 / 1000.0)
-                .unwrap_or(0.0),
-            frame_count: self.frame_count.load(Ordering::Relaxed),
             cpu_usage: *self.cpu_usage.read().unwrap(),
             memory_mb: *self.memory_bytes.read().unwrap() as f64 / (1024.0 * 1024.0),
-            phase_poll_ms: self.phase_avg_ms(Phase::EventPoll),
-            phase_handle_ms: self.phase_avg_ms(Phase::EventHandle),
-            phase_tick_ms: self.phase_avg_ms(Phase::Tick),
-            phase_render_ms: self.phase_avg_ms(Phase::Render),
         }
     }
 
@@ -348,49 +304,24 @@ impl PerfMetrics {
         }
         new_state
     }
-
-    /// Get average time for a phase in milliseconds
-    pub fn phase_avg_ms(&self, phase: Phase) -> f64 {
-        if let Some(ring) = self.phase_times.read().unwrap().get(&phase) {
-            let samples = ring.recent(SAMPLE_RING_SIZE);
-            if samples.is_empty() {
-                return 0.0;
-            }
-            let sum: u64 = samples.iter().sum();
-            (sum as f64 / samples.len() as f64) / 1000.0
-        } else {
-            0.0
-        }
-    }
 }
 
 /// Snapshot of operation statistics for display
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct OpSnapshot {
     pub name: &'static str,
-    pub count: u64,
     pub total_ms: f64,
     pub mean_ms: f64,
     pub std_ms: f64,
-    pub p95_ms: Option<f64>,
 }
 
 /// Snapshot of all metrics for display
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct PerfSnapshot {
     pub ops: Vec<OpSnapshot>,
     pub frame_times_ms: Vec<f64>,
     pub frame_avg_ms: f64,
     pub frame_max_ms: f64,
-    pub frame_p95_ms: f64,
-    pub frame_count: u64,
     pub cpu_usage: f32,
     pub memory_mb: f64,
-    /// Phase timings (avg ms)
-    pub phase_poll_ms: f64,
-    pub phase_handle_ms: f64,
-    pub phase_tick_ms: f64,
-    pub phase_render_ms: f64,
 }

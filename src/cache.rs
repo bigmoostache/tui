@@ -296,8 +296,9 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
     }
 
     // Get status first for change detection (fast)
+    // Use -uall to show individual untracked files instead of just directory names
     let status_output = Command::new("git")
-        .args(["status", "--porcelain"])
+        .args(["status", "--porcelain", "-uall"])
         .output()
         .ok()
         .filter(|o| o.status.success())
@@ -353,7 +354,7 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
         };
 
         let change_type = match (x, y) {
-            ('?', '?') => GitChangeType::Added, // Untracked = new file
+            ('?', '?') => GitChangeType::Untracked,
             ('A', _) | (_, 'A') => GitChangeType::Added,
             ('D', _) | (_, 'D') => GitChangeType::Deleted,
             ('R', _) | (_, 'R') => GitChangeType::Renamed,
@@ -381,7 +382,7 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
 
         // For untracked files, count lines
         let untracked_files: Vec<String> = file_changes.iter()
-            .filter(|(_, (add, del, ct))| *ct == GitChangeType::Added && *add == 0 && *del == 0)
+            .filter(|(_, (add, del, ct))| *ct == GitChangeType::Untracked && *add == 0 && *del == 0)
             .map(|(path, _)| path.clone())
             .collect();
 
@@ -448,7 +449,7 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
 
         // For untracked files, create a pseudo-diff
         for (path, _, _, ct, _) in &changes {
-            if *ct == GitChangeType::Added && !diff_contents.contains_key(path) {
+            if *ct == GitChangeType::Untracked && !diff_contents.contains_key(path) {
                 if let Ok(content) = std::fs::read_to_string(path) {
                     let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
                     pseudo_diff.push_str("new file\n");
@@ -535,6 +536,7 @@ fn format_git_content(
             let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
             let type_str = match change_type {
                 GitChangeType::Added => "A",
+                GitChangeType::Untracked => "U",
                 GitChangeType::Deleted => "D",
                 GitChangeType::Modified => "M",
                 GitChangeType::Renamed => "R",

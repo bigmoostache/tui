@@ -307,10 +307,13 @@ impl App {
         // Create tool call messages
         for tool in &tools {
             let tool_id = format!("T{}", self.state.next_tool_id);
+            let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
             self.state.next_tool_id += 1;
+            self.state.global_next_uid += 1;
 
             let tool_msg = Message {
                 id: tool_id,
+                uid: Some(tool_uid),
                 role: "assistant".to_string(),
                 message_type: MessageType::ToolCall,
                 content: String::new(),
@@ -336,7 +339,9 @@ impl App {
 
         // Create tool result message
         let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
         let tool_result_records: Vec<ToolResultRecord> = tool_results.iter()
             .map(|r| ToolResultRecord {
                 tool_use_id: r.tool_use_id.clone(),
@@ -346,6 +351,7 @@ impl App {
             .collect();
         let result_msg = Message {
             id: result_id,
+            uid: Some(result_uid),
             role: "user".to_string(),
             message_type: MessageType::ToolResult,
             content: String::new(),
@@ -369,9 +375,12 @@ impl App {
 
         // Create new assistant message
         let assistant_id = format!("A{}", self.state.next_assistant_id);
+        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
         self.state.next_assistant_id += 1;
+        self.state.global_next_uid += 1;
         let new_assistant_msg = Message {
             id: assistant_id,
+            uid: Some(assistant_uid),
             role: "assistant".to_string(),
             message_type: MessageType::TextMessage,
             content: String::new(),

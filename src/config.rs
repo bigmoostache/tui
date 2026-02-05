@@ -1,6 +1,4 @@
 //! YAML configuration loader for prompts, icons, and UI strings.
-#![allow(dead_code)]
-
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -39,16 +37,29 @@ pub struct PanelPrompts {
 }
 
 // ============================================================================
-// Icons Configuration
+// UI Configuration
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct IconsConfig {
-    pub messages: MessageIcons,
-    pub context: ContextIcons,
-    pub status: StatusIcons,
-    pub todo: TodoIcons,
+pub struct UiConfig {
+    pub tool_categories: ToolCategories,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ToolCategories {
+    pub file: String,
+    pub tree: String,
+    pub console: String,
+    pub context: String,
+    pub todo: String,
+    pub memory: String,
+    pub git: String,
+    pub scratchpad: String,
+}
+
+// ============================================================================
+// Theme Configuration
+// ============================================================================
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct MessageIcons {
@@ -88,108 +99,6 @@ pub struct TodoIcons {
     pub in_progress: String,
     pub done: String,
 }
-
-// ============================================================================
-// UI Configuration
-// ============================================================================
-
-#[derive(Debug, Deserialize)]
-pub struct UiConfig {
-    pub panels: PanelNames,
-    pub tool_categories: ToolCategories,
-    pub status_bar: StatusBarLabels,
-    pub sidebar: SidebarLabels,
-    pub commands: HashMap<String, CommandConfig>,
-    pub panel_titles: PanelTitles,
-    pub labels: CommonLabels,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PanelNames {
-    pub system: String,
-    pub conversation: String,
-    pub tree: String,
-    pub todo: String,
-    pub memory: String,
-    pub overview: String,
-    pub git: String,
-    pub scratchpad: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ToolCategories {
-    pub file: String,
-    pub tree: String,
-    pub console: String,
-    pub context: String,
-    pub todo: String,
-    pub memory: String,
-    pub git: String,
-    pub scratchpad: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct StatusBarLabels {
-    pub streaming: String,
-    pub loading_files: String,
-    pub summarizing: String,
-    pub loading: String,
-    pub ready: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SidebarLabels {
-    pub context_header: String,
-    pub page_indicator: String,
-    pub help: SidebarHelp,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SidebarHelp {
-    pub tab: String,
-    pub arrows: String,
-    pub ctrl_p: String,
-    pub ctrl_q: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CommandConfig {
-    pub label: String,
-    pub description: String,
-    pub keywords: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PanelTitles {
-    pub file: String,
-    pub conversation: String,
-    pub conversation_streaming: String,
-    pub git: String,
-    pub glob: String,
-    pub grep: String,
-    pub memory: String,
-    pub overview: String,
-    pub scratchpad: String,
-    pub system: String,
-    pub tmux: String,
-    pub todo: String,
-    pub tree: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CommonLabels {
-    pub loading: String,
-    pub no_content: String,
-    pub no_memories: String,
-    pub not_git_repo: String,
-    pub branch: String,
-    pub branches: String,
-    pub working_tree_clean: String,
-}
-
-// ============================================================================
-// Theme Configuration
-// ============================================================================
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ThemesConfig {
@@ -287,13 +196,6 @@ pub fn active_theme() -> &'static Theme {
     get_theme(&theme_id)
 }
 
-/// Get the active theme ID
-pub fn active_theme_id() -> String {
-    ACTIVE_THEME.read()
-        .map(|t| t.clone())
-        .unwrap_or_else(|_| DEFAULT_THEME.to_string())
-}
-
 // ============================================================================
 // Icon Helper
 // ============================================================================
@@ -304,42 +206,3 @@ pub fn normalize_icon(icon: &str) -> String {
     format!("{} ", icon)
 }
 
-// ============================================================================
-// Convenience Accessors
-// ============================================================================
-
-/// Get icon for a context type from active theme (normalized to 2 cells)
-pub fn context_icon(context_type: &str) -> String {
-    let theme = active_theme();
-    let icon = match context_type {
-        "system" => &theme.context.system,
-        "conversation" => &theme.context.conversation,
-        "tree" => &theme.context.tree,
-        "todo" => &theme.context.todo,
-        "memory" => &theme.context.memory,
-        "overview" => &theme.context.overview,
-        "file" => &theme.context.file,
-        "glob" => &theme.context.glob,
-        "grep" => &theme.context.grep,
-        "tmux" => &theme.context.tmux,
-        "git" => &theme.context.git,
-        "scratchpad" => &theme.context.scratchpad,
-        _ => "? ",
-    };
-    normalize_icon(icon)
-}
-
-/// Get default panel name for a context type
-pub fn panel_name(context_type: &str) -> &'static str {
-    match context_type {
-        "system" => &UI.panels.system,
-        "conversation" => &UI.panels.conversation,
-        "tree" => &UI.panels.tree,
-        "todo" => &UI.panels.todo,
-        "memory" => &UI.panels.memory,
-        "overview" => &UI.panels.overview,
-        "git" => &UI.panels.git,
-        "scratchpad" => &UI.panels.scratchpad,
-        _ => "Unknown",
-    }
-}

@@ -155,8 +155,11 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
         return CreateResult::Error(format!("Failed to create file '{}': {}", path, e));
     }
 
-    // Add to context
+    // Add to context with UID
     let context_id = state.next_available_context_id();
+    let uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid += 1;
+
     let file_name = file_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -166,6 +169,7 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
 
     state.context.push(ContextElement {
         id: context_id,
+        uid: Some(uid),
         context_type: ContextType::File,
         name: file_name,
         token_count,
@@ -182,7 +186,7 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
         tmux_description: None,
         cached_content: Some(content.to_string()),
         cache_deprecated: true,
-        last_refresh_ms: 0,
+        last_refresh_ms: crate::panels::now_ms(),
         tmux_last_lines_hash: None,
     });
 

@@ -284,6 +284,7 @@ impl Panel for OverviewPanel {
                     // Type indicator
                     let (type_char, type_color) = match file.change_type {
                         GitChangeType::Added => ("A", theme::success()),
+                        GitChangeType::Untracked => ("U", theme::success()),
                         GitChangeType::Deleted => ("D", theme::error()),
                         GitChangeType::Modified => ("M", theme::warning()),
                         GitChangeType::Renamed => ("R", theme::accent()),

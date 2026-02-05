@@ -1,6 +1,16 @@
 use crate::constants::prompts;
 use crate::state::{ContextElement, ContextType, State, SystemItem};
 
+/// Assign a UID to a panel if it doesn't have one
+fn assign_panel_uid(state: &mut State, context_type: ContextType) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type) {
+        if ctx.uid.is_none() {
+            ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
+            state.global_next_uid += 1;
+        }
+    }
+}
+
 /// Ensure the default seed exists and there's always an active seed
 pub fn ensure_default_seed(state: &mut State) {
     // Check if default seed (S0) exists
@@ -57,6 +67,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::System) {
         state.context.insert(0, ContextElement {
             id: "P0".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::System,
             name: "Seed".to_string(),
             token_count: 0,
@@ -73,7 +84,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -82,6 +93,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Conversation) {
         state.context.insert(1.min(state.context.len()), ContextElement {
             id: "P1".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Conversation,
             name: "Chat".to_string(),
             token_count: 0,
@@ -98,7 +110,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: true,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -107,6 +119,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Tree) {
         state.context.insert(2.min(state.context.len()), ContextElement {
             id: "P2".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Tree,
             name: "Tree".to_string(),
             token_count: 0,
@@ -123,7 +136,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: true,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -132,6 +145,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Todo) {
         state.context.insert(3.min(state.context.len()), ContextElement {
             id: "P3".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Todo,
             name: "WIP".to_string(),
             token_count: 0,
@@ -148,7 +162,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -157,6 +171,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Memory) {
         state.context.insert(4.min(state.context.len()), ContextElement {
             id: "P4".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Memory,
             name: "Memories".to_string(),
             token_count: 0,
@@ -173,7 +188,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -182,6 +197,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Overview) {
         state.context.insert(5.min(state.context.len()), ContextElement {
             id: "P5".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Overview,
             name: "World".to_string(),
             token_count: 0,
@@ -198,7 +214,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -207,6 +223,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     if !state.context.iter().any(|c| c.context_type == ContextType::Git) {
         state.context.insert(6.min(state.context.len()), ContextElement {
             id: "P6".to_string(),
+            uid: None, // Fixed panel - no UID
             context_type: ContextType::Git,
             name: "Changes".to_string(),
             token_count: 0,
@@ -223,8 +240,44 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: 0,
+            last_refresh_ms: crate::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
+
+    // Ensure Scratchpad context element exists (P7)
+    if !state.context.iter().any(|c| c.context_type == ContextType::Scratchpad) {
+        state.context.insert(7.min(state.context.len()), ContextElement {
+            id: "P7".to_string(),
+            uid: None,
+            context_type: ContextType::Scratchpad,
+            name: "Scratch".to_string(),
+            token_count: 0,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            grep_pattern: None,
+            grep_path: None,
+            grep_file_pattern: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+            cached_content: None,
+            cache_deprecated: false,
+            last_refresh_ms: crate::panels::now_ms(),
+            tmux_last_lines_hash: None,
+        });
+    }
+
+    // Assign UIDs to all fixed panels (except System which doesn't get stored)
+    // These are needed for panels/ storage
+    assign_panel_uid(state, ContextType::Conversation);
+    assign_panel_uid(state, ContextType::Tree);
+    assign_panel_uid(state, ContextType::Todo);
+    assign_panel_uid(state, ContextType::Memory);
+    assign_panel_uid(state, ContextType::Overview);
+    assign_panel_uid(state, ContextType::Git);
+    assign_panel_uid(state, ContextType::Scratchpad);
 }

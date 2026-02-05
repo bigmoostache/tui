@@ -89,6 +89,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !created.is_empty() {
         output.push_str(&format!("Created {} todo(s):\n{}", created.len(), created.join("\n")));
+        // Update Todo panel timestamp
+        state.touch_panel(crate::state::ContextType::Todo);
     }
 
     if !errors.is_empty() {
@@ -228,6 +230,11 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 not_found.push(id.to_string());
             }
         }
+    }
+
+    // Update Todo panel timestamp if anything changed
+    if !updated.is_empty() || !deleted.is_empty() {
+        state.touch_panel(crate::state::ContextType::Todo);
     }
 
     let mut output = String::new();
