@@ -295,13 +295,23 @@ pub fn active_theme_id() -> String {
 }
 
 // ============================================================================
+// Icon Helper
+// ============================================================================
+
+/// Return icon with trailing space for visual separation.
+/// All icons should be single-width Unicode symbols.
+pub fn normalize_icon(icon: &str) -> String {
+    format!("{} ", icon)
+}
+
+// ============================================================================
 // Convenience Accessors
 // ============================================================================
 
-/// Get icon for a context type from active theme
-pub fn context_icon(context_type: &str) -> &'static str {
+/// Get icon for a context type from active theme (normalized to 2 cells)
+pub fn context_icon(context_type: &str) -> String {
     let theme = active_theme();
-    match context_type {
+    let icon = match context_type {
         "system" => &theme.context.system,
         "conversation" => &theme.context.conversation,
         "tree" => &theme.context.tree,
@@ -314,8 +324,9 @@ pub fn context_icon(context_type: &str) -> &'static str {
         "tmux" => &theme.context.tmux,
         "git" => &theme.context.git,
         "scratchpad" => &theme.context.scratchpad,
-        _ => "?",
-    }
+        _ => "? ",
+    };
+    normalize_icon(icon)
 }
 
 /// Get default panel name for a context type

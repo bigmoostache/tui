@@ -79,7 +79,7 @@ impl ConversationPanel {
                 };
 
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", icons::msg_tool_call()), Style::default().fg(theme::success())),
+                    Span::styled(icons::msg_tool_call(), Style::default().fg(theme::success())),
                     Span::styled(padded_id.clone(), Style::default().fg(theme::success()).bold()),
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(tool_use.name.clone(), Style::default().fg(theme::text())),
@@ -115,7 +115,7 @@ impl ConversationPanel {
                     for wrapped_line in wrapped {
                         if is_first {
                             lines.push(Line::from(vec![
-                                Span::styled(format!("{} ", status_icon), Style::default().fg(status_color)),
+                                Span::styled(status_icon.clone(), Style::default().fg(status_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(status_color).bold()),
                                 Span::styled(" ".to_string(), base_style),
                                 Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
@@ -152,14 +152,14 @@ impl ConversationPanel {
             _ => &msg.content,
         };
 
-        let prefix = format!("{} {}{} ", role_icon, padded_id, status_icon);
+        let prefix = format!("{}{}{}", role_icon, padded_id, status_icon);
         let prefix_width = prefix.chars().count();
         let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 
         if content.trim().is_empty() {
             if msg.role == "assistant" && is_streaming_this {
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
                     Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(" ".to_string(), base_style),
@@ -167,7 +167,7 @@ impl ConversationPanel {
                 ]));
             } else {
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
                     Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                 ]));
@@ -208,7 +208,7 @@ impl ConversationPanel {
                         for (idx, row_spans) in table_spans.into_iter().enumerate() {
                             if is_first_line && idx == 0 {
                                 let mut line_spans = vec![
-                                    Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
                                     Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                     Span::styled(" ".to_string(), base_style),
@@ -236,7 +236,7 @@ impl ConversationPanel {
 
                         if is_first_line {
                             let mut line_spans = vec![
-                                Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
                                 Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                 Span::styled(" ".to_string(), base_style),
@@ -259,7 +259,7 @@ impl ConversationPanel {
                     for line_text in wrapped.iter() {
                         if is_first_line {
                             lines.push(Line::from(vec![
-                                Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
                                 Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                 Span::styled(" ".to_string(), base_style),
@@ -318,7 +318,7 @@ impl ConversationPanel {
 
         if input.is_empty() {
             lines.push(Line::from(vec![
-                Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                 Span::styled("... ", Style::default().fg(role_color).dim()),
                 Span::styled(" ", base_style),
                 Span::styled(cursor_char, Style::default().fg(theme::accent())),
@@ -348,7 +348,7 @@ impl ConversationPanel {
 
                     if is_first_line {
                         let mut line_spans = vec![
-                            Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                            Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                             Span::styled("... ", Style::default().fg(role_color).dim()),
                             Span::styled(" ".to_string(), base_style),
                         ];

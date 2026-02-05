@@ -179,41 +179,42 @@ pub mod chars {
 
 // =============================================================================
 // ICONS / EMOJIS (loaded from active theme in yamls/themes.yaml)
+// All icons are normalized to 2 display cells width for consistent alignment
 // =============================================================================
 
 pub mod icons {
-    use crate::config::active_theme;
+    use crate::config::{active_theme, normalize_icon};
 
-    // Message types - accessor functions for active theme
-    pub fn msg_user() -> &'static str { &active_theme().messages.user }
-    pub fn msg_assistant() -> &'static str { &active_theme().messages.assistant }
-    pub fn msg_tool_call() -> &'static str { &active_theme().messages.tool_call }
-    pub fn msg_tool_result() -> &'static str { &active_theme().messages.tool_result }
-    pub fn msg_error() -> &'static str { &active_theme().messages.error }
+    // Message types - accessor functions for active theme (normalized to 2 cells)
+    pub fn msg_user() -> String { normalize_icon(&active_theme().messages.user) }
+    pub fn msg_assistant() -> String { normalize_icon(&active_theme().messages.assistant) }
+    pub fn msg_tool_call() -> String { normalize_icon(&active_theme().messages.tool_call) }
+    pub fn msg_tool_result() -> String { normalize_icon(&active_theme().messages.tool_result) }
+    pub fn msg_error() -> String { normalize_icon(&active_theme().messages.error) }
 
-    // Context panel types
-    pub fn ctx_system() -> &'static str { &active_theme().context.system }
-    pub fn ctx_conversation() -> &'static str { &active_theme().context.conversation }
-    pub fn ctx_tree() -> &'static str { &active_theme().context.tree }
-    pub fn ctx_todo() -> &'static str { &active_theme().context.todo }
-    pub fn ctx_memory() -> &'static str { &active_theme().context.memory }
-    pub fn ctx_overview() -> &'static str { &active_theme().context.overview }
-    pub fn ctx_file() -> &'static str { &active_theme().context.file }
-    pub fn ctx_glob() -> &'static str { &active_theme().context.glob }
-    pub fn ctx_grep() -> &'static str { &active_theme().context.grep }
-    pub fn ctx_tmux() -> &'static str { &active_theme().context.tmux }
-    pub fn ctx_git() -> &'static str { &active_theme().context.git }
-    pub fn ctx_scratchpad() -> &'static str { &active_theme().context.scratchpad }
+    // Context panel types (normalized to 2 cells)
+    pub fn ctx_system() -> String { normalize_icon(&active_theme().context.system) }
+    pub fn ctx_conversation() -> String { normalize_icon(&active_theme().context.conversation) }
+    pub fn ctx_tree() -> String { normalize_icon(&active_theme().context.tree) }
+    pub fn ctx_todo() -> String { normalize_icon(&active_theme().context.todo) }
+    pub fn ctx_memory() -> String { normalize_icon(&active_theme().context.memory) }
+    pub fn ctx_overview() -> String { normalize_icon(&active_theme().context.overview) }
+    pub fn ctx_file() -> String { normalize_icon(&active_theme().context.file) }
+    pub fn ctx_glob() -> String { normalize_icon(&active_theme().context.glob) }
+    pub fn ctx_grep() -> String { normalize_icon(&active_theme().context.grep) }
+    pub fn ctx_tmux() -> String { normalize_icon(&active_theme().context.tmux) }
+    pub fn ctx_git() -> String { normalize_icon(&active_theme().context.git) }
+    pub fn ctx_scratchpad() -> String { normalize_icon(&active_theme().context.scratchpad) }
 
-    // Message status
-    pub fn status_full() -> &'static str { &active_theme().status.full }
-    pub fn status_summarized() -> &'static str { &active_theme().status.summarized }
-    pub fn status_deleted() -> &'static str { &active_theme().status.deleted }
+    // Message status (normalized to 2 cells)
+    pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }
+    pub fn status_summarized() -> String { normalize_icon(&active_theme().status.summarized) }
+    pub fn status_deleted() -> String { normalize_icon(&active_theme().status.deleted) }
 
-    // Todo status
-    pub fn todo_pending() -> &'static str { &active_theme().todo.pending }
-    pub fn todo_in_progress() -> &'static str { &active_theme().todo.in_progress }
-    pub fn todo_done() -> &'static str { &active_theme().todo.done }
+    // Todo status (normalized to 2 cells)
+    pub fn todo_pending() -> String { normalize_icon(&active_theme().todo.pending) }
+    pub fn todo_in_progress() -> String { normalize_icon(&active_theme().todo.in_progress) }
+    pub fn todo_done() -> String { normalize_icon(&active_theme().todo.done) }
 }
 
 // =============================================================================

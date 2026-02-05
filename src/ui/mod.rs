@@ -369,19 +369,20 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
         ]));
     } else if let Some(result) = &state.api_check_result {
+        use crate::config::normalize_icon;
         let (icon, color, msg) = if result.all_ok() {
-            ("✓", theme::success(), "API OK")
+            (normalize_icon("✓"), theme::success(), "API OK")
         } else if let Some(err) = &result.error {
-            ("✗", theme::error(), err.as_str())
+            (normalize_icon("✗"), theme::error(), err.as_str())
         } else {
             let mut issues = Vec::new();
             if !result.auth_ok { issues.push("auth"); }
             if !result.streaming_ok { issues.push("streaming"); }
             if !result.tools_ok { issues.push("tools"); }
-            ("!", theme::warning(), if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
+            (normalize_icon("!"), theme::warning(), if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", icon), Style::default().fg(color)),
+            Span::styled(format!("  {}", icon), Style::default().fg(color)),
             Span::styled(msg.to_string(), Style::default().fg(color)),
         ]));
     }

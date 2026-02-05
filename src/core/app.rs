@@ -390,7 +390,7 @@ impl App {
         save_state(&self.state);
 
         // Wait for any dirty file panels to be loaded before continuing
-        super::wait::wait_for_panels(&mut self.state, cache_rx, terminal, |state, rx| {
+        super::wait::wait_for_panels(&mut self.state, cache_rx, &self.cache_tx, terminal, |state, rx| {
             Self::process_cache_updates_static(state, rx);
         });
 

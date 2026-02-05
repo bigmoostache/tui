@@ -82,8 +82,8 @@ impl ContextType {
         )
     }
 
-    /// Get icon for this context type
-    pub fn icon(&self) -> &'static str {
+    /// Get icon for this context type (normalized to 2 cells)
+    pub fn icon(&self) -> String {
         match self {
             ContextType::System => icons::ctx_system(),
             ContextType::Conversation => icons::ctx_conversation(),
@@ -180,7 +180,7 @@ pub enum TodoStatus {
 }
 
 impl TodoStatus {
-    pub fn icon(&self) -> &'static str {
+    pub fn icon(&self) -> String {
         match self {
             TodoStatus::Pending => icons::todo_pending(),
             TodoStatus::InProgress => icons::todo_in_progress(),

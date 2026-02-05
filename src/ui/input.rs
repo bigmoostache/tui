@@ -24,14 +24,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    if state.waiting_for_panels {
-        spans.push(Span::styled(
-            format!(" {} LOADING FILES ", spin),
-            Style::default().fg(theme::bg_base()).bg(theme::warning()).bold()
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
     if state.pending_tldrs > 0 {
         spans.push(Span::styled(
             format!(" {} SUMMARIZING {} ", spin, state.pending_tldrs),

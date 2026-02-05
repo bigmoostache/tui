@@ -239,7 +239,7 @@ fn render_context_line(
     lines.push(Line::from(vec![
         Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
         Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::text_muted())),
-        Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
+        Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
         Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
         Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
         Span::styled(" ", base_style),

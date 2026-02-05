@@ -407,7 +407,7 @@ impl Panel for OverviewPanel {
 
             let mut spans = vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(format!("{} ", icon), Style::default().fg(theme::text_muted())),
+                Span::styled(icon, Style::default().fg(theme::text_muted())),
                 Span::styled(format!("{} ", shortcut), Style::default().fg(theme::accent_dim())),
                 Span::styled(format!("{:<12}", type_name), Style::default().fg(theme::text_secondary())),
                 Span::styled(format!("{:>8}", tokens), Style::default().fg(theme::accent())),
@@ -521,9 +521,9 @@ impl Panel for OverviewPanel {
             for sys in &state.systems {
                 let is_active = state.active_system_id.as_deref() == Some(&sys.id);
                 let (active_icon, active_color) = if is_active {
-                    ("✓", theme::success())
+                    (crate::config::normalize_icon("✓"), theme::success())
                 } else {
-                    (" ", theme::text_muted())
+                    ("  ".to_string(), theme::text_muted())  // 2 spaces for alignment
                 };
 
                 // Truncate name if needed
@@ -547,7 +547,7 @@ impl Panel for OverviewPanel {
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::text())),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("  {}   ", active_icon), Style::default().fg(active_color)),
+                    Span::styled(format!("  {} ", active_icon), Style::default().fg(active_color)),
                     Span::styled("  ", base_style),
                     Span::styled(display_desc, Style::default().fg(theme::text_muted())),
                 ]));

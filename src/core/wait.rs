@@ -4,13 +4,13 @@
 //! cache system to load the file content before continuing the stream.
 
 use std::io;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::cache::CacheUpdate;
+use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
 use crate::panels::now_ms;
 use crate::state::{ContextType, State};
 use crate::ui;
@@ -23,12 +23,29 @@ use crate::ui;
 pub fn wait_for_panels(
     state: &mut State,
     cache_rx: &Receiver<CacheUpdate>,
+    cache_tx: &Sender<CacheUpdate>,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     process_cache_updates: impl Fn(&mut State, &Receiver<CacheUpdate>),
 ) {
     // Check if any File panels are dirty - if not, return immediately
     if !has_dirty_file_panels(state) {
         return;
+    }
+
+    // Immediately trigger cache refresh for all dirty file panels
+    for ctx in &state.context {
+        if ctx.context_type == ContextType::File && ctx.cache_deprecated {
+            if let Some(path) = &ctx.file_path {
+                process_cache_request(
+                    CacheRequest::RefreshFile {
+                        context_id: ctx.id.clone(),
+                        file_path: path.clone(),
+                        current_hash: ctx.file_hash.clone(),
+                    },
+                    cache_tx.clone(),
+                );
+            }
+        }
     }
 
     // Set flag for UI indicator
