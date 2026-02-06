@@ -178,32 +178,35 @@ This section documents how the prompt sent to the LLM is constructed.
 
 ### Message Flow Overview
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    System Prompt                        │
-│              (from active seed/system)                  │
-├─────────────────────────────────────────────────────────┤
-│           Dynamic Panels (as fake tool calls)           │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ [assistant] Panel header + tool_use: dynamic_panel│   │
-│  │ [user] tool_result: Panel P2 content              │   │
-│  │ [assistant] timestamp + tool_use: dynamic_panel   │   │
-│  │ [user] tool_result: Panel P3 content              │   │
-│  │ ... (sorted by last_refresh_ms, oldest first)     │   │
-│  │ [assistant] Footer + tool_use: dynamic_panel      │   │
-│  │ [user] tool_result: "Acknowledged"                │   │
-│  └─────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────┤
-│        Seed Re-injection (for emphasis)                 │
-│  [user] "System instructions (repeated)..."             │
-│  [assistant] "Understood. I will follow..."            │
-├─────────────────────────────────────────────────────────┤
-│              Conversation Messages                      │
-│  [user] [U1]: First user message                       │
-│  [assistant] [A1]: First response                      │
-│  [user] [U2]: Second message                           │
-│  ...                                                    │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph SystemPrompt["System Prompt"]
+        SP[Active Seed/System Content]
+    end
+    
+    subgraph DynamicPanels["Dynamic Panels (as fake tool calls)"]
+        direction TB
+        PH[Panel Header] --> P2["[assistant] tool_use: dynamic_panel<br/>[user] tool_result: P2 Tree"]
+        P2 --> P3["[assistant] tool_use: dynamic_panel<br/>[user] tool_result: P3 Todo"]
+        P3 --> PN["... more panels sorted by timestamp ..."]
+        PN --> PF[Panel Footer + Acknowledgment]
+    end
+    
+    subgraph SeedReinjection["Seed Re-injection"]
+        SR1["[user] System instructions repeated"]
+        SR2["[assistant] Understood, I will follow..."]
+    end
+    
+    subgraph Conversation["Conversation Messages"]
+        U1["[user] [U1]: First message"]
+        A1["[assistant] [A1]: First response"]
+        U2["[user] [U2]: Second message"]
+        AN["..."]
+    end
+    
+    SystemPrompt --> DynamicPanels
+    DynamicPanels --> SeedReinjection
+    SeedReinjection --> Conversation
 ```
 
 ### Panel Injection (Dynamic Context)
@@ -253,23 +256,32 @@ When a message has `status == Summarized`:
 
 The application uses a non-blocking caching architecture to ensure the UI remains responsive:
 
-```
-┌─────────────┐     CacheRequest      ┌──────────────────┐
-│  Main Loop  │ ───────────────────▸ │ Background Thread │
-│  (UI Thread)│                       │  (Cache Worker)   │
-│             │ ◂─────────────────── │                   │
-└─────────────┘     CacheUpdate       └──────────────────┘
-       │                                      │
-       │                                      ▼
-       │                              ┌──────────────────┐
-       │                              │   File System    │
-       │                              │   Tmux Sessions  │
-       │                              │   Glob/Grep Exec │
-       │                              └──────────────────┘
-       ▼
-┌─────────────┐
-│ File Watcher│ ──▸ Detects changes, triggers cache refresh
-└─────────────┘
+```mermaid
+flowchart LR
+    subgraph MainThread["Main Thread (UI)"]
+        ML[Main Loop]
+        FW[File Watcher]
+    end
+    
+    subgraph BackgroundThread["Background Thread"]
+        CW[Cache Worker]
+    end
+    
+    subgraph External["External Sources"]
+        FS[File System]
+        TM[Tmux Sessions]
+        GG[Glob/Grep Exec]
+        GT[Git Status]
+    end
+    
+    ML -->|CacheRequest| CW
+    CW -->|CacheUpdate| ML
+    CW --> FS
+    CW --> TM
+    CW --> GG
+    CW --> GT
+    FW -->|"Detects changes"| ML
+    ML -->|"Triggers refresh"| CW
 ```
 
 **Cache Invalidation Strategies:**
