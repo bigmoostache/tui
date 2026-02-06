@@ -8,9 +8,9 @@ A terminal-based AI coding assistant built in Rust that provides an interactive 
 ## Features
 
 ### 🤖 AI-Powered Assistance
-- **Claude Integration** - Powered by Anthropic's Claude API with streaming responses
+- **Multi-LLM Support** - Anthropic Claude, Grok (xAI), Groq, and Claude Code (OAuth)
 - **Context-Aware** - Automatically includes relevant project files, directory structure, and more
-- **Tool Execution** - AI can directly interact with your codebase through built-in tools
+- **Tool Execution** - AI can directly interact with your codebase through 37+ built-in tools
 
 ### 📁 Smart Context Management
 - **File Context** - Open files and keep them in context for reference
@@ -73,196 +73,179 @@ cargo run --release
 | Shortcut | Action |
 |----------|--------|
 | `Shift+Enter` or `Alt+Enter` | Send message |
+| `Tab` / `Shift+Tab` | Next / Previous panel |
 | `Up/Down` | Scroll panel content |
-| `Left/Right` | Switch between panels |
 | `PageUp/PageDown` | Fast scroll |
 | `Ctrl+L` | Clear conversation |
-| `Ctrl+Y` | Toggle copy mode |
+| `Ctrl+H` | Open configuration overlay |
+| `Ctrl+P` | Open command palette |
+| `Ctrl+N` | New context |
 | `Ctrl+Q` | Quit |
-| `Esc` | Stop streaming / Exit copy mode |
-| `p1`, `p2`, etc. | Quick switch context panels |
+| `Esc` | Stop streaming |
+| `F12` | Toggle performance monitor |
+| `p1`, `p2`, etc. | Quick switch to panel |
 
 ### Context Panel Navigation
 
-- Use `Left/Right` arrow keys to cycle through panels
+- Use `Tab` / `Shift+Tab` to cycle through panels
 - Type `p1`, `p2`, `p3`, etc. in the input and press Enter/Space to jump to a specific panel
-- Click on panel names in the sidebar to select them
+- Use `Ctrl+P` to open command palette and search for panels
 
 ## Available Tools
 
 The AI assistant can use these tools to interact with your project:
 
+### File Tools
 | Tool | Description |
 |------|-------------|
-| `open_file` | Open a file and add it to context |
-| `create_file` | Create a new file |
-| `edit_file` | Edit an existing file |
-| `close_contexts` | Remove context elements |
-| `glob` | Search for files matching a pattern |
-| `grep` | Search file contents with regex pattern |
-| `edit_tree_filter` | Modify directory tree filtering |
-| `tree_toggle_folders` | Open/close folders in directory tree |
-| `tree_describe_files` | Add descriptions to files/folders in tree |
-| `set_message_status` | Manage message context (full/summarized/forgotten) |
-| `create_tmux_pane` | Create a new terminal pane |
-| `tmux_send_keys` | Send commands to a tmux pane |
-| `edit_tmux_config` | Configure tmux pane settings |
-| `sleep` | Wait for command output (2 seconds) |
-| `create_todos` | Create todo items |
-| `update_todos` | Update or delete todo items |
-| `create_memories` | Create memory/note items |
-| `update_memories` | Update or delete memory items |
+| `file_open` | Open a file and add it to context |
+| `file_create` | Create a new file |
+| `file_edit` | Edit an existing file with search/replace |
+| `file_batch_create` | Create multiple files and folders at once |
+| `file_glob` | Search for files matching a glob pattern |
+| `file_grep` | Search file contents with regex |
+
+### Tree Tools
+| Tool | Description |
+|------|-------------|
+| `tree_filter` | Edit gitignore-style directory filter |
+| `tree_toggle` | Open/close folders in directory tree |
+| `tree_describe` | Add descriptions to files/folders |
+
+### Context Tools
+| Tool | Description |
+|------|-------------|
+| `context_close` | Remove context elements |
+| `context_message_status` | Set message status (full/summarized/deleted) |
+
+### Console Tools
+| Tool | Description |
+|------|-------------|
+| `console_create` | Create a tmux pane for terminal output |
+| `console_edit` | Configure tmux pane settings |
+| `console_send_keys` | Send commands to a tmux pane |
+| `console_sleep` | Wait for command output |
+
+### Todo Tools
+| Tool | Description |
+|------|-------------|
+| `todo_create` | Create todo items |
+| `todo_update` | Update or delete todo items |
+
+### Memory Tools
+| Tool | Description |
+|------|-------------|
+| `memory_create` | Create persistent memory items |
+| `memory_update` | Update or delete memory items |
+
+### System Prompt Tools
+| Tool | Description |
+|------|-------------|
+| `system_create` | Create a new system prompt (seed) |
+| `system_edit` | Edit an existing system prompt |
+| `system_delete` | Delete a system prompt |
+| `system_load` | Activate a system prompt |
+| `system_reload` | Reload the TUI application |
+
+### Git Tools
+| Tool | Description |
+|------|-------------|
+| `git_toggle_details` | Show/hide diff content in git panel |
+| `git_toggle_logs` | Show/hide commit history |
+| `git_commit` | Stage files and commit |
+| `git_branch_create` | Create and switch to new branch |
+| `git_branch_switch` | Switch to another branch |
+| `git_merge` | Merge a branch into current |
+| `git_pull` | Pull from remote |
+| `git_push` | Push to remote |
+| `git_fetch` | Fetch from remote |
+
+### Scratchpad Tools
+| Tool | Description |
+|------|-------------|
+| `scratchpad_create_cell` | Create a scratchpad cell for notes |
+| `scratchpad_edit_cell` | Edit a scratchpad cell |
+| `scratchpad_wipe` | Delete scratchpad cells |
+
+### Meta Tools
+| Tool | Description |
+|------|-------------|
+| `tool_manage` | Enable/disable tools |
 
 ## API Request Structure
 
-This section documents exactly how the prompt sent to Claude is constructed.
+This section documents how the prompt sent to the LLM is constructed.
 
-### Top-Level Request
-
-```
-ApiRequest {
-    model: "claude-sonnet-4-20250514"
-    max_tokens: 8192
-    system: ""                          # Empty for normal mode, custom for cleaner mode
-    messages: Vec<ApiMessage>           # See below
-    tools: [...]                        # Tool definitions JSON
-    stream: true
-}
-```
-
-### Message Construction
-
-Messages are built by `messages_to_api()` in `src/api.rs`.
-
-#### Step 1: Build Context Parts
-
-Context is collected into `context_parts: Vec<String>` in this order:
+### Message Flow Overview
 
 ```
-1. Directory Tree (if non-empty)
-   === Directory Tree ===
-   {tree content}
-   === End of Directory Tree ===
-
-2. Todo List (if non-empty)
-   === Todo List ===
-   {todos}
-   === End of Todo List ===
-
-3. Memories (if non-empty and not "No memories")
-   === Memories ===
-   {memories}
-   === End of Memories ===
-
-4. Context Overview (if non-empty)
-   === Context Overview ===
-   {overview with token counts}
-   === End of Context Overview ===
-
-5. Open Files (for each file)
-   === File: {path} ===
-   {file content}
-   === End of {path} ===
-
-6. Glob Results (for each glob)
-   === {glob name} ===
-   {matching files}
-   === End of {glob name} ===
-
-7. Grep Results (for each grep)
-   === grep:{pattern} ===
-   {file:line:content matches}
-   === End of grep:{pattern} ===
-
-8. Tmux Panes (for each pane)
-   === {pane header} ===
-   {terminal output}
-   === End of {pane header} ===
+┌─────────────────────────────────────────────────────────┐
+│                    System Prompt                        │
+│              (from active seed/system)                  │
+├─────────────────────────────────────────────────────────┤
+│           Dynamic Panels (as fake tool calls)           │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │ [assistant] Panel header + tool_use: dynamic_panel│   │
+│  │ [user] tool_result: Panel P2 content              │   │
+│  │ [assistant] timestamp + tool_use: dynamic_panel   │   │
+│  │ [user] tool_result: Panel P3 content              │   │
+│  │ ... (sorted by last_refresh_ms, oldest first)     │   │
+│  │ [assistant] Footer + tool_use: dynamic_panel      │   │
+│  │ [user] tool_result: "Acknowledged"                │   │
+│  └─────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│        Seed Re-injection (for emphasis)                 │
+│  [user] "System instructions (repeated)..."             │
+│  [assistant] "Understood. I will follow..."            │
+├─────────────────────────────────────────────────────────┤
+│              Conversation Messages                      │
+│  [user] [U1]: First user message                       │
+│  [assistant] [A1]: First response                      │
+│  [user] [U2]: Second message                           │
+│  ...                                                    │
+└─────────────────────────────────────────────────────────┘
 ```
 
-#### Step 2: Convert Messages to API Format
+### Panel Injection (Dynamic Context)
 
-For each message in `state.messages` (skipping `status == Deleted`):
+Panels (P2-P7+) are injected as fake `tool_use`/`tool_result` pairs before the conversation. This allows the LLM to see project context as if it had called tools itself.
 
-**TextMessage (U/A prefixes):**
+**Panel Order**: Sorted by `last_refresh_ms` ascending (oldest first, newest closest to conversation).
+
+**Panel Format**:
 ```
-role: "user" or "assistant"
-content: [
-    Text { text: "[U1]: {content}" }      # First user msg gets context prepended
-]
-```
-
-First user message format:
-```
-{context_parts joined by \n\n}
-
-[U1]: {user message}
+======= [P2] Directory Tree =======
+{tree content}
 ```
 
-**ToolCall (T prefix):**
-- Only included if a ToolResult exists after it
-- Appended to previous assistant message's content blocks:
-```
-content: [
-    Text { text: "[A1]: {assistant text}" },
-    ToolUse { id: "toolu_xxx", name: "open_file", input: {...} },
-    ToolUse { id: "toolu_yyy", name: "edit_file", input: {...} }
-]
-```
+**Panels Excluded**: P0 (System/Seed) and P1 (Conversation) are not injected as panels.
 
-**ToolResult (R prefix):**
-```
-role: "user"
-content: [
-    ToolResult { tool_use_id: "toolu_xxx", content: "[R1]: {result}" },
-    ToolResult { tool_use_id: "toolu_yyy", content: "[R2]: {result}" }
-]
-```
+### Message ID Format
 
-#### Step 3: Final Assembly
+All messages include visible IDs for the LLM to reference:
 
-```
-messages: [
-    { role: "user",      content: [Text { "[context...]\n\n[U1]: hello" }] },
-    { role: "assistant", content: [Text { "[A1]: I'll help" }, ToolUse {...}] },
-    { role: "user",      content: [ToolResult { "[R1]: file opened" }] },
-    { role: "assistant", content: [Text { "[A2]: Done!" }] },
-    { role: "user",      content: [Text { "[U2]: thanks" }] },
-    ...
-]
-```
+| Role | ID Format | Example |
+|------|-----------|---------|
+| User message | `[U{n}]:` | `[U1]:\nHello!` |
+| Assistant response | `[A{n}]:` | `[A1]:\nHi there!` |
+| Tool result | `[R{n}]:` | `[R1]:\nFile opened` |
 
-### Message ID Visibility to LLM
-
-| ID Type | Prefix | Visible to LLM | How |
-|---------|--------|----------------|-----|
-| User message | U | Yes | `[U1]: {content}` |
-| Assistant message | A | Yes | `[A1]: {content}` |
-| Tool call | T | **No** | Only `tool_use` block sent (API constraint) |
-| Tool result | R | Yes | `[R1]: {content}` in tool_result |
-
-**Note:** T-block IDs cannot be exposed due to Claude API constraints - `tool_use` blocks cannot have text mixed in; they must be immediately followed by `tool_result` blocks.
+**Note**: Tool call messages (T-blocks) don't have visible IDs due to API constraints - `tool_use` blocks cannot contain mixed text.
 
 ### Summarized Messages
 
-When `status == Summarized`:
-- Uses `tl_dr` field instead of `content`
-- Same format: `[A5]: {tl_dr text}`
+When a message has `status == Summarized`:
+- Uses the `tl_dr` field instead of full `content`
+- Same ID format: `[A5]:\n{tl_dr text}`
+- Reduces token usage while preserving context
 
-### Tool Results Flow
+### Tool Execution Flow
 
-When assistant calls tools:
-1. Assistant message with `tool_use` blocks is sent
+1. Assistant message includes `tool_use` blocks
 2. Tools execute locally, results collected
-3. New request sent with `tool_result` blocks as user message
+3. Tool results sent as `tool_result` blocks in user message
 4. Assistant continues with access to results
-
-### Cleaner Mode
-
-Special mode triggered by `/clean` command:
-- Custom system prompt from `context_cleaner.rs`
-- Adds user message: `"Please clean up the context to reduce token usage:\n\n{cleaner_context}"`
-- Cleaner context includes all message IDs, types, statuses, and token counts
+5. Process repeats if more tools are called
 
 ## Architecture
 
