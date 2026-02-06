@@ -318,13 +318,21 @@ The application uses a non-blocking caching architecture to ensure the UI remain
 - **globset** - Glob pattern matching
 - **notify** - File system notifications (inotify on Linux)
 
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please open an issue or submit a pull request. By contributing, you agree that your contributions will be licensed under the AGPL-3.0 license.
+
+## License
+
+This project is dual-licensed:
+
+- **Open source** — available under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE). You are free to use, modify, and distribute this software under the terms of the AGPL, which requires that any modified versions or derivative works (including use over a network) also be released under the AGPL with full source code.
+
+- **Commercial** — if you wish to use this software in a proprietary or closed-source product without the AGPL copyleft obligations, a commercial license is available. Please contact **[your email or link]** for pricing and terms.
+
+### Why dual licensing?
+
+If you're building an open-source project or are comfortable sharing your source code, the AGPL-3.0 license is free and imposes no cost. If you need to keep your code proprietary, the commercial license lets you do that while supporting the continued development of this project.
 
 ---
 
