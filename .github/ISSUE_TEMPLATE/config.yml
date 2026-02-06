@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/contextpilot/tui#readme
+    about: Check the README for usage instructions
+  - name: Security Vulnerability
+    url: https://github.com/contextpilot/tui/security/policy
+    about: Please report security issues privately
