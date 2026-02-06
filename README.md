@@ -186,8 +186,8 @@ flowchart TB
     
     subgraph DynamicPanels["Dynamic Panels (as fake tool calls)"]
         direction TB
-        PH[Panel Header] --> P2["[assistant] tool_use: dynamic_panel<br/>[user] tool_result: P2 Tree"]
-        P2 --> P3["[assistant] tool_use: dynamic_panel<br/>[user] tool_result: P3 Todo"]
+        PH[Panel Header] --> P2["[assistant] tool_use: dynamic_panel\n[user] tool_result: P2 Tree"]
+        P2 --> P3["[assistant] tool_use: dynamic_panel\n[user] tool_result: P3 Todo"]
         P3 --> PN["... more panels sorted by timestamp ..."]
         PN --> PF[Panel Footer + Acknowledgment]
     end
