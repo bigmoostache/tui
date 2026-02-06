@@ -119,17 +119,19 @@ GROQ_API_KEY=your_groq_key
 
 ### Code Owners
 
-We use [CODEOWNERS](/.github/CODEOWNERS) for automatic reviewer assignment. When you open a PR, the right team is automatically assigned based on the files you changed:
+We use [CODEOWNERS](/.github/CODEOWNERS) for automatic reviewer assignment. When you open a PR, the right people are automatically assigned based on the files you changed:
 
-| Team | Owns |
-|------|------|
-| `@contextpilot/core-maintainers` | Core app, state, actions, config |
-| `@contextpilot/llm-team` | LLM provider integrations |
-| `@contextpilot/tools-team` | Tool implementations |
-| `@contextpilot/ui-team` | Panels, UI, events |
-| `@contextpilot/backend-team` | Persistence, caching |
-| `@contextpilot/docs-team` | Documentation |
-| `@contextpilot/security-team` | Security-sensitive files |
+| Area | Files | Reviewers |
+|------|-------|-----------|
+| Core | `/src/core/`, `state.rs`, `actions.rs` | Lead maintainers |
+| LLM | `/src/llms/`, `api.rs` | LLM specialists |
+| Tools | `/src/tools/`, `tool_defs.rs` | Tools team |
+| UI | `/src/ui/`, `/src/panels/` | UI developers |
+| Backend | `/src/persistence/`, `cache.rs` | Backend team |
+| Docs | `*.md`, `/docs/` | Documentation team |
+| Security | `SECURITY.md`, `/src/llms/` | Security reviewers |
+
+**Note:** The CODEOWNERS file uses placeholder usernames. Replace them with your actual GitHub usernames.
 
 ### Commit Message Format
 
