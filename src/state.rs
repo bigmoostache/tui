@@ -659,8 +659,6 @@ pub struct State {
     pub git_is_repo: bool,
     /// Per-file git changes
     pub git_file_changes: Vec<GitFileChange>,
-    /// Last time git status was refreshed (milliseconds)
-    pub git_last_refresh_ms: u64,
     /// Whether to show full diff content in Git panel (vs summary only)
     pub git_show_diffs: bool,
     /// Hash of last git status --porcelain output (for change detection)
@@ -951,7 +949,6 @@ impl Default for State {
             git_branches: vec![],
             git_is_repo: false,
             git_file_changes: vec![],
-            git_last_refresh_ms: crate::core::panels::now_ms(),
             git_show_diffs: true, // Show diffs by default
             git_status_hash: None,
             git_show_logs: false,

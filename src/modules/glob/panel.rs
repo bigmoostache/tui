@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::constants::{GLOB_DEPRECATION_MS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GlobPanel;
@@ -31,6 +31,30 @@ impl Panel for GlobPanel {
         } else {
             "Glob".to_string()
         }
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let pattern = ctx.glob_pattern.as_ref()?;
+        Some(CacheRequest::RefreshGlob {
+            context_id: ctx.id.clone(),
+            pattern: pattern.clone(),
+            base_path: ctx.glob_path.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        let CacheUpdate::GlobContent { content, token_count, .. } = update else {
+            return false;
+        };
+        ctx.cached_content = Some(content);
+        ctx.token_count = token_count;
+        ctx.cache_deprecated = false;
+        ctx.last_refresh_ms = now_ms();
+        true
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GLOB_DEPRECATION_MS)
     }
 
     fn refresh(&self, _state: &mut State) {

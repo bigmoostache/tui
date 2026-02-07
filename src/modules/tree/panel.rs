@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, helpers::*};
 
 pub struct TreePanel;
@@ -23,6 +23,26 @@ impl Panel for TreePanel {
 
     fn title(&self, _state: &State) -> String {
         "Directory Tree".to_string()
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+        Some(CacheRequest::RefreshTree {
+            context_id: ctx.id.clone(),
+            tree_filter: state.tree_filter.clone(),
+            tree_open_folders: state.tree_open_folders.clone(),
+            tree_descriptions: state.tree_descriptions.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        let CacheUpdate::TreeContent { content, token_count, .. } = update else {
+            return false;
+        };
+        ctx.cached_content = Some(content);
+        ctx.token_count = token_count;
+        ctx.cache_deprecated = false;
+        ctx.last_refresh_ms = now_ms();
+        true
     }
 
     fn refresh(&self, _state: &mut State) {

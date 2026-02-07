@@ -5,10 +5,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, GitChangeType, State};
+use crate::constants::{GIT_STATUS_REFRESH_MS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::state::{estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
 use crate::ui::{theme, chars};
 
 pub struct GitPanel;
@@ -177,6 +177,61 @@ fn parse_numstat_to_map(
 }
 
 impl Panel for GitPanel {
+    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+        // Force full refresh if cache is explicitly deprecated (e.g., toggle_diffs)
+        let current_hash = if ctx.cache_deprecated {
+            None
+        } else {
+            state.git_status_hash.clone()
+        };
+        Some(CacheRequest::RefreshGitStatus {
+            show_diffs: state.git_show_diffs,
+            current_hash,
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, state: &mut State) -> bool {
+        match update {
+            CacheUpdate::GitStatus {
+                branch,
+                is_repo,
+                file_changes,
+                branches,
+                formatted_content,
+                token_count,
+                status_hash,
+            } => {
+                state.git_branch = branch;
+                state.git_branches = branches;
+                state.git_is_repo = is_repo;
+                state.git_file_changes = file_changes.into_iter()
+                    .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
+                        path,
+                        additions,
+                        deletions,
+                        change_type,
+                        diff_content,
+                    })
+                    .collect();
+                state.git_status_hash = Some(status_hash);
+                ctx.cached_content = Some(formatted_content);
+                ctx.token_count = token_count;
+                ctx.cache_deprecated = false;
+                ctx.last_refresh_ms = now_ms();
+                true
+            }
+            CacheUpdate::GitStatusUnchanged => {
+                ctx.last_refresh_ms = now_ms();
+                false // No actual content change
+            }
+            _ => false,
+        }
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GIT_STATUS_REFRESH_MS)
+    }
+
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
+use crate::cache::{process_cache_request, CacheUpdate};
 use crate::core::panels::now_ms;
 use crate::state::{ContextType, State};
 use crate::ui;
@@ -35,15 +35,9 @@ pub fn wait_for_panels(
     // Immediately trigger cache refresh for all dirty file panels
     for ctx in &state.context {
         if ctx.context_type == ContextType::File && ctx.cache_deprecated {
-            if let Some(path) = &ctx.file_path {
-                process_cache_request(
-                    CacheRequest::RefreshFile {
-                        context_id: ctx.id.clone(),
-                        file_path: path.clone(),
-                        current_hash: ctx.file_hash.clone(),
-                    },
-                    cache_tx.clone(),
-                );
+            let panel = crate::core::panels::get_panel(ctx.context_type);
+            if let Some(request) = panel.build_cache_request(ctx, state) {
+                process_cache_request(request, cache_tx.clone());
             }
         }
     }

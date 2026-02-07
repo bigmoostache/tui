@@ -27,7 +27,7 @@ use crossterm::event::KeyEvent;
 
 use crate::actions::Action;
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::state::{ContextType, State};
+use crate::state::{ContextElement, ContextType, State};
 use crate::ui::{theme, helpers::count_wrapped_lines};
 
 /// Get current time in milliseconds since UNIX epoch
@@ -90,6 +90,23 @@ pub trait Panel {
     /// Called from a background thread — implementations should do blocking I/O here.
     /// Returns None if no update is needed (e.g., content unchanged).
     fn refresh_cache(&self, _request: CacheRequest) -> Option<CacheUpdate> {
+        None
+    }
+
+    /// Build a cache request for the given context element.
+    /// Returns None for panels without background caching.
+    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        None
+    }
+
+    /// Apply a cache update to the context element and state.
+    /// Returns true if content changed (caller sets state.dirty).
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+        false
+    }
+
+    /// Timer interval in ms for auto-refresh. None = no timer (uses watchers or no refresh).
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
 

@@ -123,6 +123,34 @@ impl CacheRequest {
     }
 }
 
+impl CacheUpdate {
+    /// Get the context type this update is for, to dispatch to the correct panel.
+    pub fn context_type(&self) -> crate::state::ContextType {
+        use crate::state::ContextType;
+        match self {
+            CacheUpdate::FileContent { .. } => ContextType::File,
+            CacheUpdate::TreeContent { .. } => ContextType::Tree,
+            CacheUpdate::GlobContent { .. } => ContextType::Glob,
+            CacheUpdate::GrepContent { .. } => ContextType::Grep,
+            CacheUpdate::TmuxContent { .. } => ContextType::Tmux,
+            CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => ContextType::Git,
+        }
+    }
+
+    /// Get the context_id for this update (used to find the matching ContextElement).
+    /// Returns None for Git updates which are matched by context_type instead.
+    pub fn context_id(&self) -> Option<&str> {
+        match self {
+            CacheUpdate::FileContent { context_id, .. } => Some(context_id),
+            CacheUpdate::TreeContent { context_id, .. } => Some(context_id),
+            CacheUpdate::GlobContent { context_id, .. } => Some(context_id),
+            CacheUpdate::GrepContent { context_id, .. } => Some(context_id),
+            CacheUpdate::TmuxContent { context_id, .. } => Some(context_id),
+            CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => None,
+        }
+    }
+}
+
 /// Hash content for change detection
 pub fn hash_content(content: &str) -> String {
     let mut hasher = DefaultHasher::new();

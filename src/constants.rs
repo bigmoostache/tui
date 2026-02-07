@@ -99,7 +99,7 @@ pub const RENDER_THROTTLE_MS: u64 = 36;
 pub const PERF_STATS_REFRESH_MS: u64 = 500;
 
 /// Delay after tmux send-keys in milliseconds (allows command output to appear)
-pub const TMUX_SEND_DELAY_MS: u64 = 2000;
+pub const TMUX_SEND_DELAY_MS: u64 = 300;
 
 /// Fixed sleep duration in seconds for the sleep tool
 pub const SLEEP_DURATION_SECS: u64 = 1;

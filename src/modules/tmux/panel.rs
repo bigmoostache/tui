@@ -4,9 +4,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::constants::TMUX_DEPRECATION_MS;
+use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
@@ -46,6 +47,31 @@ impl Panel for TmuxPanel {
         } else {
             "Tmux".to_string()
         }
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let pane_id = ctx.tmux_pane_id.as_ref()?;
+        Some(CacheRequest::RefreshTmux {
+            context_id: ctx.id.clone(),
+            pane_id: pane_id.clone(),
+            current_content_hash: ctx.tmux_last_lines_hash.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        let CacheUpdate::TmuxContent { content, content_hash, token_count, .. } = update else {
+            return false;
+        };
+        ctx.cached_content = Some(content);
+        ctx.tmux_last_lines_hash = Some(content_hash);
+        ctx.token_count = token_count;
+        ctx.cache_deprecated = false;
+        ctx.last_refresh_ms = now_ms();
+        true
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(TMUX_DEPRECATION_MS)
     }
 
     fn refresh(&self, _state: &mut State) {

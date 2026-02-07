@@ -5,11 +5,11 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::highlight::highlight_file;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::theme;
 
 pub struct FilePanel;
@@ -29,6 +29,27 @@ impl Panel for FilePanel {
         state.context.get(state.selected_context)
             .map(|ctx| ctx.name.clone())
             .unwrap_or_else(|| "File".to_string())
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let path = ctx.file_path.as_ref()?;
+        Some(CacheRequest::RefreshFile {
+            context_id: ctx.id.clone(),
+            file_path: path.clone(),
+            current_hash: ctx.file_hash.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        let CacheUpdate::FileContent { content, hash, token_count, .. } = update else {
+            return false;
+        };
+        ctx.cached_content = Some(content);
+        ctx.file_hash = Some(hash);
+        ctx.token_count = token_count;
+        ctx.cache_deprecated = false;
+        ctx.last_refresh_ms = now_ms();
+        true
     }
 
     fn refresh(&self, _state: &mut State) {

@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{ContextItem, Panel};
+use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::constants::{GREP_DEPRECATION_MS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GrepPanel;
@@ -31,6 +31,31 @@ impl Panel for GrepPanel {
         } else {
             "Grep".to_string()
         }
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let pattern = ctx.grep_pattern.as_ref()?;
+        Some(CacheRequest::RefreshGrep {
+            context_id: ctx.id.clone(),
+            pattern: pattern.clone(),
+            path: ctx.grep_path.clone(),
+            file_pattern: ctx.grep_file_pattern.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        let CacheUpdate::GrepContent { content, token_count, .. } = update else {
+            return false;
+        };
+        ctx.cached_content = Some(content);
+        ctx.token_count = token_count;
+        ctx.cache_deprecated = false;
+        ctx.last_refresh_ms = now_ms();
+        true
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GREP_DEPRECATION_MS)
     }
 
     fn refresh(&self, _state: &mut State) {
