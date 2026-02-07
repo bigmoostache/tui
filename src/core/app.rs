@@ -9,10 +9,10 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{EVENT_POLL_MS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
+use crate::constants::{EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
 use crate::events::handle_event;
 use crate::help::CommandPalette;
-use crate::panels::now_ms;
+use crate::core::panels::now_ms;
 use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
@@ -328,7 +328,7 @@ impl App {
                 }],
                 tool_results: Vec::new(),
                 input_tokens: 0,
-                timestamp_ms: crate::panels::now_ms(),
+                timestamp_ms: crate::core::panels::now_ms(),
             };
             save_message(&tool_msg);
             self.state.messages.push(tool_msg);
@@ -362,7 +362,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
-            timestamp_ms: crate::panels::now_ms(),
+            timestamp_ms: crate::core::panels::now_ms(),
         };
         save_message(&result_msg);
         self.state.messages.push(result_msg);
@@ -391,7 +391,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
-            timestamp_ms: crate::panels::now_ms(),
+            timestamp_ms: crate::core::panels::now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 
@@ -551,87 +551,12 @@ impl App {
 
     /// Schedule initial cache refreshes for all context elements
     fn schedule_initial_cache_refreshes(&self) {
-        let current_ms = now_ms();
-
         for ctx in &self.state.context {
-            match ctx.context_type {
-                ContextType::File => {
-                    if let Some(path) = &ctx.file_path {
-                        process_cache_request(
-                            CacheRequest::RefreshFile {
-                                context_id: ctx.id.clone(),
-                                file_path: path.clone(),
-                                current_hash: ctx.file_hash.clone(),
-                            },
-                            self.cache_tx.clone(),
-                        );
-                    }
-                }
-                ContextType::Tree => {
-                    process_cache_request(
-                        CacheRequest::RefreshTree {
-                            context_id: ctx.id.clone(),
-                            tree_filter: self.state.tree_filter.clone(),
-                            tree_open_folders: self.state.tree_open_folders.clone(),
-                            tree_descriptions: self.state.tree_descriptions.clone(),
-                        },
-                        self.cache_tx.clone(),
-                    );
-                }
-                ContextType::Glob => {
-                    if let Some(pattern) = &ctx.glob_pattern {
-                        process_cache_request(
-                            CacheRequest::RefreshGlob {
-                                context_id: ctx.id.clone(),
-                                pattern: pattern.clone(),
-                                base_path: ctx.glob_path.clone(),
-                            },
-                            self.cache_tx.clone(),
-                        );
-                    }
-                }
-                ContextType::Grep => {
-                    if let Some(pattern) = &ctx.grep_pattern {
-                        process_cache_request(
-                            CacheRequest::RefreshGrep {
-                                context_id: ctx.id.clone(),
-                                pattern: pattern.clone(),
-                                path: ctx.grep_path.clone(),
-                                file_pattern: ctx.grep_file_pattern.clone(),
-                            },
-                            self.cache_tx.clone(),
-                        );
-                    }
-                }
-                ContextType::Tmux => {
-                    if let Some(pane_id) = &ctx.tmux_pane_id {
-                        process_cache_request(
-                            CacheRequest::RefreshTmux {
-                                context_id: ctx.id.clone(),
-                                pane_id: pane_id.clone(),
-                                current_content_hash: ctx.tmux_last_lines_hash.clone(),
-                            },
-                            self.cache_tx.clone(),
-                        );
-                    }
-                }
-                // Conversation, Memory, Todo, Overview - internal state triggers, no initial refresh needed
-                _ => {}
+            let panel = crate::core::panels::get_panel(ctx.context_type);
+            if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                process_cache_request(request, self.cache_tx.clone());
             }
         }
-
-        // Schedule initial git status refresh
-        process_cache_request(
-            CacheRequest::RefreshGitStatus {
-                show_diffs: self.state.git_show_diffs,
-                current_hash: None, // Force full refresh on startup
-            },
-            self.cache_tx.clone(),
-        );
-
-        // Update last timer check
-        // (This is handled in the mutable version - we just set it in new())
-        let _ = current_ms;
     }
 
     /// Process incoming cache updates from background threads
@@ -642,147 +567,85 @@ impl App {
     /// Static version of process_cache_updates for use in wait module
     fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
         while let Ok(update) = cache_rx.try_recv() {
-            state.dirty = true;
+            let context_type = update.context_type();
+            let panel = crate::core::panels::get_panel(context_type);
 
-            match update {
-                CacheUpdate::FileContent { context_id, content, hash, token_count } => {
-                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
-                        ctx.cached_content = Some(content);
-                        ctx.file_hash = Some(hash);
-                        ctx.token_count = token_count;
-                        ctx.cache_deprecated = false;
-                        ctx.last_refresh_ms = now_ms();
-                    }
-                }
-                CacheUpdate::TreeContent { context_id, content, token_count } => {
-                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
-                        ctx.cached_content = Some(content);
-                        ctx.token_count = token_count;
-                        ctx.cache_deprecated = false;
-                        ctx.last_refresh_ms = now_ms();
-                    }
-                }
-                CacheUpdate::GlobContent { context_id, content, token_count } => {
-                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
-                        ctx.cached_content = Some(content);
-                        ctx.token_count = token_count;
-                        ctx.cache_deprecated = false;
-                        ctx.last_refresh_ms = now_ms();
-                    }
-                }
-                CacheUpdate::GrepContent { context_id, content, token_count } => {
-                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
-                        ctx.cached_content = Some(content);
-                        ctx.token_count = token_count;
-                        ctx.cache_deprecated = false;
-                        ctx.last_refresh_ms = now_ms();
-                    }
-                }
-                CacheUpdate::TmuxContent { context_id, content, content_hash, token_count } => {
-                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
-                        ctx.cached_content = Some(content);
-                        ctx.tmux_last_lines_hash = Some(content_hash);
-                        ctx.token_count = token_count;
-                        ctx.cache_deprecated = false;
-                        ctx.last_refresh_ms = now_ms();
-                    }
-                }
-                CacheUpdate::GitStatus {
-                    branch,
-                    is_repo,
-                    file_changes,
-                    branches,
-                    formatted_content,
-                    token_count,
-                    status_hash,
-                } => {
-                    use crate::state::{GitFileChange, ContextType};
-                    state.git_branch = branch;
-                    state.git_branches = branches;
-                    state.git_is_repo = is_repo;
-                    state.git_file_changes = file_changes.into_iter()
-                        .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
-                            path,
-                            additions,
-                            deletions,
-                            change_type,
-                            diff_content,
-                        })
-                        .collect();
-                    state.git_last_refresh_ms = now_ms();
-                    state.git_status_hash = Some(status_hash);
+            // Find the matching context element index
+            let idx = if let Some(id) = update.context_id() {
+                state.context.iter().position(|c| c.id == id)
+            } else {
+                // Git updates: match by context_type
+                state.context.iter().position(|c| c.context_type == context_type)
+            };
 
-                    // Update cached content and token count for Git panel
-                    for ctx in &mut state.context {
-                        if ctx.context_type == ContextType::Git {
-                            ctx.cached_content = Some(formatted_content);
-                            ctx.token_count = token_count;
-                            ctx.cache_deprecated = false;
-                            ctx.last_refresh_ms = now_ms();
-                            break;
-                        }
-                    }
-                }
-                CacheUpdate::GitStatusUnchanged => {
-                    // Just update the refresh time, no other changes needed
-                    state.git_last_refresh_ms = now_ms();
-                    state.dirty = false; // No actual change, don't trigger re-render
-                }
+            let Some(idx) = idx else { continue };
+
+            // Remove ctx from vec to get &mut ContextElement and &mut State simultaneously
+            let mut ctx = state.context.remove(idx);
+            let changed = panel.apply_cache_update(update, &mut ctx, state);
+            state.context.insert(idx, ctx);
+
+            if changed {
+                state.dirty = true;
             }
         }
     }
 
     /// Process file watcher events
     fn process_watcher_events(&mut self) {
-        let Some(watcher) = &self.file_watcher else { return };
+        // Collect events (immutable borrow on file_watcher released after this block)
+        let events = {
+            let Some(watcher) = &self.file_watcher else { return };
+            watcher.poll_events()
+        };
+        if events.is_empty() { return; }
 
-        let events = watcher.poll_events();
-        for event in events {
+        // First pass: mark deprecated, collect indices and paths needing re-watch
+        let mut refresh_indices = Vec::new();
+        let mut rewatch_paths: Vec<String> = Vec::new();
+        for event in &events {
             match event {
                 WatchEvent::FileChanged(path) => {
-                    // Find and mark file context as deprecated, then schedule refresh
-                    for ctx in &mut self.state.context {
-                        if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(&path) {
+                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                        if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
                             ctx.cache_deprecated = true;
                             self.state.dirty = true;
-
-                            // Schedule background refresh
-                            process_cache_request(
-                                CacheRequest::RefreshFile {
-                                    context_id: ctx.id.clone(),
-                                    file_path: path.clone(),
-                                    current_hash: ctx.file_hash.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
+                            refresh_indices.push(i);
                         }
                     }
+                    rewatch_paths.push(path.clone());
                 }
                 WatchEvent::DirChanged(_path) => {
-                    // Mark tree context as deprecated and schedule refresh
-                    for ctx in &mut self.state.context {
+                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
                         if ctx.context_type == ContextType::Tree {
                             ctx.cache_deprecated = true;
                             self.state.dirty = true;
-
-                            // Schedule background refresh
-                            process_cache_request(
-                                CacheRequest::RefreshTree {
-                                    context_id: ctx.id.clone(),
-                                    tree_filter: self.state.tree_filter.clone(),
-                                    tree_open_folders: self.state.tree_open_folders.clone(),
-                                    tree_descriptions: self.state.tree_descriptions.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
+                            refresh_indices.push(i);
                         }
                     }
                 }
             }
         }
+
+        // Second pass: build and send requests
+        for i in refresh_indices {
+            let ctx = &self.state.context[i];
+            let panel = crate::core::panels::get_panel(ctx.context_type);
+            if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                process_cache_request(request, self.cache_tx.clone());
+            }
+        }
+
+        // Third pass: re-watch files to pick up new inodes after atomic rename
+        // (editors like vim/vscode save via rename, which invalidates the inotify watch)
+        if let Some(watcher) = &mut self.file_watcher {
+            for path in rewatch_paths {
+                let _ = watcher.rewatch_file(&path);
+            }
+        }
     }
 
-    /// Check timer-based deprecation for glob, grep, tmux
+    /// Check timer-based deprecation for glob, grep, tmux, git
     /// Also handles initial population for newly created context elements
     fn check_timer_based_deprecation(&mut self) {
         let current_ms = now_ms();
@@ -793,117 +656,43 @@ impl App {
         }
         self.last_timer_check_ms = current_ms;
 
-        for ctx in &self.state.context {
-            // Check if this element needs initial population (newly created via tool)
-            let needs_initial_population = ctx.cached_content.is_none();
+        // Immutable pass: collect requests and file watcher setup needs
+        let mut requests: Vec<(CacheRequest, Option<String>)> = Vec::new();
 
-            // Check if cache was explicitly marked as deprecated (e.g., after sending keys to tmux)
+        for ctx in &self.state.context {
+            let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
             let explicitly_deprecated = ctx.cache_deprecated;
 
-            // For timer-based types, also check if refresh timer has elapsed
-            let timer_refresh_needed = match ctx.context_type {
-                ContextType::Glob => {
-                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= GLOB_DEPRECATION_MS
-                }
-                ContextType::Grep => {
-                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= GREP_DEPRECATION_MS
-                }
-                ContextType::Tmux => {
-                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= TMUX_DEPRECATION_MS
-                }
-                _ => false,
-            };
+            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let timer_refresh = panel.cache_refresh_interval_ms()
+                .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
+                .unwrap_or(false);
 
-            if needs_initial_population || explicitly_deprecated || timer_refresh_needed {
-                // Schedule refresh in background based on context type
-                match ctx.context_type {
-                    ContextType::File => {
-                        if let Some(path) = &ctx.file_path {
-                            // Set up file watcher for new file
-                            if needs_initial_population {
-                                if let Some(watcher) = &mut self.file_watcher {
-                                    if !self.watched_file_paths.contains(path) {
-                                        if watcher.watch_file(path).is_ok() {
-                                            self.watched_file_paths.insert(path.clone());
-                                        }
-                                    }
-                                }
-                            }
-                            process_cache_request(
-                                CacheRequest::RefreshFile {
-                                    context_id: ctx.id.clone(),
-                                    file_path: path.clone(),
-                                    current_hash: ctx.file_hash.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
-                        }
-                    }
-                    ContextType::Glob => {
-                        if let Some(pattern) = &ctx.glob_pattern {
-                            process_cache_request(
-                                CacheRequest::RefreshGlob {
-                                    context_id: ctx.id.clone(),
-                                    pattern: pattern.clone(),
-                                    base_path: ctx.glob_path.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
-                        }
-                    }
-                    ContextType::Grep => {
-                        if let Some(pattern) = &ctx.grep_pattern {
-                            process_cache_request(
-                                CacheRequest::RefreshGrep {
-                                    context_id: ctx.id.clone(),
-                                    pattern: pattern.clone(),
-                                    path: ctx.grep_path.clone(),
-                                    file_pattern: ctx.grep_file_pattern.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
-                        }
-                    }
-                    ContextType::Tmux => {
-                        if let Some(pane_id) = &ctx.tmux_pane_id {
-                            process_cache_request(
-                                CacheRequest::RefreshTmux {
-                                    context_id: ctx.id.clone(),
-                                    pane_id: pane_id.clone(),
-                                    current_content_hash: ctx.tmux_last_lines_hash.clone(),
-                                },
-                                self.cache_tx.clone(),
-                            );
-                        }
-                    }
-                    // Tree, Conversation, Todo, Memory, Overview - handled by state changes
-                    _ => {}
+            if needs_initial || explicitly_deprecated || timer_refresh {
+                if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                    // For new File contexts, we also need to set up a watcher
+                    let watcher_path = if needs_initial && ctx.context_type == ContextType::File {
+                        ctx.file_path.clone()
+                    } else {
+                        None
+                    };
+                    requests.push((request, watcher_path));
                 }
             }
         }
 
-        // Check if git status needs refresh (timer-based or explicitly deprecated)
-        let git_elapsed = current_ms.saturating_sub(self.state.git_last_refresh_ms);
-        let git_deprecated = self.state.context.iter()
-            .any(|c| c.context_type == ContextType::Git && c.cache_deprecated);
-        
-        if git_elapsed >= GIT_STATUS_REFRESH_MS || git_deprecated {
-            // Clear the deprecated flag before requesting refresh
-            for ctx in &mut self.state.context {
-                if ctx.context_type == ContextType::Git {
-                    ctx.cache_deprecated = false;
+        // Mutable pass: set up watchers and send requests
+        for (request, watcher_path) in requests {
+            if let Some(path) = watcher_path {
+                if let Some(watcher) = &mut self.file_watcher {
+                    if !self.watched_file_paths.contains(&path) {
+                        if watcher.watch_file(&path).is_ok() {
+                            self.watched_file_paths.insert(path);
+                        }
+                    }
                 }
             }
-            process_cache_request(
-                CacheRequest::RefreshGitStatus {
-                    show_diffs: self.state.git_show_diffs,
-                    current_hash: if git_deprecated { None } else { self.state.git_status_hash.clone() },
-                },
-                self.cache_tx.clone(),
-            );
+            process_cache_request(request, self.cache_tx.clone());
         }
     }
 

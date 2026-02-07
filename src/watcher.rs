@@ -110,6 +110,30 @@ impl FileWatcher {
         Ok(())
     }
 
+    /// Re-watch a file that may have been replaced (e.g., by an editor using atomic rename).
+    /// Removes the stale watch and creates a new one on the current inode at that path.
+    pub fn rewatch_file(&mut self, path: &str) -> notify::Result<()> {
+        let path_buf = PathBuf::from(path);
+        if !path_buf.exists() {
+            return Ok(());
+        }
+
+        let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
+
+        // Unwatch the old inode (may already be gone after kernel removed it)
+        let _ = self.watcher.unwatch(&canonical);
+
+        // Re-watch the path (now points to the new inode)
+        self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
+
+        // Ensure mapping is up-to-date
+        if let Ok(mut files) = self.watched_files.lock() {
+            files.insert(canonical, path.to_string());
+        }
+
+        Ok(())
+    }
+
     /// Poll for watch events (non-blocking)
     pub fn poll_events(&self) -> Vec<WatchEvent> {
         let mut events = Vec::new();

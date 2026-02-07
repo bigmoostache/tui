@@ -12,7 +12,7 @@ use ratatui::{
 };
 
 use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
-use crate::panels;
+use crate::core::panels;
 use crate::perf::{PERF, FRAME_BUDGET_60FPS, FRAME_BUDGET_30FPS};
 use crate::state::{ContextType, State};
 

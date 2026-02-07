@@ -1,6 +1,7 @@
 mod app;
 mod context;
 mod init;
+pub mod panels;
 mod wait;
 
 pub use app::App;

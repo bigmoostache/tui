@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use crate::constants::{prompts, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
-use crate::panels::now_ms;
+use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
 use crate::tools::ToolUse;
@@ -325,7 +325,7 @@ impl LlmClient for AnthropicClient {
 /// Context items are injected as fake tool call/result pairs at the start
 fn messages_to_api(
     messages: &[Message],
-    context_items: &[crate::panels::ContextItem],
+    context_items: &[crate::core::panels::ContextItem],
     include_last_tool_uses: bool,
     seed_content: Option<&str>,
 ) -> Vec<ApiMessage> {

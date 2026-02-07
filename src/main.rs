@@ -9,12 +9,12 @@ mod events;
 mod help;
 mod highlight;
 mod llms;
-mod panels;
 mod perf;
 mod persistence;
 mod profiler;
 mod state;
 mod tool_defs;
+mod modules;
 mod tools;
 mod typewriter;
 mod ui;
@@ -45,6 +45,9 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut state = load_state();
+
+    // Validate module dependencies at startup
+    modules::validate_dependencies(&state.active_modules);
 
     // Ensure default context elements and seed exist
     ensure_default_contexts(&mut state);

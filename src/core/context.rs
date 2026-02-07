@@ -1,4 +1,4 @@
-use crate::panels::{collect_all_context, refresh_all_panels, ContextItem};
+use crate::core::panels::{collect_all_context, refresh_all_panels, ContextItem};
 use crate::state::{Message, State};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::refresh_conversation_context;

@@ -251,14 +251,14 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
                 input_tokens: 0,
-                timestamp_ms: crate::panels::now_ms(),
+                timestamp_ms: crate::core::panels::now_ms(),
             };
             save_message(&user_msg);
 
             // Add user message tokens to Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count += user_token_estimate;
-                ctx.last_refresh_ms = crate::panels::now_ms();
+                ctx.last_refresh_ms = crate::core::panels::now_ms();
             }
 
             // During streaming: insert BEFORE the streaming assistant message
@@ -291,7 +291,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
                 input_tokens: 0,
-                timestamp_ms: crate::panels::now_ms(),
+                timestamp_ms: crate::core::panels::now_ms(),
             };
             state.messages.push(assistant_msg);
 
@@ -310,7 +310,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             // Reset token count for Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
                 ctx.token_count = 0;
-                ctx.last_refresh_ms = crate::panels::now_ms();
+                ctx.last_refresh_ms = crate::core::panels::now_ms();
             }
             ActionResult::Save
         }
@@ -335,7 +335,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_description: None,
                 cached_content: None,
                 cache_deprecated: false,
-                last_refresh_ms: crate::panels::now_ms(),
+                last_refresh_ms: crate::core::panels::now_ms(),
                 tmux_last_lines_hash: None,
             });
             ActionResult::Save
@@ -410,7 +410,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 ctx.token_count = ctx.token_count
                     .saturating_sub(state.streaming_estimated_tokens)
                     .saturating_add(output_tokens);
-                ctx.last_refresh_ms = crate::panels::now_ms();
+                ctx.last_refresh_ms = crate::core::panels::now_ms();
             }
             state.streaming_estimated_tokens = 0;
 
