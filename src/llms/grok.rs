@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
-use crate::panels::{ContextItem, now_ms};
+use crate::core::panels::{ContextItem, now_ms};
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::ToolUse;

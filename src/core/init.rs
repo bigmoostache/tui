@@ -84,7 +84,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -110,13 +110,13 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: true,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
     // Ensure Tree context element exists (P2)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Tree) {
+    if state.active_modules.contains("tree") && !state.context.iter().any(|c| c.context_type == ContextType::Tree) {
         state.context.insert(2.min(state.context.len()), ContextElement {
             id: "P2".to_string(),
             uid: None, // Fixed panel - no UID
@@ -136,13 +136,13 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: true,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
-    // Ensure Todo context element exists (P3)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Todo) {
+    // Ensure Todo context element exists (P3) — only if todo module is active
+    if state.active_modules.contains("todo") && !state.context.iter().any(|c| c.context_type == ContextType::Todo) {
         state.context.insert(3.min(state.context.len()), ContextElement {
             id: "P3".to_string(),
             uid: None, // Fixed panel - no UID
@@ -162,13 +162,13 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
-    // Ensure Memory context element exists (P4)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Memory) {
+    // Ensure Memory context element exists (P4) — only if memory module is active
+    if state.active_modules.contains("memory") && !state.context.iter().any(|c| c.context_type == ContextType::Memory) {
         state.context.insert(4.min(state.context.len()), ContextElement {
             id: "P4".to_string(),
             uid: None, // Fixed panel - no UID
@@ -188,7 +188,7 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
@@ -214,13 +214,13 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
-    // Ensure Git context element exists (P6)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Git) {
+    // Ensure Git context element exists (P6) — only if git module is active
+    if state.active_modules.contains("git") && !state.context.iter().any(|c| c.context_type == ContextType::Git) {
         state.context.insert(6.min(state.context.len()), ContextElement {
             id: "P6".to_string(),
             uid: None, // Fixed panel - no UID
@@ -240,13 +240,13 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
-    // Ensure Scratchpad context element exists (P7)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Scratchpad) {
+    // Ensure Scratchpad context element exists (P7) — only if scratchpad module is active
+    if state.active_modules.contains("scratchpad") && !state.context.iter().any(|c| c.context_type == ContextType::Scratchpad) {
         state.context.insert(7.min(state.context.len()), ContextElement {
             id: "P7".to_string(),
             uid: None,
@@ -266,18 +266,26 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_description: None,
             cached_content: None,
             cache_deprecated: false,
-            last_refresh_ms: crate::panels::now_ms(),
+            last_refresh_ms: crate::core::panels::now_ms(),
             tmux_last_lines_hash: None,
         });
     }
 
-    // Assign UIDs to all fixed panels (except System which doesn't get stored)
+    // Assign UIDs to all existing fixed panels (except System which doesn't get stored)
     // These are needed for panels/ storage
     assign_panel_uid(state, ContextType::Conversation);
     assign_panel_uid(state, ContextType::Tree);
-    assign_panel_uid(state, ContextType::Todo);
-    assign_panel_uid(state, ContextType::Memory);
+    if state.context.iter().any(|c| c.context_type == ContextType::Todo) {
+        assign_panel_uid(state, ContextType::Todo);
+    }
+    if state.context.iter().any(|c| c.context_type == ContextType::Memory) {
+        assign_panel_uid(state, ContextType::Memory);
+    }
     assign_panel_uid(state, ContextType::Overview);
-    assign_panel_uid(state, ContextType::Git);
-    assign_panel_uid(state, ContextType::Scratchpad);
+    if state.context.iter().any(|c| c.context_type == ContextType::Git) {
+        assign_panel_uid(state, ContextType::Git);
+    }
+    if state.context.iter().any(|c| c.context_type == ContextType::Scratchpad) {
+        assign_panel_uid(state, ContextType::Scratchpad);
+    }
 }

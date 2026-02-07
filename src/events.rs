@@ -3,7 +3,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::llms::{AnthropicModel, GrokModel, GroqModel, LlmProvider};
-use crate::panels::get_panel;
+use crate::core::panels::get_panel;
 use crate::state::State;
 
 pub fn handle_event(event: &Event, state: &State) -> Option<Action> {

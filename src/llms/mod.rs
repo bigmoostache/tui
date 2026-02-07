@@ -12,7 +12,7 @@ use std::sync::mpsc::Sender;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::panels::ContextItem;
+use crate::core::panels::ContextItem;
 use crate::state::Message;
 use crate::tool_defs::ToolDefinition;
 use crate::tools::{ToolResult, ToolUse};

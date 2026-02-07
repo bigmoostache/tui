@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::{icons, CHARS_PER_TOKEN};
 use crate::llms::ModelInfo;
-use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
+use crate::tool_defs::ToolDefinition;
 
 /// Cached rendered lines for a message (using Rc to avoid clones)
 #[derive(Clone)]
@@ -376,10 +376,10 @@ pub struct Message {
 // =============================================================================
 
 /// Shared configuration (config.json)
-/// Global settings, memories, systems - shared across all workers
+/// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedConfig {
-    // === Global settings ===
+    // === Infrastructure ===
     /// Flag to request reload (checked by run.sh supervisor)
     #[serde(default)]
     pub reload_requested: bool,
@@ -389,35 +389,9 @@ pub struct SharedConfig {
     /// PID of the process that owns this state
     #[serde(default)]
     pub owner_pid: Option<u32>,
-    /// Dev mode - shows additional debug info
+    /// Selected context index
     #[serde(default)]
-    pub dev_mode: bool,
-
-    // === LLM configuration ===
-    #[serde(default)]
-    pub llm_provider: crate::llms::LlmProvider,
-    #[serde(default)]
-    pub anthropic_model: crate::llms::AnthropicModel,
-    #[serde(default)]
-    pub grok_model: crate::llms::GrokModel,
-    #[serde(default)]
-    pub groq_model: crate::llms::GroqModel,
-
-    // === Shared data (all workers see same) ===
-    /// Memory items
-    #[serde(default)]
-    pub memories: Vec<MemoryItem>,
-    /// Next memory ID counter
-    #[serde(default = "default_one")]
-    pub next_memory_id: usize,
-    /// System prompt items
-    #[serde(default)]
-    pub systems: Vec<SystemItem>,
-    /// Next system ID counter
-    #[serde(default)]
-    pub next_system_id: usize,
-
-    // === Input state ===
+    pub selected_context: usize,
     /// Draft input text (not yet sent)
     #[serde(default)]
     pub draft_input: String,
@@ -425,32 +399,9 @@ pub struct SharedConfig {
     #[serde(default)]
     pub draft_cursor: usize,
 
-    // === Tree settings (shared) ===
-    /// Gitignore-style filter for directory tree
-    #[serde(default = "default_tree_filter")]
-    pub tree_filter: String,
-    /// File descriptions in tree view
+    // === Module data (keyed by module ID) ===
     #[serde(default)]
-    pub tree_descriptions: Vec<TreeFileDescription>,
-
-    // === Context management ===
-    /// Cleaning threshold (0.0 - 1.0)
-    #[serde(default = "default_cleaning_threshold")]
-    pub cleaning_threshold: f32,
-    /// Cleaning target as proportion of threshold (0.0 - 1.0)
-    #[serde(default = "default_cleaning_target_proportion")]
-    pub cleaning_target_proportion: f32,
-    /// Context budget in tokens (None = use model's full context window)
-    #[serde(default)]
-    pub context_budget: Option<usize>,
-    /// Selected context index
-    #[serde(default)]
-    pub selected_context: usize,
-
-    // === Global UID counter ===
-    /// Next UID counter (shared across all types)
-    #[serde(default = "default_one")]
-    pub global_next_uid: usize,
+    pub modules: HashMap<String, serde_json::Value>,
 }
 
 impl Default for SharedConfig {
@@ -459,30 +410,16 @@ impl Default for SharedConfig {
             reload_requested: false,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
             owner_pid: None,
-            dev_mode: false,
-            llm_provider: Default::default(),
-            anthropic_model: Default::default(),
-            grok_model: Default::default(),
-            groq_model: Default::default(),
-            memories: vec![],
-            next_memory_id: 1,
-            systems: vec![],
-            next_system_id: 0,
+            selected_context: 0,
             draft_input: String::new(),
             draft_cursor: 0,
-            tree_filter: DEFAULT_TREE_FILTER.to_string(),
-            tree_descriptions: vec![],
-            cleaning_threshold: 0.70,
-            cleaning_target_proportion: 0.70,
-            context_budget: None,
-            selected_context: 0,
-            global_next_uid: 1,
+            modules: HashMap::new(),
         }
     }
 }
 
 /// Worker-specific state (states/{worker}.json)
-/// Each worker has its own conversation, todos, context elements
+/// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerState {
     /// Worker identifier
@@ -503,32 +440,10 @@ pub struct WorkerState {
     /// Next result message ID
     #[serde(default = "default_one")]
     pub next_result_id: usize,
-    /// Next todo ID
-    #[serde(default = "default_one")]
-    pub next_todo_id: usize,
 
-    // === 100% local data ===
-    /// Todo items (local to this worker)
+    // === Module data (keyed by module ID) ===
     #[serde(default)]
-    pub todos: Vec<TodoItem>,
-    /// Disabled tool IDs
-    #[serde(default)]
-    pub disabled_tools: Vec<String>,
-    /// Whether to show full diff content in Git panel
-    #[serde(default = "default_true")]
-    pub git_show_diffs: bool,
-    /// Open folders in tree view (local expansion state)
-    #[serde(default)]
-    pub tree_open_folders: Vec<String>,
-    /// Active system prompt ID (points to systems[] in SharedConfig)
-    #[serde(default)]
-    pub active_system_id: Option<String>,
-    /// Scratchpad cells (local to this worker)
-    #[serde(default)]
-    pub scratchpad_cells: Vec<ScratchpadCell>,
-    /// Next scratchpad cell ID
-    #[serde(default = "default_one")]
-    pub next_scratchpad_id: usize,
+    pub modules: HashMap<String, serde_json::Value>,
 }
 
 impl Default for WorkerState {
@@ -539,14 +454,7 @@ impl Default for WorkerState {
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,
             next_result_id: 1,
-            next_todo_id: 1,
-            todos: vec![],
-            disabled_tools: vec![],
-            git_show_diffs: true,
-            tree_open_folders: vec![".".to_string()],
-            active_system_id: None,
-            scratchpad_cells: vec![],
-            next_scratchpad_id: 1,
+            modules: HashMap::new(),
         }
     }
 }
@@ -641,24 +549,8 @@ fn default_theme() -> String {
     crate::config::DEFAULT_THEME.to_string()
 }
 
-fn default_cleaning_threshold() -> f32 {
-    0.70
-}
-
-fn default_cleaning_target_proportion() -> f32 {
-    0.70 // 70% of threshold
-}
-
 fn default_one() -> usize {
     1
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_tree_filter() -> String {
-    DEFAULT_TREE_FILTER.to_string()
 }
 
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
@@ -721,6 +613,8 @@ pub struct State {
     pub next_scratchpad_id: usize,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
+    /// Active module IDs
+    pub active_modules: std::collections::HashSet<String>,
     /// Whether the UI needs to be redrawn
     pub dirty: bool,
     /// Frame counter for spinner animations (wraps around)
@@ -847,7 +741,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -869,7 +763,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -891,7 +785,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: true, // Initial refresh needed
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -913,7 +807,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -935,7 +829,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -957,7 +851,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -979,7 +873,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
                 ContextElement {
@@ -1001,7 +895,7 @@ impl Default for State {
                     tmux_description: None,
                     cached_content: None,
                     cache_deprecated: false,
-                    last_refresh_ms: crate::panels::now_ms(),
+                    last_refresh_ms: crate::core::panels::now_ms(),
                     tmux_last_lines_hash: None,
                 },
             ],
@@ -1033,7 +927,8 @@ impl Default for State {
             active_system_id: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
-            tools: get_all_tool_definitions(),
+            active_modules: crate::modules::default_active_modules(),
+            tools: crate::modules::active_tool_definitions(&crate::modules::default_active_modules()),
             dirty: true, // Start dirty to ensure initial render
             spinner_frame: 0,
             dev_mode: false,
@@ -1056,7 +951,7 @@ impl Default for State {
             git_branches: vec![],
             git_is_repo: false,
             git_file_changes: vec![],
-            git_last_refresh_ms: crate::panels::now_ms(),
+            git_last_refresh_ms: crate::core::panels::now_ms(),
             git_show_diffs: true, // Show diffs by default
             git_status_hash: None,
             git_show_logs: false,
@@ -1079,7 +974,7 @@ impl State {
     /// Update the last_refresh_ms timestamp for a panel by its context type
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
-            ctx.last_refresh_ms = crate::panels::now_ms();
+            ctx.last_refresh_ms = crate::core::panels::now_ms();
         }
     }
 

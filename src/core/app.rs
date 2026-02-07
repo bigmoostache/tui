@@ -12,7 +12,7 @@ use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
 use crate::constants::{EVENT_POLL_MS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
 use crate::events::handle_event;
 use crate::help::CommandPalette;
-use crate::panels::now_ms;
+use crate::core::panels::now_ms;
 use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
@@ -328,7 +328,7 @@ impl App {
                 }],
                 tool_results: Vec::new(),
                 input_tokens: 0,
-                timestamp_ms: crate::panels::now_ms(),
+                timestamp_ms: crate::core::panels::now_ms(),
             };
             save_message(&tool_msg);
             self.state.messages.push(tool_msg);
@@ -362,7 +362,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
-            timestamp_ms: crate::panels::now_ms(),
+            timestamp_ms: crate::core::panels::now_ms(),
         };
         save_message(&result_msg);
         self.state.messages.push(result_msg);
@@ -391,7 +391,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
-            timestamp_ms: crate::panels::now_ms(),
+            timestamp_ms: crate::core::panels::now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 

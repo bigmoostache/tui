@@ -181,7 +181,7 @@ fn refresh_tree_cache(
     tree_descriptions: Vec<TreeFileDescription>,
     tx: Sender<CacheUpdate>,
 ) {
-    use crate::tools::tree::generate_tree_string;
+    use crate::tools::generate_tree_string;
 
     let content = generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
     let token_count = estimate_tokens(&content);

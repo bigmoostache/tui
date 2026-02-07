@@ -11,7 +11,7 @@ use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::panels::now_ms;
+use crate::core::panels::now_ms;
 use crate::state::{ContextType, State};
 use crate::ui;
 

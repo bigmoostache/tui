@@ -23,31 +23,9 @@ use chrono::Local;
 use crate::config::set_active_theme;
 use crate::constants::{STORE_DIR, CONFIG_FILE, DEFAULT_WORKER_ID};
 use crate::state::{SharedConfig, WorkerState, PanelData, Message, State, ContextType, ContextElement};
-use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
-use crate::tools::MANAGE_TOOLS_ID;
 
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
-
-/// Build tools from defaults, applying disabled_tools list
-fn build_tools_from_disabled(disabled_tools: &[String]) -> Vec<ToolDefinition> {
-    let mut tools = get_all_tool_definitions();
-    for tool in &mut tools {
-        // manage_tools can never be disabled
-        if tool.id != MANAGE_TOOLS_ID && disabled_tools.contains(&tool.id) {
-            tool.enabled = false;
-        }
-    }
-    tools
-}
-
-/// Extract disabled tool IDs from tools list
-fn extract_disabled_tools(tools: &[ToolDefinition]) -> Vec<String> {
-    tools.iter()
-        .filter(|t| !t.enabled)
-        .map(|t| t.id.clone())
-        .collect()
-}
 
 /// Check if new multi-file format exists
 fn new_format_exists() -> bool {
@@ -89,7 +67,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         cached_content: None,
         cache_deprecated: true,  // Will be refreshed on load
         // Use saved timestamp if available, otherwise current time for new panels
-        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::panels::now_ms() },
+        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
         tmux_last_lines_hash: None,
     }
 }
@@ -116,7 +94,7 @@ fn load_state_new() -> State {
         file_path: None, file_hash: None, glob_pattern: None, glob_path: None,
         grep_pattern: None, grep_path: None, grep_file_pattern: None,
         tmux_pane_id: None, tmux_lines: None, tmux_last_keys: None, tmux_description: None,
-        cached_content: None, cache_deprecated: false, last_refresh_ms: crate::panels::now_ms(), tmux_last_lines_hash: None,
+        cached_content: None, cache_deprecated: false, last_refresh_ms: crate::core::panels::now_ms(), tmux_last_lines_hash: None,
     });
 
     // P1 = Conversation (chat)
@@ -177,12 +155,6 @@ fn load_state_new() -> State {
         .filter_map(|uid| load_message(uid))
         .collect();
 
-    // Ensure root is always open
-    let mut open_folders = worker_state.tree_open_folders.clone();
-    if !open_folders.contains(&".".to_string()) {
-        open_folders.insert(0, ".".to_string());
-    }
-
     // Calculate display ID counters from loaded messages
     let next_user_id = messages.iter()
         .filter(|m| m.id.starts_with('U'))
@@ -197,78 +169,37 @@ fn load_state_new() -> State {
         .map(|n| n + 1)
         .unwrap_or(1);
 
-    let state = State {
-        // From loaded panels
+    // Start with default state, then apply infrastructure + module data
+    let mut state = State {
         context,
         messages,
         selected_context: shared_config.selected_context,
-        todos: worker_state.todos,
         next_user_id,
         next_assistant_id,
         next_tool_id: worker_state.next_tool_id,
         next_result_id: worker_state.next_result_id,
-        next_todo_id: worker_state.next_todo_id,
-        scratchpad_cells: worker_state.scratchpad_cells,
-        next_scratchpad_id: worker_state.next_scratchpad_id,
-        active_system_id: worker_state.active_system_id,
-        git_show_diffs: worker_state.git_show_diffs,
-        tree_open_folders: open_folders,
-        tools: build_tools_from_disabled(&worker_state.disabled_tools),
-
-        // From shared config
-        memories: shared_config.memories,
-        next_memory_id: shared_config.next_memory_id,
-        systems: shared_config.systems,
-        next_system_id: shared_config.next_system_id,
-        tree_filter: shared_config.tree_filter,
-        tree_descriptions: shared_config.tree_descriptions,
-        dev_mode: shared_config.dev_mode,
-        active_theme: shared_config.active_theme.clone(),
-        llm_provider: shared_config.llm_provider,
-        anthropic_model: shared_config.anthropic_model,
-        grok_model: shared_config.grok_model,
-        groq_model: shared_config.groq_model,
-        cleaning_threshold: shared_config.cleaning_threshold,
-        cleaning_target_proportion: shared_config.cleaning_target_proportion,
-        context_budget: shared_config.context_budget,
         input: shared_config.draft_input,
         input_cursor: shared_config.draft_cursor,
-
-        // Global UID counter for all shared elements
-        global_next_uid: shared_config.global_next_uid,
-
-        // Runtime-only state (defaults)
-        is_streaming: false,
-        scroll_offset: 0.0,
-        user_scrolled: false,
-        scroll_accel: 1.0,
-        max_scroll: 0.0,
-        streaming_estimated_tokens: 0,
-        pending_tldrs: 0,
-        dirty: true,
-        spinner_frame: 0,
-        perf_enabled: false,
-        config_view: false,
-        config_selected_bar: 0,
-        api_check_in_progress: false,
-        api_check_result: None,
-        git_branch: None,
-        git_branches: vec![],
-        git_is_repo: false,
-        git_file_changes: vec![],
-        git_last_refresh_ms: crate::panels::now_ms(),
-        git_status_hash: None,
-        git_show_logs: false,
-        git_log_args: None,
-        git_log_content: None,
-        api_retry_count: 0,
-        reload_pending: false,
-        waiting_for_panels: false,
-        last_viewport_width: 0,
-        message_cache: HashMap::new(),
-        input_cache: None,
-        full_content_cache: None,
+        active_theme: shared_config.active_theme.clone(),
+        ..State::default()
     };
+
+    // Load module data from appropriate config (global → SharedConfig, worker → WorkerState)
+    let null = serde_json::Value::Null;
+    for module in crate::modules::all_modules() {
+        let data = if module.is_global() {
+            shared_config.modules.get(module.id()).unwrap_or(&null)
+        } else {
+            worker_state.modules.get(module.id()).unwrap_or(&null)
+        };
+        module.load_module_data(data, &mut state);
+    }
+
+    // If tools weren't built by core module's load_module_data (e.g., no saved data),
+    // ensure tools are built from active_modules
+    if state.tools.is_empty() {
+        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+    }
 
     // Set the global active theme
     set_active_theme(&state.active_theme);
@@ -280,33 +211,32 @@ pub fn save_state(state: &State) {
     let dir = PathBuf::from(STORE_DIR);
     fs::create_dir_all(&dir).ok();
 
-    // Create SharedConfig
+    // Build module data maps
+    let mut global_modules = HashMap::new();
+    let mut worker_modules = HashMap::new();
+    for module in crate::modules::all_modules() {
+        let data = module.save_module_data(state);
+        if !data.is_null() {
+            if module.is_global() {
+                global_modules.insert(module.id().to_string(), data);
+            } else {
+                worker_modules.insert(module.id().to_string(), data);
+            }
+        }
+    }
+
+    // Create SharedConfig (infrastructure + global module data)
     let shared_config = SharedConfig {
         reload_requested: false,
         active_theme: state.active_theme.clone(),
         owner_pid: Some(current_pid()),
-        dev_mode: state.dev_mode,
-        llm_provider: state.llm_provider,
-        anthropic_model: state.anthropic_model,
-        grok_model: state.grok_model,
-        groq_model: state.groq_model,
-        memories: state.memories.clone(),
-        next_memory_id: state.next_memory_id,
-        systems: state.systems.clone(),
-        next_system_id: state.next_system_id,
+        selected_context: state.selected_context,
         draft_input: state.input.clone(),
         draft_cursor: state.input_cursor,
-        tree_filter: state.tree_filter.clone(),
-        tree_descriptions: state.tree_descriptions.clone(),
-        cleaning_threshold: state.cleaning_threshold,
-        cleaning_target_proportion: state.cleaning_target_proportion,
-        context_budget: state.context_budget,
-        selected_context: state.selected_context,
-        global_next_uid: state.global_next_uid,
+        modules: global_modules,
     };
 
     // Build important_panel_uids from context elements (fixed panels P1-P7)
-    // All fixed panels get UIDs and are stored in panels/ folder
     let mut important_uids = crate::state::ImportantPanelUids::default();
     for ctx in &state.context {
         if let Some(uid) = &ctx.uid {
@@ -324,27 +254,19 @@ pub fn save_state(state: &State) {
     }
 
     // Build panel_uid_to_local_id for dynamic panels (P8+)
-    // Excludes chat (already in important_panel_uids) and other fixed panels
     let panel_uid_to_local_id: HashMap<String, String> = state.context.iter()
         .filter(|c| c.uid.is_some() && !c.context_type.is_fixed())
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
 
-    // Create WorkerState (no context field - panels are in panels/ folder)
+    // Create WorkerState (infrastructure + worker module data)
     let worker_state = WorkerState {
         worker_id: DEFAULT_WORKER_ID.to_string(),
         important_panel_uids: important_uids.clone(),
         panel_uid_to_local_id,
         next_tool_id: state.next_tool_id,
         next_result_id: state.next_result_id,
-        next_todo_id: state.next_todo_id,
-        todos: state.todos.clone(),
-        disabled_tools: extract_disabled_tools(&state.tools),
-        git_show_diffs: state.git_show_diffs,
-        tree_open_folders: state.tree_open_folders.clone(),
-        active_system_id: state.active_system_id.clone(),
-        scratchpad_cells: state.scratchpad_cells.clone(),
-        next_scratchpad_id: state.next_scratchpad_id,
+        modules: worker_modules,
     };
 
     // Save shared config
