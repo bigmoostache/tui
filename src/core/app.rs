@@ -593,13 +593,16 @@ impl App {
 
     /// Process file watcher events
     fn process_watcher_events(&mut self) {
-        let Some(watcher) = &self.file_watcher else { return };
-
-        let events = watcher.poll_events();
+        // Collect events (immutable borrow on file_watcher released after this block)
+        let events = {
+            let Some(watcher) = &self.file_watcher else { return };
+            watcher.poll_events()
+        };
         if events.is_empty() { return; }
 
-        // First pass: mark deprecated and collect indices needing refresh
+        // First pass: mark deprecated, collect indices and paths needing re-watch
         let mut refresh_indices = Vec::new();
+        let mut rewatch_paths: Vec<String> = Vec::new();
         for event in &events {
             match event {
                 WatchEvent::FileChanged(path) => {
@@ -610,6 +613,7 @@ impl App {
                             refresh_indices.push(i);
                         }
                     }
+                    rewatch_paths.push(path.clone());
                 }
                 WatchEvent::DirChanged(_path) => {
                     for (i, ctx) in self.state.context.iter_mut().enumerate() {
@@ -629,6 +633,14 @@ impl App {
             let panel = crate::core::panels::get_panel(ctx.context_type);
             if let Some(request) = panel.build_cache_request(ctx, &self.state) {
                 process_cache_request(request, self.cache_tx.clone());
+            }
+        }
+
+        // Third pass: re-watch files to pick up new inodes after atomic rename
+        // (editors like vim/vscode save via rename, which invalidates the inotify watch)
+        if let Some(watcher) = &mut self.file_watcher {
+            for path in rewatch_paths {
+                let _ = watcher.rewatch_file(&path);
             }
         }
     }
