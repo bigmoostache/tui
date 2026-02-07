@@ -7,7 +7,8 @@ use ratatui::prelude::*;
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
 use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{GIT_STATUS_REFRESH_MS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use super::GIT_STATUS_REFRESH_MS;
 use crate::state::{estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
 use crate::ui::{theme, chars};
 
@@ -177,6 +178,8 @@ fn parse_numstat_to_map(
 }
 
 impl Panel for GitPanel {
+    fn needs_cache(&self) -> bool { true }
+
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         // Force full refresh if cache is explicitly deprecated (e.g., toggle_diffs)
         let current_hash = if ctx.cache_deprecated {

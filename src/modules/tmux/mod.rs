@@ -1,6 +1,9 @@
 mod panel;
 pub(crate) mod tools;
 
+/// Deprecation timer for tmux panels (milliseconds)
+pub const TMUX_DEPRECATION_MS: u64 = 1_000; // 1 second (check hash of last 2 lines)
+
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
 use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};

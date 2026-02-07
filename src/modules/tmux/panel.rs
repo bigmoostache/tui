@@ -6,13 +6,15 @@ use ratatui::prelude::*;
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
 use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::TMUX_DEPRECATION_MS;
+use super::TMUX_DEPRECATION_MS;
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
 
 impl Panel for TmuxPanel {
+    fn needs_cache(&self) -> bool { true }
+
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         // Get current tmux pane ID
         let pane_id = state.context.get(state.selected_context)

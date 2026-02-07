@@ -1,4 +1,4 @@
-mod system_panel;
+pub mod conversation;
 mod conversation_panel;
 mod overview_panel;
 mod tools;
@@ -10,7 +10,6 @@ use crate::state::{ContextType, State};
 use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
 use crate::tools::{ToolUse, ToolResult};
 
-use self::system_panel::SystemPanel;
 use self::conversation_panel::ConversationPanel;
 use self::overview_panel::OverviewPanel;
 use super::Module;
@@ -26,8 +25,6 @@ impl Module for CoreModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
-            "systems": state.systems,
-            "next_system_id": state.next_system_id,
             "active_modules": state.active_modules.iter().collect::<Vec<_>>(),
             "dev_mode": state.dev_mode,
             "llm_provider": state.llm_provider,
@@ -39,19 +36,10 @@ impl Module for CoreModule {
             "context_budget": state.context_budget,
             "global_next_uid": state.global_next_uid,
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
-            "active_system_id": state.active_system_id,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("systems") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
-                state.systems = v;
-            }
-        }
-        if let Some(v) = data.get("next_system_id").and_then(|v| v.as_u64()) {
-            state.next_system_id = v as usize;
-        }
         if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
             state.active_modules = arr.iter()
                 .filter_map(|v| v.as_str().map(String::from))
@@ -104,22 +92,24 @@ impl Module for CoreModule {
                 }
             }
         }
-        if let Some(v) = data.get("active_system_id") {
-            state.active_system_id = v.as_str().map(String::from);
-        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![
-            ContextType::System,
             ContextType::Conversation,
             ContextType::Overview,
         ]
     }
 
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![
+            (ContextType::Conversation, "Chat", true),
+            (ContextType::Overview, "World", false),
+        ]
+    }
+
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
         match context_type {
-            ContextType::System => Some(Box::new(SystemPanel)),
             ContextType::Conversation => Some(Box::new(ConversationPanel)),
             ContextType::Overview => Some(Box::new(OverviewPanel)),
             _ => None,
@@ -165,71 +155,7 @@ impl Module for CoreModule {
                 category: ToolCategory::Context,
             },
 
-            // System prompt tools
-            ToolDefinition {
-                id: "system_create".to_string(),
-                name: "Create System".to_string(),
-                short_desc: "Create system prompt".to_string(),
-                description: "Creates a new system prompt with a name, description, and content. System prompts define the agent's identity and behavior.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String)
-                        .desc("System prompt name")
-                        .required(),
-                    ToolParam::new("description", ParamType::String)
-                        .desc("Short description of this system prompt"),
-                    ToolParam::new("content", ParamType::String)
-                        .desc("Full system prompt content")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
-            ToolDefinition {
-                id: "system_edit".to_string(),
-                name: "Edit System".to_string(),
-                short_desc: "Edit system prompt".to_string(),
-                description: "Edits an existing system prompt. Can update name, description, or content.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("System prompt ID (e.g., S0, S1)")
-                        .required(),
-                    ToolParam::new("name", ParamType::String)
-                        .desc("New name"),
-                    ToolParam::new("description", ParamType::String)
-                        .desc("New description"),
-                    ToolParam::new("content", ParamType::String)
-                        .desc("New content"),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
-            ToolDefinition {
-                id: "system_delete".to_string(),
-                name: "Delete System".to_string(),
-                short_desc: "Delete system prompt".to_string(),
-                description: "Deletes a system prompt. If the deleted prompt was active, reverts to default.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("System prompt ID to delete (e.g., S0)")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
-            ToolDefinition {
-                id: "system_load".to_string(),
-                name: "Load System".to_string(),
-                short_desc: "Activate system prompt".to_string(),
-                description: "Loads/activates a system prompt. Pass empty id to revert to default system prompt.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("System prompt ID to activate (e.g., S0). Empty to use default."),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
-
-            // System tools
+            // System tools (reload stays in core)
             ToolDefinition {
                 id: "system_reload".to_string(),
                 name: "Reload TUI".to_string(),
@@ -276,13 +202,7 @@ impl Module for CoreModule {
             "context_close" => Some(self::tools::close_context::execute(tool, state)),
             "context_message_status" => Some(self::tools::message_status::execute(tool, state)),
 
-            // System prompt tools
-            "system_create" => Some(self::tools::system::create_system(tool, state)),
-            "system_edit" => Some(self::tools::system::edit_system(tool, state)),
-            "system_delete" => Some(self::tools::system::delete_system(tool, state)),
-            "system_load" => Some(self::tools::system::load_system(tool, state)),
-
-            // System tools
+            // System tools (reload stays in core)
             "system_reload" => Some(crate::tools::execute_reload_tui(tool, state)),
 
             // Meta tools

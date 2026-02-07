@@ -68,18 +68,9 @@ pub enum ContextType {
 }
 
 impl ContextType {
-    /// Returns true if this is a fixed/system context type
+    /// Returns true if this is a fixed/system context type (derived from module registry)
     pub fn is_fixed(&self) -> bool {
-        matches!(self,
-            ContextType::System |
-            ContextType::Conversation |
-            ContextType::Tree |
-            ContextType::Todo |
-            ContextType::Memory |
-            ContextType::Overview |
-            ContextType::Git |
-            ContextType::Scratchpad
-        )
+        crate::modules::all_modules().iter().any(|m| m.fixed_panel_types().contains(self))
     }
 
     /// Get icon for this context type (normalized to 2 cells)
@@ -100,16 +91,12 @@ impl ContextType {
         }
     }
 
-    /// Returns true if this context type uses cached_content from background loading
+    /// Returns true if this context type uses cached_content from background loading.
+    /// Delegates to the Panel trait's needs_cache() method.
     pub fn needs_cache(&self) -> bool {
-        matches!(self,
-            ContextType::File |
-            ContextType::Tree |
-            ContextType::Glob |
-            ContextType::Grep |
-            ContextType::Tmux |
-            ContextType::Git
-        )
+        crate::modules::create_panel(*self)
+            .map(|p| p.needs_cache())
+            .unwrap_or(false)
     }
 }
 
@@ -172,131 +159,13 @@ pub struct ContextElement {
     pub tmux_last_lines_hash: Option<String>,
 }
 
-/// Todo item status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum TodoStatus {
-    #[default]
-    Pending,    // ' '
-    InProgress, // '~'
-    Done,       // 'x'
-}
-
-impl TodoStatus {
-    pub fn icon(&self) -> String {
-        match self {
-            TodoStatus::Pending => icons::todo_pending(),
-            TodoStatus::InProgress => icons::todo_in_progress(),
-            TodoStatus::Done => icons::todo_done(),
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            " " | "pending" => Some(TodoStatus::Pending),
-            "~" | "in_progress" => Some(TodoStatus::InProgress),
-            "x" | "X" | "done" => Some(TodoStatus::Done),
-            _ => None,
-        }
-    }
-}
-
-/// A todo item
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TodoItem {
-    /// Todo ID (X1, X2, ...)
-    pub id: String,
-    /// Parent todo ID (for nesting)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_id: Option<String>,
-    /// Todo name/title
-    pub name: String,
-    /// Detailed description
-    #[serde(default)]
-    pub description: String,
-    /// Status: pending, in_progress, done
-    #[serde(default)]
-    pub status: TodoStatus,
-}
-
-/// Memory importance level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum MemoryImportance {
-    Low,
-    #[default]
-    Medium,
-    High,
-    Critical,
-}
-
-impl MemoryImportance {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "low" => Some(MemoryImportance::Low),
-            "medium" => Some(MemoryImportance::Medium),
-            "high" => Some(MemoryImportance::High),
-            "critical" => Some(MemoryImportance::Critical),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MemoryImportance::Low => "low",
-            MemoryImportance::Medium => "medium",
-            MemoryImportance::High => "high",
-            MemoryImportance::Critical => "critical",
-        }
-    }
-}
-
-/// A memory item
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryItem {
-    /// Memory ID (M1, M2, ...)
-    pub id: String,
-    /// Memory content
-    pub content: String,
-    /// Importance level
-    #[serde(default)]
-    pub importance: MemoryImportance,
-}
-
-/// A system prompt item
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemItem {
-    /// System ID (S0, S1, ...)
-    pub id: String,
-    /// System name
-    pub name: String,
-    /// Short description
-    pub description: String,
-    /// Full system prompt content
-    pub content: String,
-}
-
-/// A scratchpad cell for storing temporary notes/data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScratchpadCell {
-    /// Cell ID (C1, C2, ...)
-    pub id: String,
-    /// Cell title
-    pub title: String,
-    /// Cell content
-    pub content: String,
-}
-
-/// A file description in the tree
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TreeFileDescription {
-    /// File path (relative to project root)
-    pub path: String,
-    /// Description of the file
-    pub description: String,
-    /// File hash when description was created (to detect staleness)
-    pub file_hash: String,
-}
+// Re-export module-owned types for backwards compatibility
+pub use crate::modules::todo::types::{TodoStatus, TodoItem};
+pub use crate::modules::memory::types::{MemoryImportance, MemoryItem};
+pub use crate::modules::system::types::SystemItem;
+pub use crate::modules::scratchpad::types::ScratchpadCell;
+pub use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
+pub use crate::modules::git::types::{GitFileChange, GitChangeType};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -450,7 +319,7 @@ impl Default for WorkerState {
     fn default() -> Self {
         Self {
             worker_id: crate::constants::DEFAULT_WORKER_ID.to_string(),
-            important_panel_uids: ImportantPanelUids::default(),
+            important_panel_uids: HashMap::new(),
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,
             next_result_id: 1,
@@ -511,39 +380,11 @@ pub struct PanelData {
     pub tmux_description: Option<String>,
 }
 
-/// UIDs for important/fixed panels that a worker uses
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ImportantPanelUids {
-    /// Conversation panel UID
-    pub chat: String,
-    /// Tree panel UID
-    pub tree: String,
-    /// Todo/WIP panel UID
-    pub wip: String,
-    /// Memory panel UID
-    pub memories: String,
-    /// Overview/World panel UID
-    pub world: String,
-    /// Git/Changes panel UID
-    pub changes: String,
-    /// Scratchpad panel UID
-    pub scratch: String,
-}
+/// UIDs for important/fixed panels that a worker uses.
+/// Maps ContextType to panel UID string.
+pub type ImportantPanelUids = HashMap<ContextType, String>;
 
-/// Default tree filter (gitignore-style patterns)
-pub const DEFAULT_TREE_FILTER: &str = r#"# Ignore common non-essential directories
-.git/
-target/
-node_modules/
-__pycache__/
-.venv/
-venv/
-dist/
-build/
-*.pyc
-*.pyo
-.DS_Store
-"#;
+// DEFAULT_TREE_FILTER is re-exported from modules/tree/types.rs above
 
 fn default_theme() -> String {
     crate::config::DEFAULT_THEME.to_string()
@@ -687,216 +528,20 @@ pub struct State {
     pub full_content_cache: Option<FullContentCache>,
 }
 
-/// Represents a file change in git status
-#[derive(Debug, Clone)]
-pub struct GitFileChange {
-    /// File path (relative to repo root)
-    pub path: String,
-    /// Lines added
-    pub additions: i32,
-    /// Lines deleted
-    pub deletions: i32,
-    /// Type of change
-    pub change_type: GitChangeType,
-    /// Diff content for this file (unified diff format)
-    pub diff_content: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GitChangeType {
-    /// Modified file (staged or unstaged)
-    Modified,
-    /// Newly added file (staged)
-    Added,
-    /// Untracked file (not in git)
-    Untracked,
-    /// Deleted file
-    Deleted,
-    /// Renamed file
-    Renamed,
-}
+// GitFileChange and GitChangeType are re-exported from modules/git/types.rs above
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            context: vec![
-                ContextElement {
-                    id: "P0".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::System,
-                    name: "Seed".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P1".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Conversation,
-                    name: "Chat".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P2".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Tree,
-                    name: "Tree".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: true, // Initial refresh needed
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P3".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Todo,
-                    name: "WIP".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P4".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Memory,
-                    name: "Memories".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P5".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Overview,
-                    name: "World".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P6".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Git,
-                    name: "Changes".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-                ContextElement {
-                    id: "P7".to_string(),
-                    uid: None, // Fixed panel - no UID
-                    context_type: ContextType::Scratchpad,
-                    name: "Scratch".to_string(),
-                    token_count: 0,
-                    file_path: None,
-                    file_hash: None,
-                    glob_pattern: None,
-                    glob_path: None,
-                    grep_pattern: None,
-                    grep_path: None,
-                    grep_file_pattern: None,
-                    tmux_pane_id: None,
-                    tmux_lines: None,
-                    tmux_last_keys: None,
-                    tmux_description: None,
-                    cached_content: None,
-                    cache_deprecated: false,
-                    last_refresh_ms: crate::core::panels::now_ms(),
-                    tmux_last_lines_hash: None,
-                },
-            ],
+            context: crate::modules::all_fixed_panel_defaults()
+                .iter()
+                .enumerate()
+                .map(|(i, (_, _, ct, name, cache_dep))| {
+                    crate::modules::make_default_context_element(
+                        &format!("P{}", i), *ct, name, *cache_dep,
+                    )
+                })
+                .collect(),
             messages: vec![],
             input: String::new(),
             input_cursor: 0,

@@ -1,5 +1,9 @@
+pub mod types;
 mod panel;
 pub(crate) mod tools;
+
+/// Refresh interval for git status (milliseconds)
+pub const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
 
 use serde_json::json;
 
@@ -32,6 +36,10 @@ impl Module for GitModule {
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Git]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![(ContextType::Git, "Changes", false)]
     }
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {

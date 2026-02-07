@@ -1,3 +1,4 @@
+pub mod types;
 mod panel;
 pub(crate) mod tools;
 
@@ -39,6 +40,10 @@ impl Module for MemoryModule {
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Memory]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![(ContextType::Memory, "Memories", false)]
     }
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {

@@ -5,6 +5,7 @@ pub mod glob;
 pub mod grep;
 pub mod memory;
 pub mod scratchpad;
+pub mod system;
 pub mod tmux;
 pub mod todo;
 pub mod tree;
@@ -55,12 +56,85 @@ pub trait Module: Send + Sync {
     fn fixed_panel_types(&self) -> Vec<ContextType> { vec![] }
     /// Dynamic panel types this module can create (File, Glob, Grep, Tmux)
     fn dynamic_panel_types(&self) -> Vec<ContextType> { vec![] }
+
+    /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
+    /// Used by ensure_default_contexts to create missing panels generically.
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> { vec![] }
+}
+
+/// Canonical order of fixed panels (P0-P7).
+/// This defines the sidebar position and ID assignment for each fixed panel.
+const FIXED_PANEL_ORDER: &[ContextType] = &[
+    ContextType::System,       // P0
+    ContextType::Conversation, // P1
+    ContextType::Tree,         // P2
+    ContextType::Todo,         // P3
+    ContextType::Memory,       // P4
+    ContextType::Overview,     // P5
+    ContextType::Git,          // P6
+    ContextType::Scratchpad,   // P7
+];
+
+/// Collect all fixed panel defaults in canonical P0-P7 order.
+/// Returns (module_id, is_core, context_type, display_name, cache_deprecated) for each fixed panel.
+pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
+    // Build a lookup from context_type to module defaults
+    let modules = all_modules();
+    let mut lookup: std::collections::HashMap<ContextType, (&str, bool, &str, bool)> =
+        std::collections::HashMap::new();
+    for module in &modules {
+        for (ct, name, cache_dep) in module.fixed_panel_defaults() {
+            lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
+        }
+    }
+
+    // Return in canonical order
+    FIXED_PANEL_ORDER
+        .iter()
+        .filter_map(|ct| {
+            lookup.get(ct).map(|(mid, is_core, name, cache_dep)| {
+                (*mid, *is_core, *ct, *name, *cache_dep)
+            })
+        })
+        .collect()
+}
+
+/// Create a default ContextElement for a fixed panel
+pub fn make_default_context_element(
+    id: &str,
+    context_type: ContextType,
+    name: &str,
+    cache_deprecated: bool,
+) -> crate::state::ContextElement {
+    crate::state::ContextElement {
+        id: id.to_string(),
+        uid: None,
+        context_type,
+        name: name.to_string(),
+        token_count: 0,
+        file_path: None,
+        file_hash: None,
+        glob_pattern: None,
+        glob_path: None,
+        grep_pattern: None,
+        grep_path: None,
+        grep_file_pattern: None,
+        tmux_pane_id: None,
+        tmux_lines: None,
+        tmux_last_keys: None,
+        tmux_description: None,
+        cached_content: None,
+        cache_deprecated,
+        last_refresh_ms: crate::core::panels::now_ms(),
+        tmux_last_lines_hash: None,
+    }
 }
 
 /// Returns all registered modules.
 pub fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
         Box::new(core::CoreModule),
+        Box::new(system::SystemModule),
         Box::new(files::FilesModule),
         Box::new(tree::TreeModule),
         Box::new(git::GitModule),

@@ -25,22 +25,6 @@ pub const API_VERSION: &str = "2023-06-01";
 pub const CHARS_PER_TOKEN: f32 = 4.0;
 
 // =============================================================================
-// PANEL CACHE DEPRECATION
-// =============================================================================
-
-/// Deprecation timer for glob panels (milliseconds)
-pub const GLOB_DEPRECATION_MS: u64 = 30_000; // 30 seconds
-
-/// Deprecation timer for grep panels (milliseconds)
-pub const GREP_DEPRECATION_MS: u64 = 30_000; // 30 seconds
-
-/// Deprecation timer for tmux panels (milliseconds)
-pub const TMUX_DEPRECATION_MS: u64 = 1_000; // 1 second (check hash of last 2 lines)
-
-/// Refresh interval for git status (milliseconds)
-pub const GIT_STATUS_REFRESH_MS: u64 = 5_000; // 5 seconds
-
-// =============================================================================
 // SCROLLING
 // =============================================================================
 

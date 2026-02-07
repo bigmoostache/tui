@@ -15,6 +15,8 @@ use crate::ui::theme;
 pub struct FilePanel;
 
 impl Panel for FilePanel {
+    fn needs_cache(&self) -> bool { true }
+
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

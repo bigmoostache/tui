@@ -1,3 +1,4 @@
+pub mod types;
 mod panel;
 pub(crate) mod tools;
 
@@ -38,6 +39,10 @@ impl Module for ScratchpadModule {
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Scratchpad]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![(ContextType::Scratchpad, "Scratch", false)]
     }
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {

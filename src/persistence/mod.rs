@@ -83,47 +83,18 @@ fn load_state_new() -> State {
     let mut context: Vec<ContextElement> = Vec::new();
     let important = &worker_state.important_panel_uids;
 
-    // Load fixed panels from important_panel_uids (in order P0-P7)
-    // P0 = System (not stored in panels/ - comes from systems[])
-    context.push(ContextElement {
-        id: "P0".to_string(),
-        uid: None,
-        context_type: ContextType::System,
-        name: "Seed".to_string(),
-        token_count: 0,
-        file_path: None, file_hash: None, glob_pattern: None, glob_path: None,
-        grep_pattern: None, grep_path: None, grep_file_pattern: None,
-        tmux_pane_id: None, tmux_lines: None, tmux_last_keys: None, tmux_description: None,
-        cached_content: None, cache_deprecated: false, last_refresh_ms: crate::core::panels::now_ms(), tmux_last_lines_hash: None,
-    });
-
-    // P1 = Conversation (chat)
-    if let Some(panel) = panel::load_panel(&important.chat) {
-        context.push(panel_to_context(&panel, "P1"));
-    }
-    // P2 = Tree
-    if let Some(panel) = panel::load_panel(&important.tree) {
-        context.push(panel_to_context(&panel, "P2"));
-    }
-    // P3 = Todo (wip)
-    if let Some(panel) = panel::load_panel(&important.wip) {
-        context.push(panel_to_context(&panel, "P3"));
-    }
-    // P4 = Memory
-    if let Some(panel) = panel::load_panel(&important.memories) {
-        context.push(panel_to_context(&panel, "P4"));
-    }
-    // P5 = Overview (world)
-    if let Some(panel) = panel::load_panel(&important.world) {
-        context.push(panel_to_context(&panel, "P5"));
-    }
-    // P6 = Git (changes)
-    if let Some(panel) = panel::load_panel(&important.changes) {
-        context.push(panel_to_context(&panel, "P6"));
-    }
-    // P7 = Scratchpad
-    if let Some(panel) = panel::load_panel(&important.scratch) {
-        context.push(panel_to_context(&panel, "P7"));
+    // Load fixed panels in canonical order (P0-P7) from module registry
+    let defaults = crate::modules::all_fixed_panel_defaults();
+    for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
+        let id = format!("P{}", pos);
+        if *ct == ContextType::System {
+            // System panel is not stored in panels/ - comes from systems[]
+            context.push(crate::modules::make_default_context_element(&id, *ct, name, *cache_deprecated));
+        } else if let Some(uid) = important.get(ct) {
+            if let Some(panel_data) = panel::load_panel(uid) {
+                context.push(panel_to_context(&panel_data, &id));
+            }
+        }
     }
 
     // Load dynamic panels from panel_uid_to_local_id (P8+)
@@ -143,13 +114,10 @@ fn load_state_new() -> State {
     }
 
     // Load messages from the conversation panel
-    let message_uids: Vec<String> = if !important.chat.is_empty() {
-        panel::load_panel(&important.chat)
-            .map(|p| p.message_uids)
-            .unwrap_or_default()
-    } else {
-        vec![]
-    };
+    let message_uids: Vec<String> = important.get(&ContextType::Conversation)
+        .and_then(|uid| panel::load_panel(uid))
+        .map(|p| p.message_uids)
+        .unwrap_or_default();
 
     let messages: Vec<Message> = message_uids.iter()
         .filter_map(|uid| load_message(uid))
@@ -236,19 +204,12 @@ pub fn save_state(state: &State) {
         modules: global_modules,
     };
 
-    // Build important_panel_uids from context elements (fixed panels P1-P7)
-    let mut important_uids = crate::state::ImportantPanelUids::default();
+    // Build important_panel_uids from fixed context elements (all except System)
+    let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
-        if let Some(uid) = &ctx.uid {
-            match ctx.context_type {
-                ContextType::Conversation => important_uids.chat = uid.clone(),
-                ContextType::Tree => important_uids.tree = uid.clone(),
-                ContextType::Todo => important_uids.wip = uid.clone(),
-                ContextType::Memory => important_uids.memories = uid.clone(),
-                ContextType::Overview => important_uids.world = uid.clone(),
-                ContextType::Git => important_uids.changes = uid.clone(),
-                ContextType::Scratchpad => important_uids.scratch = uid.clone(),
-                _ => {}
+        if ctx.context_type.is_fixed() && ctx.context_type != ContextType::System {
+            if let Some(uid) = &ctx.uid {
+                important_uids.insert(ctx.context_type, uid.clone());
             }
         }
     }

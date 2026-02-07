@@ -4,13 +4,16 @@ use ratatui::prelude::*;
 use crate::cache::{CacheRequest, CacheUpdate};
 use crate::core::panels::{now_ms, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{GREP_DEPRECATION_MS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use super::GREP_DEPRECATION_MS;
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GrepPanel;
 
 impl Panel for GrepPanel {
+    fn needs_cache(&self) -> bool { true }
+
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

@@ -1,3 +1,4 @@
+pub mod types;
 mod panel;
 pub mod tools;
 
@@ -49,6 +50,10 @@ impl Module for TreeModule {
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Tree]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![(ContextType::Tree, "Tree", true)]
     }
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {

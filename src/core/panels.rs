@@ -81,6 +81,9 @@ pub trait Panel {
         None // Default: use global key handling
     }
 
+    /// Whether this panel uses background caching (cached_content from background loading)
+    fn needs_cache(&self) -> bool { false }
+
     /// Refresh token counts and any cached data (called before generating context)
     fn refresh(&self, _state: &mut State) {
         // Default: no refresh needed
