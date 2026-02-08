@@ -4,8 +4,9 @@ pub mod git;
 pub mod glob;
 pub mod grep;
 pub mod memory;
+pub mod preset;
 pub mod scratchpad;
-pub mod system;
+pub mod prompt;
 pub mod tmux;
 pub mod todo;
 pub mod tree;
@@ -134,7 +135,7 @@ pub fn make_default_context_element(
 pub fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
         Box::new(core::CoreModule),
-        Box::new(system::SystemModule),
+        Box::new(prompt::PromptModule),
         Box::new(files::FilesModule),
         Box::new(tree::TreeModule),
         Box::new(git::GitModule),
@@ -144,6 +145,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(todo::TodoModule),
         Box::new(memory::MemoryModule),
         Box::new(scratchpad::ScratchpadModule),
+        Box::new(preset::PresetModule),
     ]
 }
 

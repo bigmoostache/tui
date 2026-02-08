@@ -2,7 +2,7 @@ use crate::state::{ContextType, State};
 use crate::modules;
 
 // Re-export seed functions from system module for backwards compatibility
-pub use crate::modules::system::seed::{ensure_default_seed, get_active_seed_content};
+pub use crate::modules::prompt::seed::{ensure_default_seed, get_active_seed_content};
 
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
