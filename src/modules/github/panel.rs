@@ -16,7 +16,7 @@ impl Panel for GithubResultPanel {
     fn needs_cache(&self) -> bool { true }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        None // GhWatcher handles periodic refresh via ETag/hash polling
+        Some(120_000) // Fallback timer; GhWatcher also polls via ETag/hash every 60s
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
