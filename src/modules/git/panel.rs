@@ -5,11 +5,11 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, ContextItem, Panel};
+use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use super::GIT_STATUS_REFRESH_MS;
-use crate::state::{estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
+use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
 use crate::ui::{theme, chars};
 
 pub struct GitPanel;
@@ -219,6 +219,8 @@ impl Panel for GitPanel {
                 state.git_status_hash = Some(status_hash);
                 ctx.cached_content = Some(formatted_content);
                 ctx.token_count = token_count;
+                ctx.total_pages = compute_total_pages(token_count);
+                ctx.current_page = 0;
                 ctx.cache_deprecated = false;
                 ctx.last_refresh_ms = now_ms();
                 true
@@ -501,30 +503,31 @@ impl Panel for GitPanel {
         if !state.git_is_repo {
             return vec![];
         }
-        
+
+        // Find the Git context element
+        let git_ctx = state.context.iter().find(|c| c.context_type == ContextType::Git);
+
         // Use cached content if available
-        let content = state.context.iter()
-            .find(|c| c.context_type == ContextType::Git)
+        let content = git_ctx
             .and_then(|ctx| ctx.cached_content.as_ref())
             .map(|c| {
-                if state.context.iter()
-                    .find(|ctx| ctx.context_type == ContextType::Git)
+                let is_deprecated = git_ctx
                     .map(|ctx| ctx.cache_deprecated)
-                    .unwrap_or(false)
-                {
+                    .unwrap_or(false);
+                if is_deprecated {
                     format!("[refreshing...]\n{}", c)
                 } else {
                     c.clone()
                 }
             })
             .unwrap_or_else(|| Self::format_git_for_context(state));
-        
-        // Find the Git context element to get its ID and timestamp
-        let (id, last_refresh_ms) = state.context.iter()
-            .find(|c| c.context_type == ContextType::Git)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P6", 0));
-        vec![ContextItem::new(id, "Git Status", content, last_refresh_ms)]
+
+        // Apply pagination
+        let (id, last_refresh_ms, current_page, total_pages) = git_ctx
+            .map(|c| (c.id.as_str(), c.last_refresh_ms, c.current_page, c.total_pages))
+            .unwrap_or(("P6", 0, 0, 1));
+        let output = paginate_content(&content, current_page, total_pages);
+        vec![ContextItem::new(id, "Git Status", output, last_refresh_ms)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

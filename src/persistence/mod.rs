@@ -69,6 +69,8 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         // Use saved timestamp if available, otherwise current time for new panels
         last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
         tmux_last_lines_hash: None,
+        current_page: 0,
+        total_pages: 1,
     }
 }
 

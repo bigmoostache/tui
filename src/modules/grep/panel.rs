@@ -2,11 +2,11 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, ContextItem, Panel};
+use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use super::GREP_DEPRECATION_MS;
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GrepPanel;
@@ -52,6 +52,8 @@ impl Panel for GrepPanel {
         };
         ctx.cached_content = Some(content);
         ctx.token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
         ctx.cache_deprecated = false;
         ctx.last_refresh_ms = now_ms();
         true
@@ -85,8 +87,9 @@ impl Panel for GrepPanel {
             .filter_map(|c| {
                 let pattern = c.grep_pattern.as_ref()?;
                 // Use cached content only - no blocking operations
-                let content = c.cached_content.as_ref().cloned()?;
-                Some(ContextItem::new(&c.id, format!("Grep: {}", pattern), content, c.last_refresh_ms))
+                let content = c.cached_content.as_ref()?;
+                let output = paginate_content(content, c.current_page, c.total_pages);
+                Some(ContextItem::new(&c.id, format!("Grep: {}", pattern), output, c.last_refresh_ms))
             })
             .collect()
     }

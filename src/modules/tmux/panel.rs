@@ -4,10 +4,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, ContextItem, Panel};
+use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use super::TMUX_DEPRECATION_MS;
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
@@ -67,6 +67,8 @@ impl Panel for TmuxPanel {
         ctx.cached_content = Some(content);
         ctx.tmux_last_lines_hash = Some(content_hash);
         ctx.token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
         ctx.cache_deprecated = false;
         ctx.last_refresh_ms = now_ms();
         true
@@ -111,14 +113,15 @@ impl Panel for TmuxPanel {
             .filter_map(|c| {
                 let pane_id = c.tmux_pane_id.as_ref()?;
                 // Use cached content only - no blocking operations
-                let content = c.cached_content.as_ref().cloned()?;
+                let content = c.cached_content.as_ref()?;
+                let output = paginate_content(content, c.current_page, c.total_pages);
                 let desc = c.tmux_description.as_deref().unwrap_or("");
                 let header = if desc.is_empty() {
                     format!("Tmux Pane {}", pane_id)
                 } else {
                     format!("Tmux Pane {} ({})", pane_id, desc)
                 };
-                Some(ContextItem::new(&c.id, header, content, c.last_refresh_ms))
+                Some(ContextItem::new(&c.id, header, output, c.last_refresh_ms))
             })
             .collect()
     }

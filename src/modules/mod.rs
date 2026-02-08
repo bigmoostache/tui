@@ -128,6 +128,8 @@ pub fn make_default_context_element(
         cache_deprecated,
         last_refresh_ms: crate::core::panels::now_ms(),
         tmux_last_lines_hash: None,
+        current_page: 0,
+        total_pages: 1,
     }
 }
 

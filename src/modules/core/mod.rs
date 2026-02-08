@@ -190,6 +190,24 @@ impl Module for CoreModule {
             },
         ];
 
+        // Panel pagination tool (dynamically enabled/disabled)
+        defs.push(ToolDefinition {
+            id: "panel_goto_page".to_string(),
+            name: "Go To Page".to_string(),
+            short_desc: "Navigate paginated panel".to_string(),
+            description: "Navigates to a specific page of a paginated panel. Only available when a panel has more than one page.".to_string(),
+            params: vec![
+                ToolParam::new("panel_id", ParamType::String)
+                    .desc("Panel ID (e.g., P8)")
+                    .required(),
+                ToolParam::new("page", ParamType::Integer)
+                    .desc("Page number (1-indexed)")
+                    .required(),
+            ],
+            enabled: false,
+            category: ToolCategory::Context,
+        });
+
         // Add module_toggle tool
         defs.push(super::module_toggle_tool_definition());
 
@@ -201,6 +219,7 @@ impl Module for CoreModule {
             // Context tools
             "context_close" => Some(self::tools::close_context::execute(tool, state)),
             "context_message_status" => Some(self::tools::message_status::execute(tool, state)),
+            "panel_goto_page" => Some(self::tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)
             "system_reload" => Some(crate::tools::execute_reload_tui(tool, state)),
