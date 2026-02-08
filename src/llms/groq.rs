@@ -125,6 +125,11 @@ impl LlmClient for GroqClient {
 
         let client = Client::new();
 
+        // Collect pending tool result IDs so the message builder includes their tool calls
+        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+            .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
+            .unwrap_or_default();
+
         // Build messages in OpenAI format
         let mut groq_messages = messages_to_groq(
             &request.messages,
@@ -132,6 +137,7 @@ impl LlmClient for GroqClient {
             &request.system_prompt,
             &request.extra_context,
             &request.model,
+            &pending_tool_ids,
         );
 
         // Add tool results if present
@@ -165,6 +171,14 @@ impl LlmClient for GroqClient {
             max_completion_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
+
+        // Dump last request for debugging
+        {
+            let dir = ".context-pilot/last_requests";
+            let _ = std::fs::create_dir_all(dir);
+            let path = format!("{}/{}_groq_last_request.json", dir, request.worker_id);
+            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
+        }
 
         let response = client
             .post(GROQ_API_ENDPOINT)
@@ -375,6 +389,7 @@ fn messages_to_groq(
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
     model: &str,
+    pending_tool_result_ids: &[String],
 ) -> Vec<GroqMessage> {
     let mut groq_messages: Vec<GroqMessage> = Vec::new();
 
@@ -477,7 +492,9 @@ fn messages_to_groq(
     // First pass: collect tool_use IDs that have matching results.
     // Tool calls without results (e.g. truncated by max_tokens) are excluded
     // to avoid the "insufficient tool messages" API error.
-    let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Seed with pending tool result IDs (from current tool loop, not yet in messages).
+    let mut included_tool_use_ids: std::collections::HashSet<String> =
+        pending_tool_result_ids.iter().cloned().collect();
     for (idx, msg) in messages.iter().enumerate() {
         if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
             continue;

@@ -45,6 +45,10 @@ struct DsMessage {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
+    /// Required on all assistant messages when using deepseek-reasoner.
+    /// Set to empty string for historical messages where we don't have the original reasoning.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<Vec<DsToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,12 +141,19 @@ impl LlmClient for DeepSeekClient {
 
         let client = Client::new();
 
+        // Collect pending tool result IDs so the message builder includes their tool calls
+        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+            .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
+            .unwrap_or_default();
+
         // Build messages in OpenAI format
         let mut ds_messages = messages_to_ds(
             &request.messages,
             &request.context_items,
             &request.system_prompt,
             &request.extra_context,
+            &pending_tool_ids,
+            &request.model,
         );
 
         // Add tool results if present
@@ -151,6 +162,7 @@ impl LlmClient for DeepSeekClient {
                 ds_messages.push(DsMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
+                    reasoning_content: None,
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
                 });
@@ -175,6 +187,9 @@ impl LlmClient for DeepSeekClient {
             max_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
+
+        // Dump last request for debugging
+        dump_last_request(&request.worker_id, &api_request);
 
         let response = client
             .post(DEEPSEEK_API_ENDPOINT)
@@ -383,8 +398,16 @@ fn messages_to_ds(
     context_items: &[ContextItem],
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
+    pending_tool_result_ids: &[String],
+    model: &str,
 ) -> Vec<DsMessage> {
     let mut ds_messages: Vec<DsMessage> = Vec::new();
+    let is_reasoner = model == "deepseek-reasoner";
+
+    // Helper: reasoning_content for assistant messages (required for deepseek-reasoner)
+    let rc = || -> Option<String> {
+        if is_reasoner { Some(String::new()) } else { None }
+    };
 
     // Add system message
     let system_content = system_prompt
@@ -393,6 +416,7 @@ fn messages_to_ds(
     ds_messages.push(DsMessage {
         role: "system".to_string(),
         content: Some(system_content),
+        reasoning_content: None,
         tool_calls: None,
         tool_call_id: None,
     });
@@ -414,6 +438,7 @@ fn messages_to_ds(
             ds_messages.push(DsMessage {
                 role: "assistant".to_string(),
                 content: Some(text),
+                reasoning_content: rc(),
                 tool_calls: Some(vec![DsToolCall {
                     id: format!("panel_{}", panel.panel_id),
                     call_type: "function".to_string(),
@@ -429,6 +454,7 @@ fn messages_to_ds(
             ds_messages.push(DsMessage {
                 role: "tool".to_string(),
                 content: Some(panel.content.clone()),
+                reasoning_content: None,
                 tool_calls: None,
                 tool_call_id: Some(format!("panel_{}", panel.panel_id)),
             });
@@ -439,6 +465,7 @@ fn messages_to_ds(
         ds_messages.push(DsMessage {
             role: "assistant".to_string(),
             content: Some(footer),
+            reasoning_content: rc(),
             tool_calls: Some(vec![DsToolCall {
                 id: "panel_footer".to_string(),
                 call_type: "function".to_string(),
@@ -452,6 +479,7 @@ fn messages_to_ds(
         ds_messages.push(DsMessage {
             role: "tool".to_string(),
             content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some("panel_footer".to_string()),
         });
@@ -465,6 +493,7 @@ fn messages_to_ds(
                 "Please clean up the context to reduce token usage:\n\n{}",
                 ctx
             )),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
         });
@@ -473,7 +502,9 @@ fn messages_to_ds(
     // First pass: collect tool_use IDs that have matching results.
     // Tool calls without results (e.g. truncated by max_tokens) are excluded
     // to avoid the "insufficient tool messages" API error.
-    let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Seed with pending tool result IDs (from current tool loop, not yet in messages).
+    let mut included_tool_use_ids: std::collections::HashSet<String> =
+        pending_tool_result_ids.iter().cloned().collect();
     for (idx, msg) in messages.iter().enumerate() {
         if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
             continue;
@@ -506,6 +537,7 @@ fn messages_to_ds(
                     ds_messages.push(DsMessage {
                         role: "tool".to_string(),
                         content: Some(format!("[{}]:\n{}", msg.id, result.content)),
+                        reasoning_content: None,
                         tool_calls: None,
                         tool_call_id: Some(result.tool_use_id.clone()),
                     });
@@ -534,6 +566,7 @@ fn messages_to_ds(
                 ds_messages.push(DsMessage {
                     role: "assistant".to_string(),
                     content: None,
+                    reasoning_content: rc(),
                     tool_calls: Some(tool_calls),
                     tool_call_id: None,
                 });
@@ -549,10 +582,13 @@ fn messages_to_ds(
 
         if !message_content.is_empty() {
             let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
+            // reasoning_content is only needed on assistant messages for deepseek-reasoner
+            let msg_rc = if msg.role == "assistant" { rc() } else { None };
 
             ds_messages.push(DsMessage {
                 role: msg.role.clone(),
                 content: Some(prefixed_content),
+                reasoning_content: msg_rc,
                 tool_calls: None,
                 tool_call_id: None,
             });
@@ -560,6 +596,14 @@ fn messages_to_ds(
     }
 
     ds_messages
+}
+
+/// Dump the outgoing API request to disk for debugging.
+fn dump_last_request(worker_id: &str, api_request: &DsRequest) {
+    let dir = ".context-pilot/last_requests";
+    let _ = std::fs::create_dir_all(dir);
+    let path = format!("{}/{}_deepseek_last_request.json", dir, worker_id);
+    let _ = std::fs::write(path, serde_json::to_string_pretty(api_request).unwrap_or_default());
 }
 
 /// Convert tool definitions to DeepSeek/OpenAI format
