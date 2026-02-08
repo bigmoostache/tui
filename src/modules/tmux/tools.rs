@@ -242,6 +242,15 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
+    // Reject bare "Enter" since it's sent automatically
+    if keys.eq_ignore_ascii_case("enter") {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "console_send_keys already sends Enter automatically after your keys — no need to send it separately.".to_string(),
+            is_error: true,
+        };
+    }
+
     // Send keys to the pane (always followed by Enter)
     let args = vec!["send-keys".to_string(), "-t".to_string(), pane_id.clone(), keys.to_string(), "Enter".to_string()];
 
