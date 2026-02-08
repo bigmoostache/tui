@@ -162,7 +162,7 @@ pub struct ContextElement {
 // Re-export module-owned types for backwards compatibility
 pub use crate::modules::todo::types::{TodoStatus, TodoItem};
 pub use crate::modules::memory::types::{MemoryImportance, MemoryItem};
-pub use crate::modules::system::types::SystemItem;
+pub use crate::modules::prompt::types::SystemItem;
 pub use crate::modules::scratchpad::types::ScratchpadCell;
 pub use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 pub use crate::modules::git::types::{GitFileChange, GitChangeType};
