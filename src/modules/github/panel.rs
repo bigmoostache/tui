@@ -16,7 +16,7 @@ impl Panel for GithubResultPanel {
     fn needs_cache(&self) -> bool { true }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        None // GhWatcher handles periodic refresh
+        Some(120_000) // 120 seconds — conservative to avoid GitHub rate limits
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
@@ -108,10 +108,12 @@ impl Panel for GithubResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::GithubResult) {
-            if let Some(cmd) = &ctx.result_command {
-                let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
-                return short;
+        if let Some(ctx) = state.context.get(state.selected_context) {
+            if ctx.context_type == ContextType::GithubResult {
+                if let Some(cmd) = &ctx.result_command {
+                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
+                    return short;
+                }
             }
         }
         "GitHub Result".to_string()
@@ -134,7 +136,8 @@ impl Panel for GithubResultPanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line> = Vec::new();
 
-        let ctx = state.context.iter().find(|c| c.context_type == ContextType::GithubResult);
+        let ctx = state.context.get(state.selected_context)
+            .filter(|c| c.context_type == ContextType::GithubResult);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![

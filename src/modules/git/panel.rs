@@ -906,12 +906,12 @@ impl Panel for GitResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        // Find the GitResult panel that is currently selected
-        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::GitResult) {
-            if let Some(cmd) = &ctx.result_command {
-                // Show a shortened version of the command
-                let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
-                return short;
+        if let Some(ctx) = state.context.get(state.selected_context) {
+            if ctx.context_type == ContextType::GitResult {
+                if let Some(cmd) = &ctx.result_command {
+                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
+                    return short;
+                }
             }
         }
         "Git Result".to_string()
@@ -935,11 +935,8 @@ impl Panel for GitResultPanel {
         let mut text: Vec<Line> = Vec::new();
 
         // Find the selected GitResult panel
-        let ctx = state.context.iter()
-            .find(|c| c.context_type == ContextType::GitResult && c.id == format!("P{}", state.selected_context));
-
-        // If not found by selected_context, find any GitResult
-        let ctx = ctx.or_else(|| state.context.iter().find(|c| c.context_type == ContextType::GitResult));
+        let ctx = state.context.get(state.selected_context)
+            .filter(|c| c.context_type == ContextType::GitResult);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![
