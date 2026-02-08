@@ -1,6 +1,8 @@
 # Context Pilot
 <!-- tracking branch for #5 -->
 
+**WIP: token counting**
+
 A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness.
 
 ![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)
