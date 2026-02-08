@@ -70,19 +70,23 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
             &[r"^gh\s+issue\s+view\s+\1\b"],
         ),
 
-        // gh issue label add/remove → invalidate issue list + issue view
+        // gh issue label add/remove → invalidate issue list + issue view + issue status
         InvalidationRule::new(
             r"^gh\s+issue\s+label\s+(add|remove)\s+(\d+)",
             &[
                 r"^gh\s+issue\s+list",
                 r"^gh\s+issue\s+view\s+\2\b",
+                r"^gh\s+issue\s+status",
             ],
         ),
 
-        // gh issue assign/unassign → invalidate issue view
+        // gh issue assign/unassign → invalidate issue view + issue status
         InvalidationRule::new(
             r"^gh\s+issue\s+(assign|unassign)\s+(\d+)",
-            &[r"^gh\s+issue\s+view\s+\2\b"],
+            &[
+                r"^gh\s+issue\s+view\s+\2\b",
+                r"^gh\s+issue\s+status",
+            ],
         ),
 
         // =====================================================================
