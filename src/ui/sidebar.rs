@@ -172,7 +172,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         let stats_line = |label: &str, hit: usize, miss: usize, out: usize| -> Line<'static> {
             Line::from(vec![
                 Span::styled(format!("  {:>4}  ", label), Style::default().fg(theme::text_muted())),
-                Span::styled(format!("{} {:>5}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
+                Span::styled(format!("{} {:>6}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
                 Span::styled("  ", base_style),
                 Span::styled(format!("{} {:>5}", chars::CROSS, format_number(miss)), Style::default().fg(theme::warning())),
                 Span::styled("  ", base_style),
@@ -193,7 +193,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled(" hit   ", Style::default().fg(theme::text_muted())),  // " hit" + 3 spaces = 7 chars
             Span::styled("  ", base_style),  // Separator (2 spaces)
             Span::styled(chars::CROSS, Style::default().fg(theme::warning())),
-            Span::styled(" miss  ", Style::default().fg(theme::text_muted())),  // " miss" + 2 spaces = 7 chars
+            Span::styled(" miss ", Style::default().fg(theme::text_muted())),  // " miss" + 1 space = 6 chars (not 7)
             Span::styled("  ", base_style),  // Separator (2 spaces)
             Span::styled(chars::ARROW_DOWN, Style::default().fg(theme::accent_dim())),
             Span::styled(" out   ", Style::default().fg(theme::text_muted())),  // " out" + 3 spaces = 7 chars
