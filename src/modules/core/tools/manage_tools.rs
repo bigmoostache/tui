@@ -50,6 +50,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         }
 
+        // panel_goto_page is system-managed — cannot be manually toggled
+        if tool_name == "panel_goto_page" {
+            failures.push(format!("Change {}: '{}' is automatically managed (enabled when panels are paginated)", i + 1, tool_name));
+            continue;
+        }
+
         // Find the tool
         let tool_entry = state.tools.iter_mut().find(|t| t.id == tool_name);
 

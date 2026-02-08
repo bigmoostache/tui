@@ -337,6 +337,9 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 cache_deprecated: false,
                 last_refresh_ms: crate::core::panels::now_ms(),
                 tmux_last_lines_hash: None,
+                current_page: 0,
+                total_pages: 1,
+                full_token_count: 0,
             });
             ActionResult::Save
         }

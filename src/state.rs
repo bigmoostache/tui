@@ -157,6 +157,15 @@ pub struct ContextElement {
     /// Hash of tmux last 2 lines (for change detection)
     #[serde(skip)]
     pub tmux_last_lines_hash: Option<String>,
+    /// Current page (0-indexed) for LLM context pagination
+    #[serde(skip)]
+    pub current_page: usize,
+    /// Total pages for LLM context pagination
+    #[serde(skip)]
+    pub total_pages: usize,
+    /// Full content token count (before pagination). token_count reflects current page.
+    #[serde(skip)]
+    pub full_token_count: usize,
 }
 
 // Re-export module-owned types for backwards compatibility
@@ -397,6 +406,12 @@ fn default_one() -> usize {
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
 pub fn estimate_tokens(text: &str) -> usize {
     (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize
+}
+
+/// Compute total pages for a given token count using PANEL_PAGE_TOKENS
+pub fn compute_total_pages(token_count: usize) -> usize {
+    let max = crate::constants::PANEL_PAGE_TOKENS;
+    if token_count <= max { 1 } else { (token_count + max - 1) / max }
 }
 
 /// Runtime state (messages loaded in memory)

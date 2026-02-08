@@ -5,11 +5,11 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, ContextItem, Panel};
+use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::constants::{PANEL_MAX_LOAD_BYTES, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::highlight::highlight_file;
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::theme;
 
 pub struct FilePanel;
@@ -48,7 +48,16 @@ impl Panel for FilePanel {
         };
         ctx.cached_content = Some(content);
         ctx.file_hash = Some(hash);
-        ctx.token_count = token_count;
+        ctx.full_token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
+        // token_count reflects current page, not full content
+        if ctx.total_pages > 1 {
+            let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+            ctx.token_count = estimate_tokens(&page_content);
+        } else {
+            ctx.token_count = token_count;
+        }
         ctx.cache_deprecated = false;
         ctx.last_refresh_ms = now_ms();
         true
@@ -65,6 +74,22 @@ impl Panel for FilePanel {
         let path = PathBuf::from(&file_path);
         if !path.exists() {
             return None;
+        }
+        // Hard byte limit: refuse to load oversized files
+        if let Ok(meta) = fs::metadata(&path) {
+            if meta.len() as usize > PANEL_MAX_LOAD_BYTES {
+                let msg = format!(
+                    "[File too large to load: {} bytes (limit: {} bytes). Close this panel and use grep or other tools to inspect portions of the file.]",
+                    meta.len(), PANEL_MAX_LOAD_BYTES
+                );
+                let token_count = estimate_tokens(&msg);
+                return Some(CacheUpdate::FileContent {
+                    context_id,
+                    content: msg,
+                    hash: format!("oversized_{}", meta.len()),
+                    token_count,
+                });
+            }
         }
         let content = fs::read_to_string(&path).ok()?;
         let new_hash = hash_content(&content);
@@ -86,8 +111,9 @@ impl Panel for FilePanel {
             .filter_map(|c| {
                 let path = c.file_path.as_ref()?;
                 // Use cached content only - no blocking file reads
-                let content = c.cached_content.as_ref().cloned()?;
-                Some(ContextItem::new(&c.id, format!("File: {}", path), content, c.last_refresh_ms))
+                let content = c.cached_content.as_ref()?;
+                let output = paginate_content(content, c.current_page, c.total_pages);
+                Some(ContextItem::new(&c.id, format!("File: {}", path), output, c.last_refresh_ms))
             })
             .collect()
     }

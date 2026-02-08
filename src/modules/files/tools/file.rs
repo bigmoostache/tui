@@ -75,6 +75,9 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         cache_deprecated: true, // Trigger background refresh
         last_refresh_ms: crate::core::panels::now_ms(),
         tmux_last_lines_hash: None,
+        current_page: 0,
+        total_pages: 1,
+        full_token_count: 0,
     });
 
     ToolResult {

@@ -21,6 +21,14 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
     // Collect all context items from panels
     let context_items = collect_all_context(state);
 
+    // Dynamically enable/disable panel_goto_page based on whether any panel is paginated
+    let has_paginated = state.context.iter().any(|c| c.total_pages > 1);
+    for tool in &mut state.tools {
+        if tool.id == "panel_goto_page" {
+            tool.enabled = has_paginated;
+        }
+    }
+
     // Prepare messages
     let messages: Vec<_> = if include_last_message {
         state.messages.iter()

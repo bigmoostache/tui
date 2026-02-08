@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, ContextItem, Panel};
+use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, helpers::*};
 
 pub struct TreePanel;
@@ -42,6 +42,8 @@ impl Panel for TreePanel {
         };
         ctx.cached_content = Some(content);
         ctx.token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
         ctx.cache_deprecated = false;
         ctx.last_refresh_ms = now_ms();
         true
@@ -70,10 +72,11 @@ impl Panel for TreePanel {
             if ctx.context_type == ContextType::Tree {
                 if let Some(content) = &ctx.cached_content {
                     if !content.is_empty() {
+                        let output = paginate_content(content, ctx.current_page, ctx.total_pages);
                         return vec![ContextItem::new(
                             &ctx.id,
                             "Directory Tree",
-                            content.clone(),
+                            output,
                             ctx.last_refresh_ms,
                         )];
                     }

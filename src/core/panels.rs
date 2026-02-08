@@ -38,6 +38,51 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Paginate content for LLM context output.
+/// Returns the original content unchanged when total_pages <= 1.
+/// Otherwise slices by approximate token offset, snaps to line boundaries,
+/// and prepends a page header.
+pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
+    use crate::constants::{PANEL_PAGE_TOKENS, CHARS_PER_TOKEN};
+
+    if total_pages <= 1 {
+        return full_content.to_string();
+    }
+
+    let chars_per_page = PANEL_PAGE_TOKENS as f32 * CHARS_PER_TOKEN;
+    let start_char = (current_page as f32 * chars_per_page) as usize;
+
+    // Snap start to next line boundary
+    let start = if start_char == 0 {
+        0
+    } else if start_char >= full_content.len() {
+        full_content.len()
+    } else {
+        // Find next newline after start_char
+        full_content[start_char..].find('\n')
+            .map(|pos| start_char + pos + 1)
+            .unwrap_or(full_content.len())
+    };
+
+    let end_char = start + chars_per_page as usize;
+    let end = if end_char >= full_content.len() {
+        full_content.len()
+    } else {
+        // Find next newline after end_char to snap to line boundary
+        full_content[end_char..].find('\n')
+            .map(|pos| end_char + pos + 1)
+            .unwrap_or(full_content.len())
+    };
+
+    let page_content = &full_content[start..end];
+    format!(
+        "[Page {}/{} — use panel_goto_page to navigate]\n{}",
+        current_page + 1,
+        total_pages,
+        page_content
+    )
+}
+
 /// A single context item to be sent to the LLM
 #[derive(Debug, Clone)]
 pub struct ContextItem {
