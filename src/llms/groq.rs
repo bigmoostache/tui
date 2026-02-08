@@ -284,6 +284,8 @@ impl LlmClient for GroqClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
+            cache_hit_tokens: 0,
+            cache_miss_tokens: 0,
             stop_reason,
         });
         Ok(())

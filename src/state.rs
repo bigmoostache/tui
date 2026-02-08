@@ -513,6 +513,12 @@ pub struct State {
     pub groq_model: crate::llms::GroqModel,
     /// Selected DeepSeek model
     pub deepseek_model: crate::llms::DeepSeekModel,
+    /// Accumulated prompt_cache_hit_tokens across all API calls (persisted)
+    pub cache_hit_tokens: usize,
+    /// Accumulated prompt_cache_miss_tokens across all API calls (persisted)
+    pub cache_miss_tokens: usize,
+    /// Accumulated output tokens across all API calls (persisted)
+    pub total_output_tokens: usize,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
     /// Cleaning target as proportion of threshold (0.0 - 1.0)
@@ -624,6 +630,9 @@ impl Default for State {
             grok_model: crate::llms::GrokModel::default(),
             groq_model: crate::llms::GroqModel::default(),
             deepseek_model: crate::llms::DeepSeekModel::default(),
+            cache_hit_tokens: 0,
+            cache_miss_tokens: 0,
+            total_output_tokens: 0,
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None, // Use model's full context window

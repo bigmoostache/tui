@@ -36,6 +36,9 @@ impl Module for CoreModule {
             "cleaning_target_proportion": state.cleaning_target_proportion,
             "context_budget": state.context_budget,
             "global_next_uid": state.global_next_uid,
+            "cache_hit_tokens": state.cache_hit_tokens,
+            "cache_miss_tokens": state.cache_miss_tokens,
+            "total_output_tokens": state.total_output_tokens,
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
         })
     }
@@ -85,6 +88,15 @@ impl Module for CoreModule {
         }
         if let Some(v) = data.get("global_next_uid").and_then(|v| v.as_u64()) {
             state.global_next_uid = v as usize;
+        }
+        if let Some(v) = data.get("cache_hit_tokens").and_then(|v| v.as_u64()) {
+            state.cache_hit_tokens = v as usize;
+        }
+        if let Some(v) = data.get("cache_miss_tokens").and_then(|v| v.as_u64()) {
+            state.cache_miss_tokens = v as usize;
+        }
+        if let Some(v) = data.get("total_output_tokens").and_then(|v| v.as_u64()) {
+            state.total_output_tokens = v as usize;
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
             let disabled: Vec<String> = arr.iter()

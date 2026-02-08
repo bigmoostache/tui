@@ -161,6 +161,32 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     }
     lines.push(Line::from(bar_spans));
 
+    // Token stats line (cache hit / cache miss / output) — only when any value is non-zero
+    if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
+        let mut stats_spans = vec![Span::styled(" ", base_style)];
+        if state.cache_hit_tokens > 0 {
+            stats_spans.push(Span::styled(
+                format!("{}{}", chars::ARROW_UP, format_number(state.cache_hit_tokens)),
+                Style::default().fg(theme::success()),
+            ));
+            stats_spans.push(Span::styled("  ", base_style));
+        }
+        if state.cache_miss_tokens > 0 {
+            stats_spans.push(Span::styled(
+                format!("{}{}", chars::CROSS, format_number(state.cache_miss_tokens)),
+                Style::default().fg(theme::warning()),
+            ));
+            stats_spans.push(Span::styled("  ", base_style));
+        }
+        if state.total_output_tokens > 0 {
+            stats_spans.push(Span::styled(
+                format!("{}{}", chars::ARROW_DOWN, format_number(state.total_output_tokens)),
+                Style::default().fg(theme::accent_dim()),
+            ));
+        }
+        lines.push(Line::from(stats_spans));
+    }
+
     let paragraph = Paragraph::new(lines)
         .style(base_style);
     frame.render_widget(paragraph, sidebar_layout[0]);

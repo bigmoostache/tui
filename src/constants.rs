@@ -190,6 +190,9 @@ pub mod chars {
     pub const BLOCK_LIGHT: &str = "░";
     pub const DOT: &str = "●";
     pub const ARROW_RIGHT: &str = "▸";
+    pub const ARROW_UP: &str = "↑";
+    pub const ARROW_DOWN: &str = "↓";
+    pub const CROSS: &str = "✗";
 }
 
 // =============================================================================

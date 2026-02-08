@@ -73,7 +73,7 @@ pub enum Action {
     SelectNextContext,
     SelectPrevContext,
     AppendChars(String),
-    StreamDone { _input_tokens: usize, output_tokens: usize, stop_reason: Option<String> },
+    StreamDone { _input_tokens: usize, output_tokens: usize, cache_hit_tokens: usize, cache_miss_tokens: usize, stop_reason: Option<String> },
     StreamError(String),
     ScrollUp(f32),
     ScrollDown(f32),
@@ -408,9 +408,14 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
-        Action::StreamDone { _input_tokens, output_tokens, ref stop_reason } => {
+        Action::StreamDone { _input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
             state.is_streaming = false;
             state.last_stop_reason = stop_reason.clone();
+
+            // Accumulate token stats
+            state.cache_hit_tokens += cache_hit_tokens;
+            state.cache_miss_tokens += cache_miss_tokens;
+            state.total_output_tokens += output_tokens;
 
             // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {

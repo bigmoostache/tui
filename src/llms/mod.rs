@@ -26,7 +26,7 @@ pub enum StreamEvent {
     /// Tool use request from the LLM
     ToolUse(ToolUse),
     /// Stream completed with token usage
-    Done { input_tokens: usize, output_tokens: usize, stop_reason: Option<String> },
+    Done { input_tokens: usize, output_tokens: usize, cache_hit_tokens: usize, cache_miss_tokens: usize, stop_reason: Option<String> },
     /// Error occurred
     Error(String),
 }

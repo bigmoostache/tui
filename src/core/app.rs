@@ -27,7 +27,7 @@ use super::init::get_active_seed_content;
 pub struct App {
     pub state: State,
     typewriter: TypewriterBuffer,
-    pending_done: Option<(usize, usize, Option<String>)>,
+    pending_done: Option<(usize, usize, usize, usize, Option<String>)>,
     pending_tools: Vec<ToolUse>,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,
@@ -213,9 +213,9 @@ impl App {
                 StreamEvent::ToolUse(tool) => {
                     self.pending_tools.push(tool);
                 }
-                StreamEvent::Done { input_tokens, output_tokens, stop_reason } => {
+                StreamEvent::Done { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason } => {
                     self.typewriter.mark_done();
-                    self.pending_done = Some((input_tokens, output_tokens, stop_reason));
+                    self.pending_done = Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
@@ -429,11 +429,11 @@ impl App {
             return;
         }
 
-        if let Some((input_tokens, output_tokens, ref stop_reason)) = self.pending_done {
+        if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) = self.pending_done {
             if self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
                 self.state.dirty = true;
                 let stop_reason = stop_reason.clone();
-                match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, stop_reason }) {
+                match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason }) {
                     ActionResult::SaveMessage(id) => {
                         let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
                             save_message(msg);
