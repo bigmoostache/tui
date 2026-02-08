@@ -70,10 +70,19 @@ pub trait Module: Send + Sync {
 
     /// Serialize this module's data from State into a JSON value for persistence.
     /// Returns Value::Null if this module has no data to persist.
+    /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
     fn save_module_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
 
     /// Deserialize this module's data from a JSON value and apply it to State.
+    /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    /// Serialize worker-specific data for modules that are global but also need per-worker state.
+    /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
+
+    /// Deserialize worker-specific data. Always loaded from WorkerState.
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Tool definitions provided by this module
     fn tool_definitions(&self) -> Vec<ToolDefinition>;

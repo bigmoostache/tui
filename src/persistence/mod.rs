@@ -166,6 +166,10 @@ fn load_state_new() -> State {
             worker_state.modules.get(module.id()).unwrap_or(&null)
         };
         module.load_module_data(data, &mut state);
+
+        // Always load worker-specific data from worker state
+        let worker_data = worker_state.modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+        module.load_worker_data(worker_data, &mut state);
     }
 
     // If tools weren't built by core module's load_module_data (e.g., no saved data),
@@ -199,6 +203,12 @@ pub fn save_state(state: &State) {
             } else {
                 worker_modules.insert(module.id().to_string(), data);
             }
+        }
+
+        // Always save worker-specific data to worker state
+        let worker_data = module.save_worker_data(state);
+        if !worker_data.is_null() {
+            worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
     }
 
