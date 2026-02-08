@@ -1,6 +1,6 @@
 /// Command classification for gh (GitHub CLI) commands.
 
-use crate::modules::git::classify::CommandClass;
+use crate::modules::git::classify::{CommandClass, parse_shell_args, check_shell_operators};
 
 /// Validate a raw command string intended for `gh`.
 /// Returns parsed args on success, or an error message on failure.
@@ -10,18 +10,11 @@ pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
         return Err("Command must start with 'gh '".to_string());
     }
 
-    // Reject shell metacharacters
-    for pattern in &["|", ";", "&&", "||", "`", "$(", ">", "<", ">>", "\n", "\r"] {
-        if trimmed.contains(pattern) {
-            return Err(format!("Shell operator '{}' is not allowed", pattern));
-        }
-    }
+    check_shell_operators(trimmed)?;
 
-    // Parse into args (skip "gh" prefix)
-    let args: Vec<String> = trimmed.split_whitespace()
-        .skip(1) // skip "gh"
-        .map(|s| s.to_string())
-        .collect();
+    // Parse into args, skip "gh" prefix
+    let all_args = parse_shell_args(trimmed)?;
+    let args: Vec<String> = all_args.into_iter().skip(1).collect();
 
     if args.is_empty() {
         return Err("No gh subcommand specified".to_string());
@@ -276,5 +269,17 @@ mod tests {
     fn test_variable_get_readonly() {
         let args = vec!["variable".to_string(), "get".to_string()];
         assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_validate_quoted_args() {
+        let args = validate_gh_command("gh issue create --title \"my issue\" --body \"details here\"").unwrap();
+        assert_eq!(args, vec!["issue", "create", "--title", "my issue", "--body", "details here"]);
+    }
+
+    #[test]
+    fn test_validate_allows_pipe_inside_quotes() {
+        let args = validate_gh_command("gh api /repos --jq \".[] | .name\"").unwrap();
+        assert_eq!(args, vec!["api", "/repos", "--jq", ".[] | .name"]);
     }
 }

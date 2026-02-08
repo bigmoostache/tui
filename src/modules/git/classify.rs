@@ -8,6 +8,78 @@ pub enum CommandClass {
     Mutating,
 }
 
+/// Parse a command string into arguments, respecting single and double quotes.
+/// Strips the leading command name (e.g. "git" or "gh") and returns the rest.
+pub fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut chars = command.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' if !in_double => {
+                in_single = !in_single;
+            }
+            '"' if !in_single => {
+                in_double = !in_double;
+            }
+            c if c.is_whitespace() && !in_single && !in_double => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            _ => {
+                current.push(c);
+            }
+        }
+    }
+
+    if in_single {
+        return Err("Unterminated single quote".to_string());
+    }
+    if in_double {
+        return Err("Unterminated double quote".to_string());
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    Ok(args)
+}
+
+/// Check for shell metacharacters outside of quoted strings.
+pub fn check_shell_operators(command: &str) -> Result<(), String> {
+    let mut in_single = false;
+    let mut in_double = false;
+    let chars: Vec<char> = command.chars().collect();
+    let len = chars.len();
+
+    for i in 0..len {
+        let c = chars[i];
+        match c {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            _ if in_single || in_double => {} // inside quotes, skip
+            '|' | ';' | '`' | '>' | '<' => {
+                return Err(format!("Shell operator '{}' is not allowed", c));
+            }
+            '$' if i + 1 < len && chars[i + 1] == '(' => {
+                return Err("Shell operator '$(' is not allowed".to_string());
+            }
+            '&' if i + 1 < len && chars[i + 1] == '&' => {
+                return Err("Shell operator '&&' is not allowed".to_string());
+            }
+            '\n' | '\r' => {
+                return Err("Newlines are not allowed outside of quoted strings".to_string());
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Validate a raw command string intended for `git`.
 /// Returns parsed args on success, or an error message on failure.
 pub fn validate_git_command(command: &str) -> Result<Vec<String>, String> {
@@ -16,18 +88,11 @@ pub fn validate_git_command(command: &str) -> Result<Vec<String>, String> {
         return Err("Command must start with 'git '".to_string());
     }
 
-    // Reject shell metacharacters
-    for pattern in &["|", ";", "&&", "||", "`", "$(", ">", "<", ">>", "\n", "\r"] {
-        if trimmed.contains(pattern) {
-            return Err(format!("Shell operator '{}' is not allowed", pattern));
-        }
-    }
+    check_shell_operators(trimmed)?;
 
-    // Parse into args (skip "git" prefix)
-    let args: Vec<String> = trimmed.split_whitespace()
-        .skip(1) // skip "git"
-        .map(|s| s.to_string())
-        .collect();
+    // Parse into args, skip "git" prefix
+    let all_args = parse_shell_args(trimmed)?;
+    let args: Vec<String> = all_args.into_iter().skip(1).collect();
 
     if args.is_empty() {
         return Err("No git subcommand specified".to_string());
@@ -286,5 +351,33 @@ mod tests {
     fn test_hash_object_write_mutating() {
         let args = vec!["hash-object".to_string(), "-w".to_string(), "file.txt".to_string()];
         assert_eq!(classify_git(&args), CommandClass::Mutating);
+    }
+
+    #[test]
+    fn test_validate_quoted_commit_message() {
+        let args = validate_git_command("git commit -m \"hello world\"").unwrap();
+        assert_eq!(args, vec!["commit", "-m", "hello world"]);
+    }
+
+    #[test]
+    fn test_validate_single_quoted_args() {
+        let args = validate_git_command("git log --format='%H %s'").unwrap();
+        assert_eq!(args, vec!["log", "--format=%H %s"]);
+    }
+
+    #[test]
+    fn test_validate_rejects_pipe_outside_quotes() {
+        assert!(validate_git_command("git log | head").is_err());
+    }
+
+    #[test]
+    fn test_validate_allows_pipe_inside_quotes() {
+        let args = validate_git_command("git log --format=\"%H | %s\"").unwrap();
+        assert_eq!(args, vec!["log", "--format=%H | %s"]);
+    }
+
+    #[test]
+    fn test_validate_rejects_unterminated_quote() {
+        assert!(validate_git_command("git commit -m \"unterminated").is_err());
     }
 }
