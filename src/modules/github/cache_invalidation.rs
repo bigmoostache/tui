@@ -249,6 +249,7 @@ mod tests {
         let invalidations = find_invalidations("gh pr merge 20");
         assert!(invalidations.iter().any(|re| re.is_match("gh pr list")));
         assert!(invalidations.iter().any(|re| re.is_match("gh pr view 20")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr status")));
         assert!(!invalidations.iter().any(|re| re.is_match("gh pr view 21")));
     }
 
