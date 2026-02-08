@@ -298,6 +298,8 @@ impl Panel for OverviewPanel {
                 ContextType::Memory => "memory",
                 ContextType::Overview => "overview",
                 ContextType::Git => "git",
+                ContextType::GitResult => "git-result",
+                ContextType::GithubResult => "github-result",
                 ContextType::Scratchpad => "scratchpad",
             };
 
@@ -309,6 +311,9 @@ impl Panel for OverviewPanel {
                     let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
                     let desc = ctx.tmux_description.as_deref().unwrap_or("");
                     if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
+                }
+                ContextType::GitResult | ContextType::GithubResult => {
+                    ctx.result_command.as_deref().unwrap_or("").to_string()
                 }
                 _ => String::new(),
             };
@@ -574,6 +579,7 @@ impl Panel for OverviewPanel {
                 ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
                 ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
                 ToolCategory::Git => ("GIT", tool_categories::git_desc()),
+                ToolCategory::Github => ("GITHUB", "GitHub API operations via gh CLI"),
                 ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
             };
 
@@ -642,6 +648,8 @@ impl OverviewPanel {
                 ContextType::Memory => "memories",
                 ContextType::Overview => "world",
                 ContextType::Git => "changes",
+                ContextType::GitResult => "git-cmd",
+                ContextType::GithubResult => "gh-cmd",
                 ContextType::Scratchpad => "scratch",
             };
 
@@ -650,6 +658,9 @@ impl OverviewPanel {
                 ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
                 ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
                 ContextType::Tmux => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
+                ContextType::GitResult | ContextType::GithubResult => {
+                    ctx.result_command.as_deref().unwrap_or("").to_string()
+                }
                 _ => String::new(),
             };
 

@@ -333,6 +333,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_lines: None,
                 tmux_last_keys: None,
                 tmux_description: None,
+                result_command: None,
+                result_command_hash: None,
                 cached_content: None,
                 cache_deprecated: false,
                 last_refresh_ms: crate::core::panels::now_ms(),

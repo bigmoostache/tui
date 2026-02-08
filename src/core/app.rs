@@ -34,6 +34,8 @@ pub struct App {
     watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched (for tree)
     watched_dir_paths: std::collections::HashSet<String>,
+    /// Tracks .git/ paths being watched (for GitResult panel deprecation)
+    watched_git_paths: std::collections::HashSet<String>,
     /// Last time we checked timer-based caches
     last_timer_check_ms: u64,
     /// Last time we checked ownership
@@ -63,6 +65,7 @@ impl App {
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
+            watched_git_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
@@ -547,6 +550,20 @@ impl App {
                 }
             }
         }
+
+        // Watch .git/ paths for GitResult panel deprecation
+        if self.watched_git_paths.is_empty() {
+            for path in &[".git/HEAD", ".git/index", ".git/MERGE_HEAD", ".git/REBASE_HEAD", ".git/CHERRY_PICK_HEAD"] {
+                if watcher.watch_file(path).is_ok() {
+                    self.watched_git_paths.insert(path.to_string());
+                }
+            }
+            for path in &[".git/refs/heads", ".git/refs/tags", ".git/refs/remotes"] {
+                if watcher.watch_dir_recursive(path).is_ok() {
+                    self.watched_git_paths.insert(path.to_string());
+                }
+            }
+        }
     }
 
     /// Schedule initial cache refreshes for all context elements
@@ -606,21 +623,45 @@ impl App {
         for event in &events {
             match event {
                 WatchEvent::FileChanged(path) => {
-                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                        if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
-                            ctx.cache_deprecated = true;
-                            self.state.dirty = true;
-                            refresh_indices.push(i);
+                    // Check if this is a .git/ file change (HEAD, index)
+                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
+                    if is_git_event {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
+                        }
+                    } else {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
                         }
                     }
                     rewatch_paths.push(path.clone());
                 }
-                WatchEvent::DirChanged(_path) => {
-                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                        if ctx.context_type == ContextType::Tree {
-                            ctx.cache_deprecated = true;
-                            self.state.dirty = true;
-                            refresh_indices.push(i);
+                WatchEvent::DirChanged(path) => {
+                    // Check if this is a .git/ directory change
+                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
+                    if is_git_event {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
+                        }
+                    } else {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::Tree {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
                         }
                     }
                 }

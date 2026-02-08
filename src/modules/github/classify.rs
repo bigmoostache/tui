@@ -1,0 +1,280 @@
+/// Command classification for gh (GitHub CLI) commands.
+
+use crate::modules::git::classify::CommandClass;
+
+/// Validate a raw command string intended for `gh`.
+/// Returns parsed args on success, or an error message on failure.
+pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
+    let trimmed = command.trim();
+    if !trimmed.starts_with("gh ") && trimmed != "gh" {
+        return Err("Command must start with 'gh '".to_string());
+    }
+
+    // Reject shell metacharacters
+    for pattern in &["|", ";", "&&", "||", "`", "$(", ">", "<", ">>", "\n", "\r"] {
+        if trimmed.contains(pattern) {
+            return Err(format!("Shell operator '{}' is not allowed", pattern));
+        }
+    }
+
+    // Parse into args (skip "gh" prefix)
+    let args: Vec<String> = trimmed.split_whitespace()
+        .skip(1) // skip "gh"
+        .map(|s| s.to_string())
+        .collect();
+
+    if args.is_empty() {
+        return Err("No gh subcommand specified".to_string());
+    }
+
+    Ok(args)
+}
+
+/// Classify a gh command (given as parsed args after "gh") as read-only or mutating.
+pub fn classify_gh(args: &[String]) -> CommandClass {
+    if args.is_empty() {
+        return CommandClass::Mutating;
+    }
+
+    let group = args[0].as_str();
+    let action = args.get(1).map(|s| s.as_str()).unwrap_or("");
+    let rest: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
+
+    match group {
+        // PR commands
+        "pr" => match action {
+            "list" | "view" | "status" | "checks" | "diff" => CommandClass::ReadOnly,
+            "create" | "merge" | "close" | "reopen" | "edit" | "comment" | "review" | "ready" => {
+                CommandClass::Mutating
+            }
+            _ => CommandClass::Mutating,
+        },
+
+        // Issue commands
+        "issue" => match action {
+            "list" | "view" | "status" => CommandClass::ReadOnly,
+            "create" | "close" | "reopen" | "edit" | "comment" | "delete" | "transfer"
+            | "pin" | "unpin" | "lock" | "unlock" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Repo commands
+        "repo" => match action {
+            "view" | "list" => CommandClass::ReadOnly,
+            "create" | "clone" | "fork" | "delete" | "edit" | "rename" | "archive"
+            | "unarchive" | "sync" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Release commands
+        "release" => match action {
+            "list" | "view" | "download" => CommandClass::ReadOnly,
+            "create" | "delete" | "edit" | "upload" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Run (Actions) commands
+        "run" => match action {
+            "list" | "view" | "download" | "watch" => CommandClass::ReadOnly,
+            "rerun" | "cancel" | "delete" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Workflow commands
+        "workflow" => match action {
+            "list" | "view" => CommandClass::ReadOnly,
+            "run" | "enable" | "disable" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Gist commands
+        "gist" => match action {
+            "list" | "view" => CommandClass::ReadOnly,
+            "create" | "edit" | "delete" | "clone" | "rename" => CommandClass::Mutating,
+            _ => CommandClass::Mutating,
+        },
+
+        // Search commands (always read-only)
+        "search" => CommandClass::ReadOnly,
+
+        // Auth commands
+        "auth" => match action {
+            "status" | "token" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // API command — special handling
+        "api" => {
+            // Check --method flag
+            let has_mutating_method = rest.windows(2).any(|w| {
+                (w[0] == "--method" || w[0] == "-X")
+                    && matches!(w[1].to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
+            });
+            if has_mutating_method {
+                CommandClass::Mutating
+            } else {
+                CommandClass::ReadOnly
+            }
+        }
+
+        // Label commands
+        "label" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Project commands
+        "project" => match action {
+            "list" | "view" | "field-list" | "item-list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // SSH key, GPG key commands
+        "ssh-key" | "gpg-key" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Always read-only groups
+        "browse" | "status" | "completion" | "help" | "version" => CommandClass::ReadOnly,
+
+        // Attestation (verify, download — always read-only)
+        "attestation" => CommandClass::ReadOnly,
+
+        // Config commands
+        "config" => match action {
+            "get" | "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Secret commands
+        "secret" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Variable commands
+        "variable" => match action {
+            "list" | "get" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Cache commands
+        "cache" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Ruleset commands
+        "ruleset" => match action {
+            "list" | "view" | "check" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Org commands
+        "org" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Extension commands
+        "extension" => match action {
+            "list" | "search" | "browse" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Alias commands
+        "alias" => match action {
+            "list" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Codespace commands
+        "codespace" => match action {
+            "list" | "view" | "ssh" | "code" | "jupyter" | "logs" | "ports" => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+
+        // Unknown → Mutating (safe default)
+        _ => CommandClass::Mutating,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_rejects_non_gh() {
+        assert!(validate_gh_command("git log").is_err());
+    }
+
+    #[test]
+    fn test_validate_accepts_valid() {
+        let args = validate_gh_command("gh pr list --json number").unwrap();
+        assert_eq!(args, vec!["pr", "list", "--json", "number"]);
+    }
+
+    #[test]
+    fn test_pr_list_readonly() {
+        let args = vec!["pr".to_string(), "list".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_pr_create_mutating() {
+        let args = vec!["pr".to_string(), "create".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::Mutating);
+    }
+
+    #[test]
+    fn test_api_get_readonly() {
+        let args = vec!["api".to_string(), "/repos/foo/bar".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_api_post_mutating() {
+        let args = vec![
+            "api".to_string(), "/repos/foo/bar/issues".to_string(),
+            "--method".to_string(), "POST".to_string(),
+        ];
+        assert_eq!(classify_gh(&args), CommandClass::Mutating);
+    }
+
+    #[test]
+    fn test_run_watch_readonly() {
+        let args = vec!["run".to_string(), "watch".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_codespace_list_readonly() {
+        let args = vec!["codespace".to_string(), "list".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_secret_set_mutating() {
+        let args = vec!["secret".to_string(), "set".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::Mutating);
+    }
+
+    #[test]
+    fn test_project_field_list_readonly() {
+        let args = vec!["project".to_string(), "field-list".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_browse_readonly() {
+        let args = vec!["browse".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+
+    #[test]
+    fn test_variable_get_readonly() {
+        let args = vec!["variable".to_string(), "get".to_string()];
+        assert_eq!(classify_gh(&args), CommandClass::ReadOnly);
+    }
+}

@@ -64,6 +64,8 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_lines: panel.tmux_lines,
         tmux_last_keys: None,
         tmux_description: panel.tmux_description.clone(),
+        result_command: panel.result_command.clone(),
+        result_command_hash: panel.result_command_hash.clone(),
         cached_content: None,
         cache_deprecated: true,  // Will be refreshed on load
         // Use saved timestamp if available, otherwise current time for new panels
@@ -172,6 +174,10 @@ fn load_state_new() -> State {
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
     }
 
+    // Load GitHub token from environment
+    dotenvy::dotenv().ok();
+    state.github_token = std::env::var("GITHUB_TOKEN").ok();
+
     // Set the global active theme
     set_active_theme(&state.active_theme);
     state
@@ -271,6 +277,8 @@ pub fn save_state(state: &State) {
                 tmux_pane_id: ctx.tmux_pane_id.clone(),
                 tmux_lines: ctx.tmux_lines,
                 tmux_description: ctx.tmux_description.clone(),
+                result_command: ctx.result_command.clone(),
+                result_command_hash: ctx.result_command_hash.clone(),
             };
             panel::save_panel(&panel_data);
         }

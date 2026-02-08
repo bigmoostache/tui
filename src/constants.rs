@@ -124,7 +124,7 @@ pub const PRESETS_DIR: &str = "presets";
 pub const PANEL_MAX_LOAD_BYTES: usize = 5 * 1024 * 1024; // 5 MB
 
 /// Tokens per page when paginating (also serves as the soft cap — panels exceeding this get paginated)
-pub const PANEL_PAGE_TOKENS: usize = 10_000;
+pub const PANEL_PAGE_TOKENS: usize = 25_000;
 
 // =============================================================================
 // TMUX
@@ -132,6 +132,18 @@ pub const PANEL_PAGE_TOKENS: usize = 10_000;
 
 /// Background session name for tmux operations
 pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
+
+/// Refresh interval for GitHub result panels (milliseconds)
+pub const GH_RESULT_REFRESH_MS: u64 = 120_000;
+
+/// Maximum size for command output cached in result panels (bytes)
+pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
+
+/// Timeout for git commands (seconds)
+pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
+
+/// Timeout for gh commands (seconds)
+pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 // =============================================================================
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)
