@@ -10,7 +10,7 @@ use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::icons;
 use crate::state::{
-    hash_values, FullContentCache, Message, MessageRenderCache, InputRenderCache,
+    hash_values, ContextType, FullContentCache, Message, MessageRenderCache, InputRenderCache,
     MessageStatus, MessageType, State,
 };
 use crate::ui::{theme, helpers::wrap_text, markdown::*};
@@ -46,7 +46,7 @@ impl ConversationPanel {
     }
 
     /// Render a single message to lines (without caching logic)
-    fn render_message(
+    pub(crate) fn render_message(
         msg: &Message,
         viewport_width: u16,
         base_style: Style,
@@ -384,6 +384,12 @@ impl ConversationPanel {
         std::hash::Hash::hash(&state.dev_mode, &mut hasher);
         std::hash::Hash::hash(&state.is_streaming, &mut hasher);
 
+        // Hash conversation history panel count (invalidate when panels added/removed)
+        let history_count = state.context.iter()
+            .filter(|c| c.context_type == ContextType::ConversationHistory)
+            .count();
+        std::hash::Hash::hash(&history_count, &mut hasher);
+
         // Hash all message content that affects rendering
         for msg in &state.messages {
             std::hash::Hash::hash(&msg.id, &mut hasher);
@@ -431,6 +437,41 @@ impl ConversationPanel {
         }
 
         let mut text: Vec<Line<'static>> = Vec::new();
+
+        // Prepend frozen ConversationHistory panels (oldest first)
+        {
+            let mut history_panels: Vec<_> = state.context.iter()
+                .filter(|c| c.context_type == ContextType::ConversationHistory)
+                .collect();
+            history_panels.sort_by_key(|c| c.last_refresh_ms);
+
+            for ctx in &history_panels {
+                if let Some(ref msgs) = ctx.history_messages {
+                    // Separator header
+                    text.push(Line::from(vec![
+                        Span::styled(
+                            format!("── {} ──", ctx.name),
+                            Style::default().fg(theme::text_muted()).bold(),
+                        ),
+                    ]));
+
+                    // Render each frozen message with full formatting
+                    for msg in msgs {
+                        let lines = Self::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                        text.extend(lines);
+                    }
+
+                    // Separator footer
+                    text.push(Line::from(vec![
+                        Span::styled(
+                            "── ── ── ──".to_string(),
+                            Style::default().fg(theme::text_muted()),
+                        ),
+                    ]));
+                    text.push(Line::from(""));
+                }
+            }
+        }
 
         if state.messages.is_empty() {
             text.push(Line::from(""));

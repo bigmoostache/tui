@@ -333,6 +333,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         result_command: None,
         result_command_hash: None,
         cached_content: Some(contents.to_string()),
+        history_messages: None,
         cache_deprecated: true,
         last_refresh_ms: crate::core::panels::now_ms(),
         content_hash: None,

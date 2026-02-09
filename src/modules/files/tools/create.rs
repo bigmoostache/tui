@@ -187,6 +187,7 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
         result_command: None,
         result_command_hash: None,
         cached_content: Some(content.to_string()),
+        history_messages: None,
         cache_deprecated: true,
         last_refresh_ms: crate::core::panels::now_ms(),
         content_hash: None,

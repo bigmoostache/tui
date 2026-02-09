@@ -167,6 +167,14 @@ pub fn detach_conversation_chunks(state: &mut State) {
             _ => break, // No valid boundary found, bail
         };
 
+        // 3b. Safety check: ensure enough active messages remain after detachment
+        let remaining_active = state.messages[boundary..].iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .count();
+        if remaining_active < DETACH_KEEP_MESSAGES {
+            break;
+        }
+
         // 4. Collect message IDs for the chunk name
         let first_id = state.messages[..boundary].iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
@@ -177,7 +185,12 @@ pub fn detach_conversation_chunks(state: &mut State) {
             .map(|m| m.id.clone())
             .unwrap_or_default();
 
-        // 5. Format chunk content
+        // 5. Collect Message objects for UI rendering + format chunk content for LLM
+        let history_msgs: Vec<Message> = state.messages[..boundary].iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .cloned()
+            .collect();
+
         let content = format_chunk_content(&state.messages, 0, boundary);
         if content.is_empty() {
             break; // Nothing useful to detach
@@ -215,6 +228,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             result_command: None,
             result_command_hash: None,
             cached_content: Some(content),
+            history_messages: Some(history_msgs),
             cache_deprecated: false,
             last_refresh_ms: chunk_timestamp,
             content_hash: None,
@@ -231,25 +245,6 @@ pub fn detach_conversation_chunks(state: &mut State) {
                 crate::persistence::delete_message(uid);
             }
         }
-
-        // 9. Insert a synthetic user message at the front so the LLM sees the seam
-        let detach_notice = Message {
-            id: format!("U{}", state.next_user_id),
-            uid: None,
-            role: "user".to_string(),
-            message_type: MessageType::TextMessage,
-            content: "Older messages automatically detached for token efficiency.".to_string(),
-            content_token_count: estimate_tokens("Older messages automatically detached for token efficiency."),
-            tl_dr: None,
-            tl_dr_token_count: 0,
-            status: MessageStatus::Full,
-            tool_uses: Vec::new(),
-            tool_results: Vec::new(),
-            input_tokens: 0,
-            timestamp_ms: now_ms(),
-        };
-        state.next_user_id += 1;
-        state.messages.insert(0, detach_notice);
 
         // Loop to check if remaining messages still exceed threshold
     }

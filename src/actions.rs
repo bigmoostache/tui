@@ -345,6 +345,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 result_command: None,
                 result_command_hash: None,
                 cached_content: None,
+                history_messages: None,
                 cache_deprecated: false,
                 last_refresh_ms: crate::core::panels::now_ms(),
                 content_hash: None,

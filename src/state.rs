@@ -160,6 +160,9 @@ pub struct ContextElement {
     /// Cached content for LLM context and UI rendering
     #[serde(skip)]
     pub cached_content: Option<String>,
+    /// Frozen Message objects for ConversationHistory panels (UI rendering)
+    #[serde(skip)]
+    pub history_messages: Option<Vec<Message>>,
     /// Cache is deprecated - source data changed, needs regeneration
     #[serde(skip)]
     pub cache_deprecated: bool,
