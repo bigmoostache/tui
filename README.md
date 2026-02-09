@@ -39,7 +39,7 @@ It explores your codebase on its own. It opens files, reads them, takes notes, c
 | Terminal integration | Embedded terminal | Spawns processes | No | **Full tmux pane management** |
 | File exploration | File tree | Auto-read | Manual add | **Glob, grep, tree with annotations** |
 | Git workflow | Basic | Good | Great | **Full git + GitHub CLI with cache invalidation** |
-| Memory across turns | None | CLAUDE.md | None | **Persistent memories, todos, scratchpad** |
+| Memory across turns | None | CLAUDE.md | None | **Persistent memories, todos, scratchpad, prompt library** |
 | Multi-provider | No | Claude only | Many | **Claude, DeepSeek, Grok, Groq** |
 | Architecture | Plugin / Cloud | CLI | Python | **Rust TUI, single binary, ~50ms frames** |
 
