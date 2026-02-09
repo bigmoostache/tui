@@ -295,7 +295,14 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
             let wrapped = wrap_text(line, wrap_width);
             for line_text in wrapped.iter() {
-                let spans = build_input_spans(line_text, cursor_char, command_ids);
+                let mut spans = build_input_spans(line_text, cursor_char, command_ids);
+
+                // Add command hints if this line segment contains the cursor and starts with /
+                if line_text.contains(cursor_char) {
+                    let clean_line = line_text.replace(cursor_char, "");
+                    let hints = build_command_hints(&clean_line, command_ids);
+                    spans.extend(hints);
+                }
 
                 if is_first_line {
                     let mut line_spans = vec![
@@ -327,31 +334,127 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
 /// Build spans for a single input line, with cursor and command highlighting.
 fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String]) -> Vec<Span<'static>> {
-    // Check if this line starts with a recognized /command
-    let trimmed = line_text.trim_start();
-    let is_command = if trimmed.starts_with('/') && !command_ids.is_empty() {
-        let token = &trimmed[1..];
-        let cmd_id = match token.find(|c: char| c.is_whitespace() || token.contains(cursor_char)) {
-            Some(pos) => &token[..pos],
-            None => token,
-        };
-        // Strip cursor char from cmd_id for matching
-        let clean_id = cmd_id.replace(cursor_char, "");
-        command_ids.iter().any(|id| id == &clean_id)
+    // Strip cursor char to get the "clean" text for analysis
+    let clean_line = line_text.replace(cursor_char, "");
+    let trimmed = clean_line.trim_start();
+    let leading_spaces = clean_line.len() - trimmed.len();
+
+    // Check if line starts with / and find the command token
+    let (matched_cmd_len, is_command) = if trimmed.starts_with('/') && !command_ids.is_empty() {
+        let after_slash = &trimmed[1..];
+        let cmd_end = after_slash.find(|c: char| c.is_whitespace()).unwrap_or(after_slash.len());
+        let cmd_id = &after_slash[..cmd_end];
+        if command_ids.iter().any(|id| id == cmd_id) {
+            // +1 for the slash itself
+            (leading_spaces + 1 + cmd_end, true)
+        } else {
+            (0, false)
+        }
     } else {
-        false
+        (0, false)
     };
 
-    let text_color = if is_command { theme::accent() } else { theme::text() };
+    // Build spans with proper coloring
+    let mut spans: Vec<Span<'static>> = Vec::new();
 
-    if line_text.contains(cursor_char) {
-        let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
-        vec![
-            Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(text_color)),
-            Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()),
-            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(text_color)),
-        ]
+    if is_command {
+        // We need to split line_text into: command part (accent) and rest (normal)
+        // But cursor_char may be embedded anywhere, so walk through carefully
+        let mut chars_consumed = 0; // chars consumed in clean_line
+        let mut cmd_part = String::new();
+        let mut rest_part = String::new();
+        let mut in_cmd = true;
+
+        for ch in line_text.chars() {
+            let ch_str: String = ch.to_string();
+            if ch_str == cursor_char {
+                // Cursor char doesn't count toward clean position
+                if in_cmd {
+                    cmd_part.push(ch);
+                } else {
+                    rest_part.push(ch);
+                }
+                continue;
+            }
+            if in_cmd && chars_consumed >= matched_cmd_len {
+                in_cmd = false;
+            }
+            if in_cmd {
+                cmd_part.push(ch);
+            } else {
+                rest_part.push(ch);
+            }
+            chars_consumed += 1;
+        }
+
+        // Split cmd_part and rest_part by cursor_char for cursor rendering
+        fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: ratatui::style::Color) {
+            if text.contains(cursor_char) {
+                let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
+                if !parts[0].is_empty() {
+                    spans.push(Span::styled(parts[0].to_string(), Style::default().fg(color)));
+                }
+                spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
+                if parts.len() > 1 && !parts[1].is_empty() {
+                    spans.push(Span::styled(parts[1].to_string(), Style::default().fg(color)));
+                }
+            } else if !text.is_empty() {
+                spans.push(Span::styled(text.to_string(), Style::default().fg(color)));
+            }
+        }
+
+        push_with_cursor(&mut spans, &cmd_part, cursor_char, theme::accent());
+        push_with_cursor(&mut spans, &rest_part, cursor_char, theme::text());
     } else {
-        vec![Span::styled(line_text.to_string(), Style::default().fg(text_color))]
+        // No command — render with normal text color + cursor
+        if line_text.contains(cursor_char) {
+            let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
+            spans.push(Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::text())));
+            spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
+            if let Some(rest) = parts.get(1) {
+                spans.push(Span::styled(rest.to_string(), Style::default().fg(theme::text())));
+            }
+        } else {
+            spans.push(Span::styled(line_text.to_string(), Style::default().fg(theme::text())));
+        }
     }
+
+    spans
+}
+
+/// Show available command hints when user types `/` at start of a line.
+/// Returns hint spans to append after the input line, or empty vec if no hints.
+fn build_command_hints(clean_line: &str, command_ids: &[String]) -> Vec<Span<'static>> {
+    let trimmed = clean_line.trim_start();
+    if !trimmed.starts_with('/') || command_ids.is_empty() {
+        return vec![];
+    }
+
+    let partial = &trimmed[1..]; // after the slash
+    // If there's a space, user is past the command name — no hints
+    if partial.contains(' ') {
+        return vec![];
+    }
+
+    // Find matching commands
+    let matches: Vec<&String> = if partial.is_empty() {
+        command_ids.iter().collect()
+    } else {
+        command_ids.iter().filter(|id| id.starts_with(partial)).collect()
+    };
+
+    // Don't show hints if exact match already typed
+    if matches.len() == 1 && matches[0] == partial {
+        return vec![];
+    }
+
+    if matches.is_empty() {
+        return vec![];
+    }
+
+    let hint_text = matches.iter().map(|id| format!("/{}", id)).collect::<Vec<_>>().join("  ");
+    vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(hint_text, Style::default().fg(theme::text_muted()).italic()),
+    ]
 }
