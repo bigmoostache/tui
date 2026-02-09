@@ -142,7 +142,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
         description: description.to_string(),
         built_in: false,
         worker_state: PresetWorkerState {
-            active_system_id: state.active_system_id.clone(),
+            active_agent_id: state.active_agent_id.clone(),
             active_modules,
             disabled_tools,
             modules: module_data,
@@ -247,12 +247,12 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let ws = &preset.worker_state;
 
-    // 1. Set active_system_id (only if the referenced system exists)
-    if let Some(ref sys_id) = ws.active_system_id {
-        if state.systems.iter().any(|s| s.id == *sys_id) {
-            state.active_system_id = Some(sys_id.clone());
+    // 1. Set active_agent_id (only if the referenced system exists)
+    if let Some(ref sys_id) = ws.active_agent_id {
+        if state.agents.iter().any(|s| s.id == *sys_id) {
+            state.active_agent_id = Some(sys_id.clone());
         }
-        // If system doesn't exist, keep current active_system_id
+        // If system doesn't exist, keep current active_agent_id
     }
 
     // 2. Set active_modules — ensure core modules are always included
@@ -344,6 +344,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_description: panel_cfg.tmux_description.clone(),
             result_command: None,
             result_command_hash: None,
+            skill_prompt_id: None,
             cached_content: None,
             history_messages: None,
             cache_deprecated: true,

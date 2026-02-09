@@ -1,29 +1,27 @@
-use crate::constants::prompts;
-use crate::state::{State, SystemItem};
+use crate::constants::library;
+use crate::state::State;
 
-/// Ensure all built-in seeds from prompts.yaml exist in state, and there's always an active seed.
-pub fn ensure_default_seed(state: &mut State) {
-    // Ensure all seeds from prompts.yaml exist
-    for seed in prompts::seeds() {
-        let exists = state.systems.iter().any(|s| s.id == seed.id);
-        if !exists {
-            state.systems.push(SystemItem {
-                id: seed.id.clone(),
-                name: seed.name.clone(),
-                description: seed.description.clone(),
-                content: seed.content.clone(),
-            });
+/// Ensure all built-in agents from library.yaml exist in state, and there's always an active agent.
+/// Also loads skills and commands from disk + built-ins.
+pub fn ensure_default_agent(state: &mut State) {
+    // Load from disk + merge built-ins
+    let (mut agents, skills, commands) = super::storage::load_all_prompts();
+
+    // Merge existing state agents that aren't already in the loaded set
+    // (handles user-created agents persisted in config.json during migration)
+    for existing in &state.agents {
+        if !agents.iter().any(|a| a.id == existing.id) {
+            agents.push(existing.clone());
         }
     }
 
-    // Sort so S0 (default) comes first, then S_ prefixed (built-in), then user-created
-    state.systems.sort_by(|a, b| {
-        let a_builtin = a.id.starts_with("S_") || a.id == prompts::default_seed_id();
-        let b_builtin = b.id.starts_with("S_") || b.id == prompts::default_seed_id();
-        match (a.id == prompts::default_seed_id(), b.id == prompts::default_seed_id()) {
+    // Sort: default first, then built-in, then user-created
+    let default_id = library::default_agent_id();
+    agents.sort_by(|a, b| {
+        match (a.id == default_id, b.id == default_id) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => match (a_builtin, b_builtin) {
+            _ => match (a.is_builtin, b.is_builtin) {
                 (true, false) => std::cmp::Ordering::Less,
                 (false, true) => std::cmp::Ordering::Greater,
                 _ => a.id.cmp(&b.id),
@@ -31,34 +29,32 @@ pub fn ensure_default_seed(state: &mut State) {
         }
     });
 
-    // Ensure there's always an active seed
-    if state.active_system_id.is_none() {
-        state.active_system_id = Some(prompts::default_seed_id().to_string());
+    state.agents = agents;
+    state.skills = skills;
+    state.commands = commands;
+
+    // Ensure there's always an active agent
+    if state.active_agent_id.is_none() {
+        state.active_agent_id = Some(default_id.to_string());
     } else {
-        // Verify the active seed still exists
-        let active_id = state.active_system_id.as_ref().unwrap();
-        if !state.systems.iter().any(|s| &s.id == active_id) {
-            state.active_system_id = Some(prompts::default_seed_id().to_string());
+        // Verify the active agent still exists
+        let active_id = state.active_agent_id.as_ref().unwrap();
+        if !state.agents.iter().any(|s| &s.id == active_id) {
+            state.active_agent_id = Some(default_id.to_string());
         }
-    }
-
-    // Update next_system_id if needed
-    let max_id: usize = state.systems.iter()
-        .filter_map(|s| s.id.strip_prefix('S').and_then(|n| n.parse().ok()))
-        .max()
-        .unwrap_or(0);
-    if state.next_system_id <= max_id {
-        state.next_system_id = max_id + 1;
     }
 }
 
-/// Get the active seed's content (system prompt)
-pub fn get_active_seed_content(state: &State) -> String {
-    if let Some(active_id) = &state.active_system_id {
-        if let Some(system) = state.systems.iter().find(|s| &s.id == active_id) {
-            return system.content.clone();
+/// Get the active agent's content (system prompt)
+pub fn get_active_agent_content(state: &State) -> String {
+    if let Some(active_id) = &state.active_agent_id {
+        if let Some(agent) = state.agents.iter().find(|s| &s.id == active_id) {
+            return agent.content.clone();
         }
     }
-    // Fallback to default (shouldn't happen if ensure_default_seed was called)
-    prompts::default_seed_content().to_string()
+    // Fallback to default
+    library::agents().first()
+        .map(|a| a.content.clone())
+        .unwrap_or_default()
 }
+

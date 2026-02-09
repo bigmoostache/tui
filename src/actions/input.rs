@@ -1,5 +1,5 @@
 use crate::persistence::{delete_message, save_message};
-use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, State};
+use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, PromptItem, State};
 
 use super::helpers::{parse_context_pattern, find_context_by_id};
 use super::ActionResult;
@@ -22,7 +22,8 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
         }
     }
 
-    let content = std::mem::take(&mut state.input);
+    let content = replace_commands(&state.input, &state.commands);
+    state.input.clear();
     state.input_cursor = 0;
     let user_token_estimate = estimate_tokens(&content);
 
@@ -117,4 +118,33 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
     ActionResult::Save
+}
+
+/// Replace /command-name tokens in input with command content.
+/// Only replaces at line start (after optional whitespace).
+fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
+    if commands.is_empty() || !input.contains('/') {
+        return input.to_string();
+    }
+
+    input.lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if !trimmed.starts_with('/') {
+                return line.to_string();
+            }
+            // Extract the command token after /
+            let token = &trimmed[1..];
+            let (cmd_id, rest) = match token.find(|c: char| c.is_whitespace()) {
+                Some(pos) => (&token[..pos], &token[pos..]),
+                None => (token, ""),
+            };
+            if let Some(cmd) = commands.iter().find(|c| c.id == cmd_id) {
+                format!("{}{}", cmd.content.trim_end(), rest)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }

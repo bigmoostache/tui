@@ -16,7 +16,7 @@ pub struct Preset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PresetWorkerState {
     /// Which system prompt ID is active
-    pub active_system_id: Option<String>,
+    pub active_agent_id: Option<String>,
     /// Which modules are active (by module ID)
     pub active_modules: Vec<String>,
     /// Which tools are disabled (by tool ID)

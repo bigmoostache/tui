@@ -22,7 +22,7 @@ use crate::watcher::{FileWatcher, WatchEvent};
 use crate::gh_watcher::GhWatcher;
 
 use super::context::prepare_stream_context;
-use super::init::get_active_seed_content;
+use super::init::get_active_agent_content;
 
 pub struct App {
     pub state: State,
@@ -259,7 +259,7 @@ impl App {
                     }
                 }
                 let ctx = prepare_stream_context(&mut self.state, true);
-                let system_prompt = get_active_seed_content(&self.state);
+                let system_prompt = get_active_agent_content(&self.state);
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
@@ -444,7 +444,7 @@ impl App {
 
         // Continue streaming
         let ctx = prepare_stream_context(&mut self.state, true);
-        let system_prompt = get_active_seed_content(&self.state);
+        let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
@@ -511,7 +511,7 @@ impl App {
                     }
                 }
                 let ctx = prepare_stream_context(&mut self.state, false);
-                let system_prompt = get_active_seed_content(&self.state);
+                let system_prompt = get_active_agent_content(&self.state);
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),

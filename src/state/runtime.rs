@@ -8,7 +8,7 @@ use super::render_cache::{MessageRenderCache, InputRenderCache, FullContentCache
 use crate::llms::ModelInfo;
 use crate::modules::todo::types::TodoItem;
 use crate::modules::memory::types::MemoryItem;
-use crate::modules::prompt::types::SystemItem;
+use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
 use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 use crate::modules::git::types::GitFileChange;
@@ -59,12 +59,18 @@ pub struct State {
     pub memories: Vec<MemoryItem>,
     /// Next memory ID (M1, M2, ...)
     pub next_memory_id: usize,
-    /// System prompt items
-    pub systems: Vec<SystemItem>,
-    /// Next system ID (S0, S1, ...)
-    pub next_system_id: usize,
-    /// Active system ID (None = default)
-    pub active_system_id: Option<String>,
+    /// Agent prompt items
+    pub agents: Vec<PromptItem>,
+    /// Active agent ID (None = default)
+    pub active_agent_id: Option<String>,
+    /// Skill prompt items
+    pub skills: Vec<PromptItem>,
+    /// IDs of skills that have open panels
+    pub loaded_skill_ids: Vec<String>,
+    /// Command prompt items
+    pub commands: Vec<PromptItem>,
+    /// Preview in P8 Library panel: (PromptType, id)
+    pub library_preview: Option<(PromptType, String)>,
     /// Scratchpad cells
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Next scratchpad cell ID (C1, C2, ...)
@@ -205,9 +211,12 @@ impl Default for State {
             next_todo_id: 1,
             memories: vec![],
             next_memory_id: 1,
-            systems: vec![],
-            next_system_id: 0,
-            active_system_id: None,
+            agents: vec![],
+            active_agent_id: None,
+            skills: vec![],
+            loaded_skill_ids: vec![],
+            commands: vec![],
+            library_preview: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
             active_modules: crate::modules::default_active_modules(),
@@ -279,8 +288,8 @@ impl State {
             .filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok()))
             .collect();
 
-        // Find first available starting from 8 (P0-P7 are fixed defaults)
-        let id = (8..).find(|n| !used_ids.contains(n)).unwrap_or(8);
+        // Find first available starting from 9 (P0-P8 are fixed defaults)
+        let id = (9..).find(|n| !used_ids.contains(n)).unwrap_or(9);
         format!("P{}", id)
     }
 

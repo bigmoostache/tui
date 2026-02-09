@@ -109,6 +109,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_description: Some(description.clone()),
         result_command: None,
         result_command_hash: None,
+        skill_prompt_id: None,
         cached_content: None,
         history_messages: None,
         cache_deprecated: true, // Mark as deprecated so background refresh runs

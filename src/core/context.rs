@@ -227,6 +227,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             tmux_description: None,
             result_command: None,
             result_command_hash: None,
+            skill_prompt_id: None,
             cached_content: Some(content),
             history_messages: Some(history_msgs),
             cache_deprecated: false,

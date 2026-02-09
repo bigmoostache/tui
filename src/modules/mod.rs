@@ -113,6 +113,7 @@ const FIXED_PANEL_ORDER: &[ContextType] = &[
     ContextType::Overview,     // P5
     ContextType::Git,          // P6
     ContextType::Scratchpad,   // P7
+    ContextType::Library,      // P8
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -165,6 +166,7 @@ pub fn make_default_context_element(
         tmux_description: None,
         result_command: None,
         result_command_hash: None,
+        skill_prompt_id: None,
         cached_content: None,
         history_messages: None,
         cache_deprecated,

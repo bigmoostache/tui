@@ -33,7 +33,7 @@ use ratatui::prelude::*;
 use api::StreamEvent;
 use background::TlDrResult;
 use cache::CacheUpdate;
-use core::{ensure_default_contexts, ensure_default_seed, App};
+use core::{ensure_default_contexts, ensure_default_agent, App};
 use persistence::load_state;
 
 fn main() -> io::Result<()> {
@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
 
     // Ensure default context elements and seed exist
     ensure_default_contexts(&mut state);
-    ensure_default_seed(&mut state);
+    ensure_default_agent(&mut state);
 
     // Ensure built-in presets exist on disk
     modules::preset::builtin::ensure_builtin_presets();

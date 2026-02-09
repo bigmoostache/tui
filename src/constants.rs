@@ -229,6 +229,8 @@ pub mod icons {
     pub fn ctx_tmux() -> String { normalize_icon(&active_theme().context.tmux) }
     pub fn ctx_git() -> String { normalize_icon(&active_theme().context.git) }
     pub fn ctx_scratchpad() -> String { normalize_icon(&active_theme().context.scratchpad) }
+    pub fn ctx_library() -> String { normalize_icon("📚") }
+    pub fn ctx_skill() -> String { normalize_icon("⚡") }
 
     // Message status (normalized to 2 cells)
     pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }
@@ -262,19 +264,24 @@ pub mod tool_categories {
 // PROMPTS (loaded from yamls/prompts.yaml via config module)
 // =============================================================================
 
+pub mod library {
+    use crate::config::LIBRARY;
+
+    pub fn default_agent_id() -> &'static str { &LIBRARY.default_agent_id }
+    pub fn default_agent_content() -> &'static str {
+        let id = &LIBRARY.default_agent_id;
+        LIBRARY.agents.iter().find(|a| a.id == *id)
+            .map(|a| a.content.as_str())
+            .unwrap_or("")
+    }
+    pub fn agents() -> &'static [crate::config::SeedEntry] { &LIBRARY.agents }
+    pub fn skills() -> &'static [crate::config::SeedEntry] { &LIBRARY.skills }
+    pub fn commands() -> &'static [crate::config::SeedEntry] { &LIBRARY.commands }
+}
+
 pub mod prompts {
     use crate::config::PROMPTS;
 
-    fn default_seed() -> &'static crate::config::SeedEntry {
-        let id = &PROMPTS.default_seed_id;
-        PROMPTS.seeds.iter().find(|s| s.id == *id)
-            .expect("Default seed must exist in seeds list")
-    }
-
-    pub fn default_seed_id() -> &'static str { &PROMPTS.default_seed_id }
-    pub fn default_seed_content() -> &'static str { &default_seed().content }
-    pub fn main_system() -> &'static str { &default_seed().content }
-    pub fn seeds() -> &'static [crate::config::SeedEntry] { &PROMPTS.seeds }
     pub fn tldr_prompt() -> &'static str { &PROMPTS.tldr_prompt }
     pub fn tldr_min_tokens() -> usize { PROMPTS.tldr_min_tokens }
     pub fn panel_header() -> &'static str { &PROMPTS.panel.header }

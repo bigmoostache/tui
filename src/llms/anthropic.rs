@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
-use crate::constants::{prompts, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
+use crate::constants::{library, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
@@ -124,7 +124,7 @@ impl LlmClient for AnthropicClient {
             }
             prompt.clone()
         } else {
-            prompts::main_system().to_string()
+            library::default_agent_content().to_string()
         };
 
         let api_request = AnthropicRequest {
