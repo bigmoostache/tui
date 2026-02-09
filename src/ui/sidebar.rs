@@ -167,12 +167,12 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Token stats (cache hit / cache miss / output) — only when any value is non-zero
     if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
         // Helper: build a stats line with perfectly aligned columns
-        // Layout: "  {label}  ↑ {hit:>5}  ✗ {miss:>5}  ↓ {out:>5}"
-        // Total width: 2 + 4 + 2 + 7 + 2 + 7 + 2 + 7 = 33 chars
+        // Format: "  {label}  ↑ {count:>5}  ✗ {count:>5}  ↓ {count:>5}"
+        // Where count is 5 chars total: 4 chars number + 1 char unit (K/M) or space
         let stats_line = |label: &str, hit: usize, miss: usize, out: usize| -> Line<'static> {
             Line::from(vec![
                 Span::styled(format!("  {:>4}  ", label), Style::default().fg(theme::text_muted())),
-                Span::styled(format!("{} {:>6}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
+                Span::styled(format!("{} {:>5}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
                 Span::styled("  ", base_style),
                 Span::styled(format!("{} {:>5}", chars::CROSS, format_number(miss)), Style::default().fg(theme::warning())),
                 Span::styled("  ", base_style),
@@ -187,16 +187,17 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         }
 
         // Legend - perfectly aligned with stats columns including separators
+        // Format: "        ↑ hit   ✗ miss  ↓ out  "
         lines.push(Line::from(vec![
             Span::styled("        ", base_style),  // 8 spaces to align with "  {label}  " (2+4+2=8)
             Span::styled(chars::ARROW_UP, Style::default().fg(theme::success())),
-            Span::styled(" hit   ", Style::default().fg(theme::text_muted())),  // " hit" + 3 spaces = 7 chars
+            Span::styled(" hit  ", Style::default().fg(theme::text_muted())),  // " hit" + 2 spaces = 6 chars
             Span::styled("  ", base_style),  // Separator (2 spaces)
             Span::styled(chars::CROSS, Style::default().fg(theme::warning())),
-            Span::styled(" miss ", Style::default().fg(theme::text_muted())),  // " miss" + 1 space = 6 chars (not 7)
+            Span::styled(" miss ", Style::default().fg(theme::text_muted())),  // " miss" + 1 space = 6 chars
             Span::styled("  ", base_style),  // Separator (2 spaces)
             Span::styled(chars::ARROW_DOWN, Style::default().fg(theme::accent_dim())),
-            Span::styled(" out   ", Style::default().fg(theme::text_muted())),  // " out" + 3 spaces = 7 chars
+            Span::styled(" out  ", Style::default().fg(theme::text_muted())),  // " out" + 2 spaces = 6 chars
         ]));
     }
 
