@@ -84,6 +84,32 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         }
     }
 
+    // Active agent card
+    if let Some(ref agent_id) = state.active_agent_id {
+        let agent_name = state.agents.iter()
+            .find(|a| &a.id == agent_id)
+            .map(|a| a.name.as_str())
+            .unwrap_or(agent_id.as_str());
+        spans.push(Span::styled(
+            format!(" 🤖 {} ", agent_name),
+            Style::default().fg(theme::bg_base()).bg(theme::accent()).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
+    // Loaded skill cards
+    for skill_id in &state.loaded_skill_ids {
+        let skill_name = state.skills.iter()
+            .find(|s| s.id == *skill_id)
+            .map(|s| s.name.as_str())
+            .unwrap_or(skill_id.as_str());
+        spans.push(Span::styled(
+            format!(" 📚 {} ", skill_name),
+            Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     // Git branch (if available)
     if let Some(branch) = &state.git_branch {
         spans.push(Span::styled(
@@ -116,32 +142,32 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
         let net_change = total_additions - total_deletions;
         
-        // Card 1: Line changes (additions/deletions/net) with industry standard colors
-        // Format: "+11 -13 -2" (additions green, deletions red, net with appropriate color)
-        // Add line change card with individual color spans
-        // +{additions} (green) -{deletions} (red) {net} (green for positive, red for negative)
+        // Card 1: Line changes with slashes between counts on gray bg
         let (net_prefix, net_value) = if net_change >= 0 {
             ("+", net_change)
         } else {
             ("", net_change)
         };
         
-        spans.push(Span::styled(" +", Style::default().fg(theme::success())));
-        spans.push(Span::styled(format!("{} ", total_additions), Style::default().fg(theme::success()).bold()));
-        spans.push(Span::styled("-", Style::default().fg(theme::error())));
-        spans.push(Span::styled(format!("{} ", total_deletions), Style::default().fg(theme::error()).bold()));
-        spans.push(Span::styled(net_prefix, Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() })));
-        spans.push(Span::styled(format!("{} ", net_value.abs()), Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() }).bold()));
+        spans.push(Span::styled(" +", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{}", total_additions), Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold()));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("-", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{}", total_deletions), Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold()));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(net_prefix, Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() }).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{} ", net_value.abs()), Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() }).bg(theme::bg_elevated()).bold()));
         spans.push(Span::styled(" ", base_style));
 
-        // Card 2: File changes (U/M/D) with industry standard colors
-        // Format: "U0 M9 D0" (untracked green, modified orange, deleted red)
-        spans.push(Span::styled("U", Style::default().fg(theme::success())));
-        spans.push(Span::styled(format!("{} ", untracked_count), Style::default().fg(theme::success()).bold()));
-        spans.push(Span::styled("M", Style::default().fg(theme::warning())));
-        spans.push(Span::styled(format!("{} ", modified_count), Style::default().fg(theme::warning()).bold()));
-        spans.push(Span::styled("D", Style::default().fg(theme::error())));
-        spans.push(Span::styled(format!("{} ", deleted_count), Style::default().fg(theme::error()).bold()));
+        // Card 2: File changes with slashes between counts on gray bg
+        spans.push(Span::styled(" U", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{}", untracked_count), Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold()));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("M", Style::default().fg(theme::warning()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{}", modified_count), Style::default().fg(theme::warning()).bg(theme::bg_elevated()).bold()));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("D", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!("{} ", deleted_count), Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 
