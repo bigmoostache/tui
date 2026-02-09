@@ -615,10 +615,15 @@ impl App {
         self.gh_watcher.sync_watches(&panels);
     }
 
-    /// Schedule initial cache refreshes for all context elements
+    /// Schedule initial cache refreshes for fixed context elements only.
+    /// Dynamic panels (File, Glob, Grep, Tmux, GitResult, GithubResult) will be
+    /// populated gradually by check_timer_based_deprecation via its `needs_initial`
+    /// path, staggered by the `cache_in_flight` guard — preventing a massive burst
+    /// of concurrent background threads on startup when many panels are persisted.
     fn schedule_initial_cache_refreshes(&mut self) {
         for i in 0..self.state.context.len() {
             let ctx = &self.state.context[i];
+            if !ctx.context_type.is_fixed() { continue; }
             let panel = crate::core::panels::get_panel(ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
@@ -751,7 +756,15 @@ impl App {
     }
 
     /// Check timer-based deprecation for glob, grep, tmux, git
-    /// Also handles initial population for newly created context elements
+    /// Also handles initial population for newly created context elements.
+    ///
+    /// Timer-based (interval) refreshes are restricted to **fixed panels and the
+    /// currently selected panel** to avoid wasting CPU on background refresh of
+    /// accumulated dynamic panels the user isn't looking at.  Dynamic panels still
+    /// get refreshed when:
+    ///   - first created (`needs_initial`)
+    ///   - explicitly deprecated by a file-watcher event
+    ///   - the user selects them (becomes the selected panel)
     fn check_timer_based_deprecation(&mut self) {
         let current_ms = now_ms();
 
@@ -771,15 +784,24 @@ impl App {
             let explicitly_deprecated = ctx.cache_deprecated;
 
             let panel = crate::core::panels::get_panel(ctx.context_type);
-            let interval_elapsed = panel.cache_refresh_interval_ms()
-                .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
-                .unwrap_or(true); // No interval = always eligible
+
+            // Timer-based interval refresh: only for fixed panels (P0-P7) and the
+            // currently selected panel.  Dynamic panels that aren't selected don't
+            // need continuous background polling — they'll refresh when selected or
+            // when a watcher event marks them deprecated.
+            let interval_eligible = ctx.context_type.is_fixed() || i == self.state.selected_context;
+            let interval_elapsed = if interval_eligible {
+                panel.cache_refresh_interval_ms()
+                    .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
+                    .unwrap_or(true) // No interval = always eligible
+            } else {
+                false
+            };
 
             let has_interval = panel.cache_refresh_interval_ms().is_some();
 
             // needs_initial: always refresh newly created panels immediately
-            // interval_elapsed: scheduled refresh — respects interval even when cache_deprecated,
-            //   preventing the feedback loop: git status → .git/index change → watcher → refresh → ...
+            // interval_elapsed: scheduled refresh — only for fixed + selected panels
             // deprecated w/o interval: File/Tree panels — refresh immediately when watcher triggers
             // Note: cache_deprecated still affects build_cache_request (forces full refresh vs hash check)
             if needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval) {

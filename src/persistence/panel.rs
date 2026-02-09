@@ -32,3 +32,23 @@ pub fn save_panel(panel: &PanelData) {
         fs::write(path, json).ok();
     }
 }
+
+/// Delete panel files in panels/ that are not in `known_uids`.
+pub fn delete_orphan_panels(known_uids: &std::collections::HashSet<String>) {
+    let dir = panels_dir();
+    let entries = match fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            if !known_uids.contains(stem) {
+                let _ = fs::remove_file(&path);
+            }
+        }
+    }
+}

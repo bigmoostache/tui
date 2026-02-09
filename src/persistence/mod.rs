@@ -259,6 +259,9 @@ pub fn save_state(state: &State) {
     worker::save_worker(&worker_state);
 
     // Save ALL panels to panels/ folder (except System P0 which comes from systems[])
+    // Collect known UIDs so we can delete orphans afterwards.
+    let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
     for ctx in state.context.iter() {
         // Skip System panel (P0) - it comes from systems[] in SharedConfig
         if ctx.context_type == ContextType::System {
@@ -267,6 +270,7 @@ pub fn save_state(state: &State) {
 
         // All other panels need a UID to be saved
         if let Some(uid) = &ctx.uid {
+            known_uids.insert(uid.clone());
             let panel_data = PanelData {
                 uid: uid.clone(),
                 panel_type: ctx.context_type,
@@ -296,6 +300,10 @@ pub fn save_state(state: &State) {
             panel::save_panel(&panel_data);
         }
     }
+
+    // Delete orphan panel files that are no longer referenced by any context element.
+    // This prevents stale files from accumulating on disk after panels are closed.
+    panel::delete_orphan_panels(&known_uids);
 }
 
 /// Check if we still own the state file (another instance may have taken over)
