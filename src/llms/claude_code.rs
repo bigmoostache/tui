@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
-use crate::constants::{prompts, API_VERSION, MAX_RESPONSE_TOKENS};
+use crate::constants::{library, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
@@ -296,7 +296,7 @@ impl LlmClient for ClaudeCodeClient {
         let system_text = if let Some(ref prompt) = request.system_prompt {
             prompt.clone()
         } else {
-            prompts::main_system().to_string()
+            library::default_agent_content().to_string()
         };
 
         // Build messages as simple JSON (matching Python example format)

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages};
-use crate::constants::prompts;
+use crate::constants::{library, prompts};
 use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
@@ -141,7 +141,7 @@ pub fn build_messages(
     let mut system_content = opts
         .system_prompt
         .clone()
-        .unwrap_or_else(|| prompts::main_system().to_string());
+        .unwrap_or_else(|| library::default_agent_content().to_string());
 
     if let Some(ref suffix) = opts.system_suffix {
         system_content.push_str("\n\n");

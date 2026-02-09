@@ -73,6 +73,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_description: None,
         result_command: None,
         result_command_hash: None,
+        skill_prompt_id: None,
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh

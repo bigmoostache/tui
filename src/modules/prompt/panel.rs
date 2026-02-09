@@ -9,8 +9,8 @@ pub struct PromptPanel;
 
 impl Panel for PromptPanel {
     fn title(&self, state: &State) -> String {
-        if let Some(active_id) = &state.active_system_id {
-            if let Some(system) = state.systems.iter().find(|s| s.id == *active_id) {
+        if let Some(active_id) = &state.active_agent_id {
+            if let Some(system) = state.agents.iter().find(|s| s.id == *active_id) {
                 return format!("System: {}", system.name);
             }
         }
@@ -20,8 +20,8 @@ impl Panel for PromptPanel {
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
-        if let Some(active_id) = &state.active_system_id {
-            if let Some(system) = state.systems.iter().find(|s| s.id == *active_id) {
+        if let Some(active_id) = &state.active_agent_id {
+            if let Some(system) = state.agents.iter().find(|s| s.id == *active_id) {
                 lines.push(Line::from(vec![
                     Span::styled("Active: ", Style::default().fg(theme::text_muted())),
                     Span::styled(format!("[{}] {}", system.id, system.name), Style::default().fg(theme::accent())),
@@ -33,17 +33,17 @@ impl Panel for PromptPanel {
                     lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(theme::text()))));
                 }
             } else {
-                lines.push(Line::from(Span::styled("Active seed not found. Run ensure_default_seed().", Style::default().fg(theme::error()))));
+                lines.push(Line::from(Span::styled("Active agent not found.", Style::default().fg(theme::error()))));
             }
         } else {
-            lines.push(Line::from(Span::styled("No active seed. Run ensure_default_seed().", Style::default().fg(theme::error()))));
+            lines.push(Line::from(Span::styled("No active agent.", Style::default().fg(theme::error()))));
         }
 
-        if !state.systems.is_empty() {
+        if !state.agents.is_empty() {
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Available systems:", Style::default().fg(theme::text_muted()))));
-            for system in &state.systems {
-                let marker = if Some(&system.id) == state.active_system_id.as_ref() { "● " } else { "  " };
+            lines.push(Line::from(Span::styled("Available agents:", Style::default().fg(theme::text_muted()))));
+            for system in &state.agents {
+                let marker = if Some(&system.id) == state.active_agent_id.as_ref() { "● " } else { "  " };
                 lines.push(Line::from(vec![
                     Span::styled(marker, Style::default().fg(theme::accent())),
                     Span::styled(format!("[{}] ", system.id), Style::default().fg(theme::text_muted())),
@@ -71,7 +71,7 @@ impl Panel for PromptPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Only include if there's an active custom system prompt
         // Note: P0 (System) is filtered out by prepare_panel_messages() and stays as actual system prompt
-        if state.active_system_id.is_none() {
+        if state.active_agent_id.is_none() {
             return Vec::new();
         }
 
@@ -87,8 +87,8 @@ impl Panel for PromptPanel {
 
 impl PromptPanel {
     fn generate_context_content(&self, state: &State) -> String {
-        if let Some(active_id) = &state.active_system_id {
-            if let Some(system) = state.systems.iter().find(|s| s.id == *active_id) {
+        if let Some(active_id) = &state.active_agent_id {
+            if let Some(system) = state.agents.iter().find(|s| s.id == *active_id) {
                 return format!(
                     "[{}] {}\n\n{}",
                     system.id, system.name, system.content

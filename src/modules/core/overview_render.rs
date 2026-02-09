@@ -211,6 +211,8 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             ContextType::GitResult => "git-result",
             ContextType::GithubResult => "github-result",
             ContextType::Scratchpad => "scratchpad",
+            ContextType::Library => "library",
+            ContextType::Skill => "skill",
             ContextType::ConversationHistory => "chat-history",
         };
 
@@ -305,14 +307,14 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
     text
 }
 
-/// Render the SEEDS section (system prompts table).
+/// Render the AGENTS section (system prompts table).
 pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
-        Span::styled("SEEDS".to_string(), Style::default().fg(theme::text_muted()).bold()),
-        Span::styled(format!("  ({} available)", state.systems.len()), Style::default().fg(theme::text_muted())),
+        Span::styled("AGENTS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+        Span::styled(format!("  ({} available)", state.agents.len()), Style::default().fg(theme::text_muted())),
     ]));
     text.push(Line::from(""));
 
@@ -323,28 +325,28 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
         Cell::new("Description", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = state.systems.iter().map(|sys| {
-        let is_active = state.active_system_id.as_deref() == Some(&sys.id);
+    let rows: Vec<Vec<Cell>> = state.agents.iter().map(|agent| {
+        let is_active = state.active_agent_id.as_deref() == Some(&agent.id);
         let (active_str, active_color) = if is_active {
             ("\u{2713}", theme::success())
         } else {
             ("", theme::text_muted())
         };
 
-        let display_name = if sys.name.len() > 20 {
-            format!("{}...", &sys.name[..17])
+        let display_name = if agent.name.len() > 20 {
+            format!("{}...", &agent.name[..17])
         } else {
-            sys.name.clone()
+            agent.name.clone()
         };
 
-        let display_desc = if sys.description.len() > 35 {
-            format!("{}...", &sys.description[..32])
+        let display_desc = if agent.description.len() > 35 {
+            format!("{}...", &agent.description[..32])
         } else {
-            sys.description.clone()
+            agent.description.clone()
         };
 
         vec![
-            Cell::new(&sys.id, Style::default().fg(theme::accent_dim())),
+            Cell::new(&agent.id, Style::default().fg(theme::accent_dim())),
             Cell::new(display_name, Style::default().fg(theme::text())),
             Cell::new(active_str, Style::default().fg(active_color)),
             Cell::new(display_desc, Style::default().fg(theme::text_muted())),
@@ -352,6 +354,68 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
     }).collect();
 
     text.extend(render_table(&header, &rows, None, 1));
+
+    // Skills section
+    if !state.skills.is_empty() {
+        text.extend(separator());
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled("SKILLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+            Span::styled(format!("  ({} available, {} loaded)", state.skills.len(), state.loaded_skill_ids.len()), Style::default().fg(theme::text_muted())),
+        ]));
+        text.push(Line::from(""));
+
+        let skill_header = [
+            Cell::new("ID", Style::default()),
+            Cell::new("Name", Style::default()),
+            Cell::new("Loaded", Style::default()),
+            Cell::new("Description", Style::default()),
+        ];
+
+        let skill_rows: Vec<Vec<Cell>> = state.skills.iter().map(|skill| {
+            let is_loaded = state.loaded_skill_ids.contains(&skill.id);
+            let (loaded_str, loaded_color) = if is_loaded {
+                ("\u{2713}", theme::success())
+            } else {
+                ("", theme::text_muted())
+            };
+            vec![
+                Cell::new(&skill.id, Style::default().fg(theme::accent_dim())),
+                Cell::new(skill.name.clone(), Style::default().fg(theme::text())),
+                Cell::new(loaded_str, Style::default().fg(loaded_color)),
+                Cell::new(skill.description.clone(), Style::default().fg(theme::text_muted())),
+            ]
+        }).collect();
+
+        text.extend(render_table(&skill_header, &skill_rows, None, 1));
+    }
+
+    // Commands section
+    if !state.commands.is_empty() {
+        text.extend(separator());
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled("COMMANDS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+            Span::styled(format!("  ({} available)", state.commands.len()), Style::default().fg(theme::text_muted())),
+        ]));
+        text.push(Line::from(""));
+
+        let cmd_header = [
+            Cell::new("ID", Style::default()),
+            Cell::new("Name", Style::default()),
+            Cell::new("Description", Style::default()),
+        ];
+
+        let cmd_rows: Vec<Vec<Cell>> = state.commands.iter().map(|cmd| {
+            vec![
+                Cell::new(format!("/{}", cmd.id), Style::default().fg(theme::accent())),
+                Cell::new(cmd.name.clone(), Style::default().fg(theme::text())),
+                Cell::new(cmd.description.clone(), Style::default().fg(theme::text_muted())),
+            ]
+        }).collect();
+
+        text.extend(render_table(&cmd_header, &cmd_rows, None, 1));
+    }
 
     text
 }

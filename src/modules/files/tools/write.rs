@@ -94,6 +94,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_description: None,
             result_command: None,
             result_command_hash: None,
+            skill_prompt_id: None,
             cached_content: Some(contents.to_string()),
             history_messages: None,
             cache_deprecated: true,

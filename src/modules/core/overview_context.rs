@@ -28,6 +28,8 @@ pub fn generate_context_content(state: &State) -> String {
             ContextType::GitResult => "git-cmd",
             ContextType::GithubResult => "gh-cmd",
             ContextType::Scratchpad => "scratch",
+            ContextType::Library => "library",
+            ContextType::Skill => "skill",
             ContextType::ConversationHistory => "history",
         };
 
@@ -64,13 +66,32 @@ pub fn generate_context_content(state: &State) -> String {
         output.push_str(&format!("Memories: {}\n", state.memories.len()));
     }
 
-    // Available seeds (system prompts) for LLM
-    output.push_str("\nSeeds (System Prompts):\n\n");
+    // Prompt Library for LLM
+    output.push_str("\nAgents (System Prompts):\n\n");
     output.push_str("| ID | Name | Active | Description |\n");
     output.push_str("|-----|------|--------|-------------|\n");
-    for sys in &state.systems {
-        let active = if state.active_system_id.as_deref() == Some(&sys.id) { "✓" } else { " " };
-        output.push_str(&format!("| {} | {} | {} | {} |\n", sys.id, sys.name, active, sys.description));
+    for agent in &state.agents {
+        let active = if state.active_agent_id.as_deref() == Some(&agent.id) { "✓" } else { " " };
+        output.push_str(&format!("| {} | {} | {} | {} |\n", agent.id, agent.name, active, agent.description));
+    }
+
+    if !state.skills.is_empty() {
+        output.push_str("\nSkills:\n\n");
+        output.push_str("| ID | Name | Loaded | Description |\n");
+        output.push_str("|-----|------|--------|-------------|\n");
+        for skill in &state.skills {
+            let loaded = if state.loaded_skill_ids.contains(&skill.id) { "✓" } else { " " };
+            output.push_str(&format!("| {} | {} | {} | {} |\n", skill.id, skill.name, loaded, skill.description));
+        }
+    }
+
+    if !state.commands.is_empty() {
+        output.push_str("\nCommands:\n\n");
+        output.push_str("| ID | Name | Description |\n");
+        output.push_str("|-----|------|-------------|\n");
+        for cmd in &state.commands {
+            output.push_str(&format!("| /{} | {} | {} |\n", cmd.id, cmd.name, cmd.description));
+        }
     }
 
     // Presets table for LLM

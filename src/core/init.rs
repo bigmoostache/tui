@@ -1,8 +1,8 @@
 use crate::state::{ContextType, State};
 use crate::modules;
 
-// Re-export seed functions from system module for backwards compatibility
-pub use crate::modules::prompt::seed::{ensure_default_seed, get_active_seed_content};
+// Re-export agent/seed functions from prompt module
+pub use crate::modules::prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
@@ -38,9 +38,9 @@ pub fn ensure_default_contexts(state: &mut State) {
     }
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
-    // System panel doesn't need a UID (it's never stored as a separate panel file)
+    // System and Library panels don't need UIDs (they're never stored as separate panel files)
     for (_, _, ct, _, _) in &defaults {
-        if *ct != ContextType::System && state.context.iter().any(|c| c.context_type == *ct) {
+        if *ct != ContextType::System && *ct != ContextType::Library && state.context.iter().any(|c| c.context_type == *ct) {
             assign_panel_uid(state, *ct);
         }
     }

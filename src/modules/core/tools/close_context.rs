@@ -45,9 +45,18 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ctx = &state.context[idx];
 
         match ctx.context_type {
-            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git | ContextType::Scratchpad => {
+            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git | ContextType::Scratchpad | ContextType::Library => {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
+            }
+            ContextType::Skill => {
+                let name = ctx.name.clone();
+                // Remove from loaded_skill_ids
+                if let Some(skill_id) = ctx.skill_prompt_id.clone() {
+                    state.loaded_skill_ids.retain(|s| s != &skill_id);
+                }
+                state.context.remove(idx);
+                closed.push(format!("{} (skill: {})", id, name));
             }
             ContextType::ConversationHistory => {
                 let name = ctx.name.clone();

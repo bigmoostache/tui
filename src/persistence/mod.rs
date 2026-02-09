@@ -66,6 +66,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_description: panel.tmux_description.clone(),
         result_command: panel.result_command.clone(),
         result_command_hash: panel.result_command_hash.clone(),
+        skill_prompt_id: panel.skill_prompt_id.clone(),
         cached_content: None,
         history_messages: None,
         cache_deprecated: true,  // Will be refreshed on load
@@ -227,10 +228,10 @@ pub fn save_state(state: &State) {
         modules: global_modules,
     };
 
-    // Build important_panel_uids from fixed context elements (all except System)
+    // Build important_panel_uids from fixed context elements (all except System and Library)
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
-        if ctx.context_type.is_fixed() && ctx.context_type != ContextType::System {
+        if ctx.context_type.is_fixed() && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library {
             if let Some(uid) = &ctx.uid {
                 important_uids.insert(ctx.context_type, uid.clone());
             }
@@ -264,8 +265,8 @@ pub fn save_state(state: &State) {
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in state.context.iter() {
-        // Skip System panel (P0) - it comes from systems[] in SharedConfig
-        if ctx.context_type == ContextType::System {
+        // Skip System panel (P0) and Library panel (P8) — both are derived from state, not panels/
+        if ctx.context_type == ContextType::System || ctx.context_type == ContextType::Library {
             continue;
         }
 
@@ -297,6 +298,7 @@ pub fn save_state(state: &State) {
                 tmux_description: ctx.tmux_description.clone(),
                 result_command: ctx.result_command.clone(),
                 result_command_hash: ctx.result_command_hash.clone(),
+                skill_prompt_id: ctx.skill_prompt_id.clone(),
             };
             panel::save_panel(&panel_data);
         }

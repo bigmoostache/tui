@@ -261,7 +261,7 @@ pub(crate) fn render_message(
 }
 
 /// Render input area to lines
-pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style) -> Vec<Line<'static>> {
+pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style, command_ids: &[String]) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let role_icon = icons::msg_user();
     let role_color = theme::user();
@@ -295,16 +295,7 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
             let wrapped = wrap_text(line, wrap_width);
             for line_text in wrapped.iter() {
-                let spans = if line_text.contains(cursor_char) {
-                    let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
-                    vec![
-                        Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
-                        Span::styled(cursor_char, Style::default().fg(theme::accent()).bold()),
-                        Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
-                    ]
-                } else {
-                    vec![Span::styled(line_text.clone(), Style::default().fg(theme::text()))]
-                };
+                let spans = build_input_spans(line_text, cursor_char, command_ids);
 
                 if is_first_line {
                     let mut line_spans = vec![
@@ -332,4 +323,35 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
     }
     lines.push(Line::from(""));
     lines
+}
+
+/// Build spans for a single input line, with cursor and command highlighting.
+fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String]) -> Vec<Span<'static>> {
+    // Check if this line starts with a recognized /command
+    let trimmed = line_text.trim_start();
+    let is_command = if trimmed.starts_with('/') && !command_ids.is_empty() {
+        let token = &trimmed[1..];
+        let cmd_id = match token.find(|c: char| c.is_whitespace() || token.contains(cursor_char)) {
+            Some(pos) => &token[..pos],
+            None => token,
+        };
+        // Strip cursor char from cmd_id for matching
+        let clean_id = cmd_id.replace(cursor_char, "");
+        command_ids.iter().any(|id| id == &clean_id)
+    } else {
+        false
+    };
+
+    let text_color = if is_command { theme::accent() } else { theme::text() };
+
+    if line_text.contains(cursor_char) {
+        let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
+        vec![
+            Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(text_color)),
+            Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()),
+            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(text_color)),
+        ]
+    } else {
+        vec![Span::styled(line_text.to_string(), Style::default().fg(text_color))]
+    }
 }

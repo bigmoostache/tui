@@ -39,7 +39,7 @@ It explores your codebase on its own. It opens files, reads them, takes notes, c
 | Terminal integration | Embedded terminal | Spawns processes | No | **Full tmux pane management** |
 | File exploration | File tree | Auto-read | Manual add | **Glob, grep, tree with annotations** |
 | Git workflow | Basic | Good | Great | **Full git + GitHub CLI with cache invalidation** |
-| Memory across turns | None | CLAUDE.md | None | **Persistent memories, todos, scratchpad** |
+| Memory across turns | None | CLAUDE.md | None | **Persistent memories, todos, scratchpad, prompt library** |
 | Multi-provider | No | Claude only | Many | **Claude, DeepSeek, Grok, Groq** |
 | Architecture | Plugin / Cloud | CLI | Python | **Rust TUI, single binary, ~50ms frames** |
 
@@ -66,7 +66,7 @@ Tracks every token in real-time. When things get heavy, it summarizes old messag
 |----------|-------|-------------|
 | **Context** | `context_close`, `context_message_status`, `system_reload`, `tool_manage`, `module_toggle`, `panel_goto_page` | Manage what's in the AI's working memory |
 | **System Prompts** | `system_create`, `system_edit`, `system_delete`, `system_load` | Create and switch between AI personalities |
-| **Files** | `file_open`, `file_edit`, `file_write`, `file_create`, `file_batch_create` | Full file system access with syntax highlighting |
+| **Files** | `file_open`, `file_edit`, `file_write` | Full file system access with syntax highlighting |
 | **Search** | `file_glob`, `file_grep` | Find files by pattern, search contents with regex |
 | **Tree** | `tree_filter`, `tree_toggle`, `tree_describe` | Directory exploration with persistent annotations |
 | **Git** | `git_execute`, `git_configure_p6` | Full git CLI with smart cache invalidation |

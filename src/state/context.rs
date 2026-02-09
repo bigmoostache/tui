@@ -19,6 +19,8 @@ pub enum ContextType {
     GitResult,
     GithubResult,
     Scratchpad,
+    Library,
+    Skill,
     ConversationHistory,
 }
 
@@ -45,6 +47,8 @@ impl ContextType {
             ContextType::GitResult => icons::ctx_git(),
             ContextType::GithubResult => icons::ctx_git(),
             ContextType::Scratchpad => icons::ctx_scratchpad(),
+            ContextType::Library => icons::ctx_library(),
+            ContextType::Skill => icons::ctx_skill(),
             ContextType::ConversationHistory => icons::ctx_conversation(),
         }
     }
@@ -107,6 +111,9 @@ pub struct ContextElement {
     /// SHA-256 hash of result_command (for dedup)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_command_hash: Option<String>,
+    /// Skill prompt ID (links to PromptItem.id for Skill panels)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_prompt_id: Option<String>,
 
     // === Caching fields (not persisted) ===
     /// Cached content for LLM context and UI rendering

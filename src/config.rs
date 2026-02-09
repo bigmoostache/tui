@@ -9,12 +9,23 @@ use std::fs;
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct PromptsConfig {
     pub seeds: Vec<SeedEntry>,
     pub default_seed_id: String,
     pub tldr_prompt: String,
     pub tldr_min_tokens: usize,
     pub panel: PanelPrompts,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LibraryConfig {
+    pub default_agent_id: String,
+    pub agents: Vec<SeedEntry>,
+    #[serde(default)]
+    pub skills: Vec<SeedEntry>,
+    #[serde(default)]
+    pub commands: Vec<SeedEntry>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -161,6 +172,7 @@ fn load_yaml<T: for<'de> Deserialize<'de>>(path: &str) -> T {
 
 lazy_static! {
     pub static ref PROMPTS: PromptsConfig = load_yaml("yamls/prompts.yaml");
+    pub static ref LIBRARY: LibraryConfig = load_yaml("yamls/library.yaml");
     pub static ref UI: UiConfig = load_yaml("yamls/ui.yaml");
     pub static ref THEMES: ThemesConfig = load_yaml("yamls/themes.yaml");
 }
