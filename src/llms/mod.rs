@@ -456,7 +456,7 @@ pub fn panel_header_text() -> &'static str {
 
 /// Generate the timestamp text for an individual panel
 /// Handles zero/unknown timestamps gracefully
-pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
+pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
     use crate::constants::prompts;
 
     // Check for zero/invalid timestamp (1970-01-01 or very old)
@@ -466,15 +466,9 @@ pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
     }
 
     let iso_time = ms_to_iso8601(timestamp_ms);
-    let time_delta = if current_ms > timestamp_ms {
-        format_time_delta(current_ms - timestamp_ms)
-    } else {
-        "just now".to_string()
-    };
 
     prompts::panel_timestamp()
         .replace("{iso_time}", &iso_time)
-        .replace("{time_delta}", &time_delta)
 }
 
 /// Generate the footer text for dynamic panel display, including message timestamps

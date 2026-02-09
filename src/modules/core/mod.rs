@@ -1,4 +1,5 @@
 pub mod conversation;
+mod conversation_history_panel;
 mod conversation_panel;
 mod overview_panel;
 mod tools;
@@ -119,6 +120,10 @@ impl Module for CoreModule {
         ]
     }
 
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![ContextType::ConversationHistory]
+    }
+
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![
             (ContextType::Conversation, "Chat", true),
@@ -130,6 +135,9 @@ impl Module for CoreModule {
         match context_type {
             ContextType::Conversation => Some(Box::new(ConversationPanel)),
             ContextType::Overview => Some(Box::new(OverviewPanel)),
+            ContextType::ConversationHistory => Some(Box::new(
+                conversation_history_panel::ConversationHistoryPanel,
+            )),
             _ => None,
         }
     }

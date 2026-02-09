@@ -300,7 +300,7 @@ impl LlmClient for ClaudeCodeClient {
 
         if !fake_panels.is_empty() {
             for (idx, panel) in fake_panels.iter().enumerate() {
-                let timestamp_text = panel_timestamp_text(panel.timestamp_ms, current_ms);
+                let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
                 let text = if idx == 0 {
                     format!("{}\n\n{}", panel_header_text(), timestamp_text)
                 } else {
@@ -369,13 +369,13 @@ impl LlmClient for ClaudeCodeClient {
         // First pass: collect tool_use IDs that have matching results (will be included)
         let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
+            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached || msg.message_type != MessageType::ToolCall {
                 continue;
             }
             let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
             let has_result = request.messages[idx + 1..]
                 .iter()
-                .filter(|m| m.status != MessageStatus::Deleted && m.message_type == MessageType::ToolResult)
+                .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached && m.message_type == MessageType::ToolResult)
                 .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
             if has_result {
                 for id in tool_use_ids {
@@ -385,7 +385,7 @@ impl LlmClient for ClaudeCodeClient {
         }
 
         for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted {
+            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
                 continue;
             }
             if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {

@@ -24,6 +24,10 @@ pub const API_VERSION: &str = "2023-06-01";
 /// Average characters per token for token estimation
 pub const CHARS_PER_TOKEN: f32 = 4.0;
 
+/// Token threshold for detaching oldest messages into a ConversationHistory panel.
+/// When non-detached conversation tokens exceed this, a chunk is carved off.
+pub const TOKEN_DETACH_COUNT: usize = 4000;
+
 // =============================================================================
 // SCROLLING
 // =============================================================================

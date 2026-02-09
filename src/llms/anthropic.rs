@@ -356,7 +356,7 @@ fn messages_to_api(
     if !fake_panels.is_empty() {
         // Add header as first panel's text
         for (idx, panel) in fake_panels.iter().enumerate() {
-            let timestamp_text = panel_timestamp_text(panel.timestamp_ms, current_ms);
+            let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
             let text = if idx == 0 {
                 // First panel includes the header
                 format!("{}\n\n{}", panel_header_text(), timestamp_text)
@@ -426,7 +426,7 @@ fn messages_to_api(
     }
 
     for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MessageStatus::Deleted {
+        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
             continue;
         }
 
@@ -459,7 +459,7 @@ fn messages_to_api(
 
             let has_matching_tool_result = messages[idx + 1..]
                 .iter()
-                .filter(|m| m.status != MessageStatus::Deleted)
+                .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
                 .filter(|m| m.message_type == MessageType::ToolResult)
                 .any(|m| {
                     m.tool_results

@@ -25,6 +25,7 @@ impl ConversationPanel {
             MessageStatus::Full => 0u8,
             MessageStatus::Summarized => 1,
             MessageStatus::Deleted => 2,
+            MessageStatus::Detached => 3,
         };
         let tl_dr_str = msg.tl_dr.as_deref().unwrap_or("");
         let tool_uses_len = msg.tool_uses.len();
@@ -144,7 +145,7 @@ impl ConversationPanel {
         let status_icon = match msg.status {
             MessageStatus::Full => icons::status_full(),
             MessageStatus::Summarized => icons::status_summarized(),
-            MessageStatus::Deleted => icons::status_deleted(),
+            MessageStatus::Deleted | MessageStatus::Detached => icons::status_deleted(),
         };
 
         let content = match msg.status {

@@ -67,6 +67,7 @@ pub enum ContextType {
     GitResult,
     GithubResult,
     Scratchpad,
+    ConversationHistory,
 }
 
 impl ContextType {
@@ -92,6 +93,7 @@ impl ContextType {
             ContextType::GitResult => icons::ctx_git(),
             ContextType::GithubResult => icons::ctx_git(),
             ContextType::Scratchpad => icons::ctx_scratchpad(),
+            ContextType::ConversationHistory => icons::ctx_conversation(),
         }
     }
 
@@ -208,6 +210,7 @@ pub enum MessageStatus {
     Full,
     Summarized,
     Deleted,
+    Detached,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

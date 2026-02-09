@@ -301,6 +301,7 @@ impl Panel for OverviewPanel {
                 ContextType::GitResult => "git-result",
                 ContextType::GithubResult => "github-result",
                 ContextType::Scratchpad => "scratchpad",
+                ContextType::ConversationHistory => "chat-history",
             };
 
             let details = match ctx.context_type {
@@ -651,6 +652,7 @@ impl OverviewPanel {
                 ContextType::GitResult => "git-cmd",
                 ContextType::GithubResult => "gh-cmd",
                 ContextType::Scratchpad => "scratch",
+                ContextType::ConversationHistory => "history",
             };
 
             let details = match ctx.context_type {
