@@ -1,6 +1,11 @@
 pub mod conversation;
+mod conversation_history_panel;
+mod conversation_list;
 mod conversation_panel;
+pub(crate) mod conversation_render;
+mod overview_context;
 mod overview_panel;
+mod overview_render;
 mod tools;
 
 use serde_json::json;
@@ -36,6 +41,9 @@ impl Module for CoreModule {
             "cleaning_target_proportion": state.cleaning_target_proportion,
             "context_budget": state.context_budget,
             "global_next_uid": state.global_next_uid,
+            "cache_hit_tokens": state.cache_hit_tokens,
+            "cache_miss_tokens": state.cache_miss_tokens,
+            "total_output_tokens": state.total_output_tokens,
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
         })
     }
@@ -86,6 +94,15 @@ impl Module for CoreModule {
         if let Some(v) = data.get("global_next_uid").and_then(|v| v.as_u64()) {
             state.global_next_uid = v as usize;
         }
+        if let Some(v) = data.get("cache_hit_tokens").and_then(|v| v.as_u64()) {
+            state.cache_hit_tokens = v as usize;
+        }
+        if let Some(v) = data.get("cache_miss_tokens").and_then(|v| v.as_u64()) {
+            state.cache_miss_tokens = v as usize;
+        }
+        if let Some(v) = data.get("total_output_tokens").and_then(|v| v.as_u64()) {
+            state.total_output_tokens = v as usize;
+        }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
             let disabled: Vec<String> = arr.iter()
                 .filter_map(|v| v.as_str().map(String::from))
@@ -107,6 +124,10 @@ impl Module for CoreModule {
         ]
     }
 
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![ContextType::ConversationHistory]
+    }
+
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![
             (ContextType::Conversation, "Chat", true),
@@ -118,6 +139,9 @@ impl Module for CoreModule {
         match context_type {
             ContextType::Conversation => Some(Box::new(ConversationPanel)),
             ContextType::Overview => Some(Box::new(OverviewPanel)),
+            ContextType::ConversationHistory => Some(Box::new(
+                conversation_history_panel::ConversationHistoryPanel,
+            )),
             _ => None,
         }
     }

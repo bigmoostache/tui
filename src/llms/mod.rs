@@ -7,6 +7,7 @@ pub mod claude_code;
 pub mod deepseek;
 pub mod grok;
 pub mod groq;
+pub mod openai_compat;
 
 use std::sync::mpsc::Sender;
 
@@ -26,7 +27,7 @@ pub enum StreamEvent {
     /// Tool use request from the LLM
     ToolUse(ToolUse),
     /// Stream completed with token usage
-    Done { input_tokens: usize, output_tokens: usize, stop_reason: Option<String> },
+    Done { input_tokens: usize, output_tokens: usize, cache_hit_tokens: usize, cache_miss_tokens: usize, stop_reason: Option<String> },
     /// Error occurred
     Error(String),
 }
@@ -54,10 +55,14 @@ pub trait ModelInfo {
     fn display_name(&self) -> &'static str;
     /// Maximum context window in tokens
     fn context_window(&self) -> usize;
-    /// Input price per million tokens in USD
+    /// Input price per million tokens in USD (used for cache miss / uncached input)
     fn input_price_per_mtok(&self) -> f32;
     /// Output price per million tokens in USD
     fn output_price_per_mtok(&self) -> f32;
+    /// Cache hit price per million tokens in USD (default: same as input)
+    fn cache_hit_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 0.1 }
+    /// Cache write/miss price per million tokens in USD (default: 1.25x input)
+    fn cache_miss_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 1.25 }
 }
 
 /// Available LLM providers
@@ -117,6 +122,22 @@ impl ModelInfo for AnthropicModel {
             AnthropicModel::ClaudeOpus45 => 25.0,
             AnthropicModel::ClaudeSonnet45 => 15.0,
             AnthropicModel::ClaudeHaiku45 => 5.0,
+        }
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self {
+            AnthropicModel::ClaudeOpus45 => 0.50,
+            AnthropicModel::ClaudeSonnet45 => 0.30,
+            AnthropicModel::ClaudeHaiku45 => 0.10,
+        }
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self {
+            AnthropicModel::ClaudeOpus45 => 6.25,
+            AnthropicModel::ClaudeSonnet45 => 3.75,
+            AnthropicModel::ClaudeHaiku45 => 1.25,
         }
     }
 }
@@ -256,6 +277,14 @@ impl ModelInfo for DeepSeekModel {
 
     fn output_price_per_mtok(&self) -> f32 {
         0.42
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        0.028
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        0.28
     }
 }
 
@@ -456,7 +485,7 @@ pub fn panel_header_text() -> &'static str {
 
 /// Generate the timestamp text for an individual panel
 /// Handles zero/unknown timestamps gracefully
-pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
+pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
     use crate::constants::prompts;
 
     // Check for zero/invalid timestamp (1970-01-01 or very old)
@@ -466,15 +495,9 @@ pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
     }
 
     let iso_time = ms_to_iso8601(timestamp_ms);
-    let time_delta = if current_ms > timestamp_ms {
-        format_time_delta(current_ms - timestamp_ms)
-    } else {
-        "just now".to_string()
-    };
 
     prompts::panel_timestamp()
         .replace("{iso_time}", &iso_time)
-        .replace("{time_delta}", &time_delta)
 }
 
 /// Generate the footer text for dynamic panel display, including message timestamps

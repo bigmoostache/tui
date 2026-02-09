@@ -1,5 +1,9 @@
-use crate::core::panels::{collect_all_context, refresh_all_panels, ContextItem};
-use crate::state::{Message, State};
+use crate::core::panels::{collect_all_context, now_ms, refresh_all_panels, ContextItem};
+use crate::constants::{DETACH_CHUNK_MESSAGES, DETACH_KEEP_MESSAGES};
+use crate::state::{
+    compute_total_pages, estimate_tokens, ContextElement, ContextType,
+    Message, MessageStatus, MessageType, State,
+};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::refresh_conversation_context;
 
@@ -12,6 +16,9 @@ pub struct StreamContext {
 
 /// Refresh all context elements and prepare data for streaming
 pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> StreamContext {
+    // Detach old conversation chunks before anything else
+    detach_conversation_chunks(state);
+
     // Refresh conversation token counts (not panel-based yet)
     refresh_conversation_context(state);
 
@@ -47,5 +54,198 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
         messages,
         context_items,
         tools: state.tools.clone(),
+    }
+}
+
+// ─── Conversation History Detachment ────────────────────────────────────────
+
+/// Check if `idx` is a turn boundary — a safe place to split the conversation.
+/// A turn boundary is after a complete assistant turn:
+/// - After an assistant text message (not a tool call)
+/// - After a tool result, IF the next message is a user text message (end of tool loop)
+/// - After a tool result that is the last message (shouldn't happen but handle gracefully)
+fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
+    let msg = &messages[idx];
+
+    // Skip Deleted/Detached messages — not meaningful boundaries
+    if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+        return false;
+    }
+
+    // After an assistant text message (not a tool call)
+    if msg.role == "assistant" && msg.message_type == MessageType::TextMessage {
+        return true;
+    }
+
+    // After a tool result, if next non-skipped message is a user text message
+    if msg.message_type == MessageType::ToolResult {
+        for next in &messages[idx + 1..] {
+            if next.status == MessageStatus::Deleted || next.status == MessageStatus::Detached {
+                continue;
+            }
+            return next.role == "user" && next.message_type == MessageType::TextMessage;
+        }
+        return true; // Last message in conversation
+    }
+
+    false
+}
+
+/// Format a range of messages into a text chunk for the ConversationHistory panel.
+/// Uses the same `[ID]:\ncontent` format the LLM sees in conversation messages.
+fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
+    let mut output = String::new();
+    for msg in &messages[start..end] {
+        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+            continue;
+        }
+        match msg.message_type {
+            MessageType::ToolCall => {
+                for tu in &msg.tool_uses {
+                    output += &format!(
+                        "[{}]: tool_call {}({})\n",
+                        msg.id,
+                        tu.name,
+                        serde_json::to_string(&tu.input).unwrap_or_default()
+                    );
+                }
+            }
+            MessageType::ToolResult => {
+                for tr in &msg.tool_results {
+                    output += &format!("[{}]:\n{}\n", msg.id, tr.content);
+                }
+            }
+            MessageType::TextMessage => {
+                let content = match msg.status {
+                    MessageStatus::Summarized => {
+                        msg.tl_dr.as_deref().unwrap_or(&msg.content)
+                    }
+                    _ => &msg.content,
+                };
+                if !content.is_empty() {
+                    output += &format!("[{}]:\n{}\n", msg.id, content);
+                }
+            }
+        }
+    }
+    output
+}
+
+/// Detach oldest conversation messages into frozen ConversationHistory panels
+/// when the active message count exceeds DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES.
+pub fn detach_conversation_chunks(state: &mut State) {
+    loop {
+        // 1. Count active (non-Deleted, non-Detached) messages
+        let active_count = state.messages.iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .count();
+
+        // 2. If within limits, nothing to detach
+        if active_count <= DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES {
+            break;
+        }
+
+        // 3. Walk from oldest, count DETACH_CHUNK_MESSAGES active messages,
+        //    then snap forward to the nearest turn boundary.
+        let mut active_seen = 0usize;
+        let mut boundary = None;
+
+        for (idx, msg) in state.messages.iter().enumerate() {
+            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+                continue;
+            }
+            active_seen += 1;
+
+            if active_seen >= DETACH_CHUNK_MESSAGES && is_turn_boundary(&state.messages, idx) {
+                boundary = Some(idx + 1); // exclusive end
+                break;
+            }
+        }
+
+        let boundary = match boundary {
+            Some(b) if b > 0 => b,
+            _ => break, // No valid boundary found, bail
+        };
+
+        // 3b. Safety check: ensure enough active messages remain after detachment
+        let remaining_active = state.messages[boundary..].iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .count();
+        if remaining_active < DETACH_KEEP_MESSAGES {
+            break;
+        }
+
+        // 4. Collect message IDs for the chunk name
+        let first_id = state.messages[..boundary].iter()
+            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .map(|m| m.id.clone())
+            .unwrap_or_default();
+        let last_id = state.messages[..boundary].iter().rev()
+            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .map(|m| m.id.clone())
+            .unwrap_or_default();
+
+        // 5. Collect Message objects for UI rendering + format chunk content for LLM
+        let history_msgs: Vec<Message> = state.messages[..boundary].iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .cloned()
+            .collect();
+
+        let content = format_chunk_content(&state.messages, 0, boundary);
+        if content.is_empty() {
+            break; // Nothing useful to detach
+        }
+
+        // 6. Get timestamp from first active message (for sort ordering — oldest first)
+        let chunk_timestamp = state.messages[..boundary].iter()
+            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .map(|m| m.timestamp_ms)
+            .unwrap_or_else(now_ms);
+
+        // 7. Create the ConversationHistory panel
+        let panel_id = state.next_available_context_id();
+        let token_count = estimate_tokens(&content);
+        let total_pages = compute_total_pages(token_count);
+        let chunk_name = format!("Chat [{}–{}]", first_id, last_id);
+
+        state.context.push(ContextElement {
+            id: panel_id,
+            uid: None,
+            context_type: ContextType::ConversationHistory,
+            name: chunk_name,
+            token_count,
+            file_path: None,
+            file_hash: None,
+            glob_pattern: None,
+            glob_path: None,
+            grep_pattern: None,
+            grep_path: None,
+            grep_file_pattern: None,
+            tmux_pane_id: None,
+            tmux_lines: None,
+            tmux_last_keys: None,
+            tmux_description: None,
+            result_command: None,
+            result_command_hash: None,
+            cached_content: Some(content),
+            history_messages: Some(history_msgs),
+            cache_deprecated: false,
+            last_refresh_ms: chunk_timestamp,
+            content_hash: None,
+            tmux_last_lines_hash: None,
+            current_page: 0,
+            total_pages,
+            full_token_count: token_count,
+        });
+
+        // 8. Remove detached messages from state and disk
+        let removed: Vec<Message> = state.messages.drain(..boundary).collect();
+        for msg in &removed {
+            if let Some(uid) = &msg.uid {
+                crate::persistence::delete_message(uid);
+            }
+        }
+
+        // Loop to check if remaining messages still exceed threshold
     }
 }

@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
+use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
@@ -45,7 +45,8 @@ impl Panel for TreePanel {
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
         ctx.cache_deprecated = false;
-        ctx.last_refresh_ms = now_ms();
+        let content_ref = ctx.cached_content.clone().unwrap_or_default();
+        update_if_changed(ctx, &content_ref);
         true
     }
 

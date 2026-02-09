@@ -261,18 +261,26 @@ struct StreamDelta {
 }
 
 #[derive(Debug, Deserialize)]
+struct StreamMessageBody {
+    usage: Option<StreamUsage>,
+}
+
+#[derive(Debug, Deserialize)]
 struct StreamMessage {
     #[serde(rename = "type")]
     event_type: String,
     content_block: Option<StreamContentBlock>,
     delta: Option<StreamDelta>,
     usage: Option<StreamUsage>,
+    message: Option<StreamMessageBody>,
 }
 
 #[derive(Debug, Deserialize)]
 struct StreamUsage {
     input_tokens: Option<usize>,
     output_tokens: Option<usize>,
+    cache_creation_input_tokens: Option<usize>,
+    cache_read_input_tokens: Option<usize>,
 }
 
 impl LlmClient for ClaudeCodeClient {
@@ -299,8 +307,19 @@ impl LlmClient for ClaudeCodeClient {
         let fake_panels = prepare_panel_messages(&request.context_items);
 
         if !fake_panels.is_empty() {
+            // Calculate cache breakpoint positions at 25%, 50%, 75%, 100% of panels.
+            // Prefix-based caching means each breakpoint caches everything before it,
+            // so spreading them across panels maximizes partial cache hits when only
+            // later panels change. Uses ceiling division to distribute evenly.
+            let panel_count = fake_panels.len();
+            let mut cache_breakpoints = std::collections::BTreeSet::new();
+            for quarter in 1..=4usize {
+                let pos = (panel_count * quarter + 3) / 4; // ceiling(panel_count * quarter / 4)
+                cache_breakpoints.insert(pos.saturating_sub(1));
+            }
+
             for (idx, panel) in fake_panels.iter().enumerate() {
-                let timestamp_text = panel_timestamp_text(panel.timestamp_ms, current_ms);
+                let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
                 let text = if idx == 0 {
                     format!("{}\n\n{}", panel_header_text(), timestamp_text)
                 } else {
@@ -321,14 +340,18 @@ impl LlmClient for ClaudeCodeClient {
                     ]
                 }));
 
-                // User message with tool_result
+                // User message with tool_result (cache_control at breakpoint positions)
+                let mut tool_result = serde_json::json!({
+                    "type": "tool_result",
+                    "tool_use_id": format!("panel_{}", panel.panel_id),
+                    "content": panel.content
+                });
+                if cache_breakpoints.contains(&idx) {
+                    tool_result["cache_control"] = serde_json::json!({"type": "ephemeral"});
+                }
                 json_messages.push(serde_json::json!({
                     "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": format!("panel_{}", panel.panel_id),
-                        "content": panel.content
-                    }]
+                    "content": [tool_result]
                 }));
             }
 
@@ -369,13 +392,13 @@ impl LlmClient for ClaudeCodeClient {
         // First pass: collect tool_use IDs that have matching results (will be included)
         let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
+            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached || msg.message_type != MessageType::ToolCall {
                 continue;
             }
             let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
             let has_result = request.messages[idx + 1..]
                 .iter()
-                .filter(|m| m.status != MessageStatus::Deleted && m.message_type == MessageType::ToolResult)
+                .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached && m.message_type == MessageType::ToolResult)
                 .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
             if has_result {
                 for id in tool_use_ids {
@@ -385,7 +408,7 @@ impl LlmClient for ClaudeCodeClient {
         }
 
         for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted {
+            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
                 continue;
             }
             if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
@@ -515,7 +538,7 @@ impl LlmClient for ClaudeCodeClient {
         // Inject system-reminder into first user message for Claude Code validation
         inject_system_reminder(&mut json_messages);
 
-        // Build final request using json!() macro (matching Python exactly)
+        // Build final request (cache_control breakpoints are on panel tool_results above)
         let api_request = serde_json::json!({
             "model": map_model_name(&request.model),
             "max_tokens": MAX_RESPONSE_TOKENS,
@@ -561,6 +584,8 @@ impl LlmClient for ClaudeCodeClient {
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
+        let mut cache_hit_tokens = 0;
+        let mut cache_miss_tokens = 0;
         let mut current_tool: Option<(String, String, String)> = None;
         let mut stop_reason: Option<String> = None;
 
@@ -615,6 +640,21 @@ impl LlmClient for ClaudeCodeClient {
                             let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                         }
                     }
+                    "message_start" => {
+                        if let Some(msg_body) = event.message {
+                            if let Some(usage) = msg_body.usage {
+                                if let Some(hit) = usage.cache_read_input_tokens {
+                                    cache_hit_tokens = hit;
+                                }
+                                if let Some(miss) = usage.cache_creation_input_tokens {
+                                    cache_miss_tokens = miss;
+                                }
+                                if let Some(inp) = usage.input_tokens {
+                                    input_tokens = inp;
+                                }
+                            }
+                        }
+                    }
                     "message_delta" => {
                         if let Some(ref delta) = event.delta {
                             if let Some(ref reason) = delta.stop_reason {
@@ -639,6 +679,8 @@ impl LlmClient for ClaudeCodeClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
+            cache_hit_tokens,
+            cache_miss_tokens,
             stop_reason,
         });
         Ok(())

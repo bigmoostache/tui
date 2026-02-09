@@ -3,7 +3,7 @@ use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
 use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
-use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
+use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
@@ -43,7 +43,8 @@ impl Panel for GithubResultPanel {
                     ctx.token_count = token_count;
                 }
                 ctx.cache_deprecated = false;
-                ctx.last_refresh_ms = now_ms();
+                let content_ref = ctx.cached_content.clone().unwrap_or_default();
+                update_if_changed(ctx, &content_ref);
                 let _ = is_error;
                 true
             }

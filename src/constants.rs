@@ -22,7 +22,13 @@ pub const API_VERSION: &str = "2023-06-01";
 // =============================================================================
 
 /// Average characters per token for token estimation
-pub const CHARS_PER_TOKEN: f32 = 4.0;
+pub const CHARS_PER_TOKEN: f32 = 3.3;
+
+/// Number of oldest active messages to carve off into a ConversationHistory panel.
+pub const DETACH_CHUNK_MESSAGES: usize = 25;
+
+/// Minimum messages to keep in the live conversation after detachment.
+pub const DETACH_KEEP_MESSAGES: usize = 10;
 
 // =============================================================================
 // SCROLLING
@@ -190,6 +196,9 @@ pub mod chars {
     pub const BLOCK_LIGHT: &str = "░";
     pub const DOT: &str = "●";
     pub const ARROW_RIGHT: &str = "▸";
+    pub const ARROW_UP: &str = "↑";
+    pub const ARROW_DOWN: &str = "↓";
+    pub const CROSS: &str = "✗";
 }
 
 // =============================================================================

@@ -6,7 +6,7 @@ use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
 use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
-use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
+use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
@@ -233,12 +233,12 @@ impl Panel for GitPanel {
                     ctx.token_count = token_count;
                 }
                 ctx.cache_deprecated = false;
-                ctx.last_refresh_ms = now_ms();
+                let content_ref = ctx.cached_content.clone().unwrap_or_default();
+                update_if_changed(ctx, &content_ref);
                 true
             }
             CacheUpdate::GitStatusUnchanged => {
-                ctx.last_refresh_ms = now_ms();
-                false // No actual content change
+                false // No actual content change — don't bump timestamp
             }
             _ => false,
         }
@@ -850,7 +850,8 @@ impl Panel for GitResultPanel {
                     ctx.token_count = token_count;
                 }
                 ctx.cache_deprecated = false;
-                ctx.last_refresh_ms = now_ms();
+                let content_ref = ctx.cached_content.clone().unwrap_or_default();
+                update_if_changed(ctx, &content_ref);
                 let _ = is_error; // could style differently in future
                 true
             }

@@ -161,6 +161,119 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     }
     lines.push(Line::from(bar_spans));
 
+    // Separator before token stats
+    lines.push(Line::from(""));
+
+    // Token stats (cache hit / cache miss / output) — only when any value is non-zero
+    if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
+        // Get current model pricing
+        let hit_price = state.cache_hit_price_per_mtok();
+        let miss_price = state.cache_miss_price_per_mtok();
+        let out_price = state.output_price_per_mtok();
+
+        // Helper: format cost in dollars with appropriate precision
+        let format_cost = |tokens: usize, price_per_mtok: f32| -> String {
+            let cost = crate::state::State::token_cost(tokens, price_per_mtok);
+            if cost < 0.001 {
+                String::new()
+            } else if cost < 0.01 {
+                format!("{:.3}", cost)
+            } else if cost < 1.0 {
+                format!("{:.2}", cost)
+            } else {
+                format!("{:.1}", cost)
+            }
+        };
+
+        // Build table rows: each row has [label, ↑hit, ✗miss, ↓out]
+        // We interleave counts rows and costs rows
+        let hit_icon = format!("{}", chars::ARROW_UP);
+        let miss_icon = format!("{}", chars::CROSS);
+        let out_icon = format!("{}", chars::ARROW_DOWN);
+
+        let header = [
+            Cell::new("", Style::default()),
+            Cell::right(format!("{} hit", hit_icon), Style::default().fg(theme::success())),
+            Cell::right(format!("{} miss", miss_icon), Style::default().fg(theme::warning())),
+            Cell::right(format!("{} out", out_icon), Style::default().fg(theme::accent_dim())),
+        ];
+
+        let mut rows: Vec<Vec<Cell>> = Vec::new();
+
+        // Helper to build a counts row
+        let counts_row = |label: &str, hit: usize, miss: usize, out: usize| -> Vec<Cell> {
+            vec![
+                Cell::new(label, Style::default().fg(theme::text_muted())),
+                Cell::right(format_number(hit), Style::default().fg(theme::success())),
+                Cell::right(format_number(miss), Style::default().fg(theme::warning())),
+                Cell::right(format_number(out), Style::default().fg(theme::accent_dim())),
+            ]
+        };
+
+        // Helper to build a costs row
+        let costs_row = |hit: usize, miss: usize, out: usize| -> Option<Vec<Cell>> {
+            let hit_cost = format_cost(hit, hit_price);
+            let miss_cost = format_cost(miss, miss_price);
+            let out_cost = format_cost(out, out_price);
+
+            if hit_cost.is_empty() && miss_cost.is_empty() && out_cost.is_empty() {
+                return None;
+            }
+
+            let fmt = |cost: &str| -> String {
+                if cost.is_empty() { String::new() } else { format!("${}", cost) }
+            };
+
+            Some(vec![
+                Cell::new("", Style::default()),
+                Cell::right(fmt(&hit_cost), Style::default().fg(theme::text_muted())),
+                Cell::right(fmt(&miss_cost), Style::default().fg(theme::text_muted())),
+                Cell::right(fmt(&out_cost), Style::default().fg(theme::text_muted())),
+            ])
+        };
+
+        // tot row
+        rows.push(counts_row("tot", state.cache_hit_tokens, state.cache_miss_tokens, state.total_output_tokens));
+        if let Some(row) = costs_row(state.cache_hit_tokens, state.cache_miss_tokens, state.total_output_tokens) {
+            rows.push(row);
+        }
+
+        // strm row
+        if state.stream_output_tokens > 0 || state.stream_cache_hit_tokens > 0 || state.stream_cache_miss_tokens > 0 {
+            rows.push(counts_row("strm", state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens));
+            if let Some(row) = costs_row(state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens) {
+                rows.push(row);
+            }
+        }
+
+        // tick row
+        if state.tick_output_tokens > 0 || state.tick_cache_hit_tokens > 0 || state.tick_cache_miss_tokens > 0 {
+            rows.push(counts_row("tick", state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens));
+            if let Some(row) = costs_row(state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens) {
+                rows.push(row);
+            }
+        }
+
+        lines.extend(render_table(&header, &rows, None, 1));
+
+        // Total cost below the table
+        let total_cost = crate::state::State::token_cost(state.cache_hit_tokens, hit_price)
+            + crate::state::State::token_cost(state.cache_miss_tokens, miss_price)
+            + crate::state::State::token_cost(state.total_output_tokens, out_price);
+        if total_cost >= 0.001 {
+            let total_str = if total_cost < 0.01 {
+                format!("${:.3}", total_cost)
+            } else if total_cost < 1.0 {
+                format!("${:.2}", total_cost)
+            } else {
+                format!("${:.2}", total_cost)
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!(" total: {}", total_str), Style::default().fg(theme::text_muted())),
+            ]));
+        }
+    }
+
     let paragraph = Paragraph::new(lines)
         .style(base_style);
     frame.render_widget(paragraph, sidebar_layout[0]);

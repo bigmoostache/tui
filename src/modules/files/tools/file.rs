@@ -74,8 +74,10 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         result_command: None,
         result_command_hash: None,
         cached_content: None, // Background will populate
+        history_messages: None,
         cache_deprecated: true, // Trigger background refresh
         last_refresh_ms: crate::core::panels::now_ms(),
+        content_hash: None,
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
