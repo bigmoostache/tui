@@ -38,6 +38,18 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Update last_refresh_ms only if content actually changed (hash differs).
+/// Returns true if content changed.
+pub fn update_if_changed(ctx: &mut crate::state::ContextElement, content: &str) -> bool {
+    let new_hash = crate::cache::hash_content(content);
+    if ctx.content_hash.as_deref() == Some(&new_hash) {
+        return false;
+    }
+    ctx.content_hash = Some(new_hash);
+    ctx.last_refresh_ms = now_ms();
+    true
+}
+
 /// Paginate content for LLM context output.
 /// Returns the original content unchanged when total_pages <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
@@ -176,12 +188,29 @@ pub trait Panel {
             area.height
         );
 
-        let block = Block::default()
+        // Build bottom title for dynamic panels: "refreshed Xs ago"
+        let bottom_title = state.context.get(state.selected_context)
+            .filter(|ctx| !ctx.context_type.is_fixed())
+            .and_then(|ctx| {
+                let ts = ctx.last_refresh_ms;
+                if ts < 1577836800000 { return None; } // invalid timestamp
+                let now = now_ms();
+                if now <= ts { return None; }
+                Some(format!(" {} ", crate::ui::helpers::format_time_ago(now - ts)))
+            });
+
+        let mut block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(Style::default().fg(theme::border()))
             .style(base_style)
             .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
+
+        if let Some(ref bottom) = bottom_title {
+            block = block.title_bottom(
+                Span::styled(bottom, Style::default().fg(theme::text_muted()))
+            );
+        }
 
         let content_area = block.inner(inner_area);
         frame.render_widget(block, inner_area);

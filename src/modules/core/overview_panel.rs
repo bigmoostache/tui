@@ -47,7 +47,8 @@ impl Panel for OverviewPanel {
 
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Overview) {
             ctx.token_count = token_count;
-            ctx.cached_content = Some(content);
+            ctx.cached_content = Some(content.clone());
+            crate::core::panels::update_if_changed(ctx, &content);
         }
     }
 

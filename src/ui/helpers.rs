@@ -29,6 +29,18 @@ pub fn format_number(n: usize) -> String {
     }
 }
 
+/// Format a millisecond delta as a human-readable "x ago" string
+pub fn format_time_ago(delta_ms: u64) -> String {
+    let seconds = delta_ms / 1000;
+    if seconds < 60 {
+        format!("{}s ago", seconds)
+    } else if seconds < 3600 {
+        format!("{}m ago", seconds / 60)
+    } else {
+        format!("{}h ago", seconds / 3600)
+    }
+}
+
 /// Word-wrap text to fit within a given width
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {

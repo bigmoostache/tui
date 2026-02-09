@@ -1,5 +1,5 @@
 use crate::core::panels::{collect_all_context, now_ms, refresh_all_panels, ContextItem};
-use crate::constants::TOKEN_DETACH_COUNT;
+use crate::constants::{DETACH_CHUNK_MESSAGES, DETACH_KEEP_MESSAGES};
 use crate::state::{
     compute_total_pages, estimate_tokens, ContextElement, ContextType,
     Message, MessageStatus, MessageType, State,
@@ -132,45 +132,31 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 }
 
 /// Detach oldest conversation messages into frozen ConversationHistory panels
-/// when the non-detached conversation exceeds TOKEN_DETACH_COUNT tokens.
+/// when the active message count exceeds DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES.
 pub fn detach_conversation_chunks(state: &mut State) {
     loop {
-        // 1. Count tokens of non-Detached, non-Deleted messages
-        let active_tokens: usize = state.messages.iter()
+        // 1. Count active (non-Deleted, non-Detached) messages
+        let active_count = state.messages.iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| match m.status {
-                MessageStatus::Summarized => {
-                    m.tl_dr_token_count.max(estimate_tokens(m.tl_dr.as_deref().unwrap_or("")))
-                }
-                _ => m.content_token_count.max(estimate_tokens(&m.content)),
-            })
-            .sum();
+            .count();
 
-        // 2. If total <= threshold, nothing to detach
-        if active_tokens <= TOKEN_DETACH_COUNT {
+        // 2. If within limits, nothing to detach
+        if active_count <= DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES {
             break;
         }
 
-        // 3. Walk messages from oldest, accumulate tokens until >= half threshold
-        let half = TOKEN_DETACH_COUNT / 2;
-        let mut accumulated = 0usize;
+        // 3. Walk from oldest, count DETACH_CHUNK_MESSAGES active messages,
+        //    then snap forward to the nearest turn boundary.
+        let mut active_seen = 0usize;
         let mut boundary = None;
 
         for (idx, msg) in state.messages.iter().enumerate() {
             if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
                 continue;
             }
+            active_seen += 1;
 
-            let tokens = match msg.status {
-                MessageStatus::Summarized => {
-                    msg.tl_dr_token_count.max(estimate_tokens(msg.tl_dr.as_deref().unwrap_or("")))
-                }
-                _ => msg.content_token_count.max(estimate_tokens(&msg.content)),
-            };
-            accumulated += tokens;
-
-            // Once we've accumulated enough, find a turn boundary at or after this point
-            if accumulated >= half && is_turn_boundary(&state.messages, idx) {
+            if active_seen >= DETACH_CHUNK_MESSAGES && is_turn_boundary(&state.messages, idx) {
                 boundary = Some(idx + 1); // exclusive end
                 break;
             }
@@ -231,6 +217,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             cached_content: Some(content),
             cache_deprecated: false,
             last_refresh_ms: chunk_timestamp,
+            content_hash: None,
             tmux_last_lines_hash: None,
             current_page: 0,
             total_pages,
@@ -244,6 +231,25 @@ pub fn detach_conversation_chunks(state: &mut State) {
                 crate::persistence::delete_message(uid);
             }
         }
+
+        // 9. Insert a synthetic user message at the front so the LLM sees the seam
+        let detach_notice = Message {
+            id: format!("U{}", state.next_user_id),
+            uid: None,
+            role: "user".to_string(),
+            message_type: MessageType::TextMessage,
+            content: "Older messages automatically detached for token efficiency.".to_string(),
+            content_token_count: estimate_tokens("Older messages automatically detached for token efficiency."),
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        state.next_user_id += 1;
+        state.messages.insert(0, detach_notice);
 
         // Loop to check if remaining messages still exceed threshold
     }

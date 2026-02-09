@@ -335,6 +335,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         cached_content: Some(contents.to_string()),
         cache_deprecated: true,
         last_refresh_ms: crate::core::panels::now_ms(),
+        content_hash: None,
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,

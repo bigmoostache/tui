@@ -166,6 +166,9 @@ pub struct ContextElement {
     /// Last time this element was refreshed (for timer-based deprecation)
     #[serde(skip)]
     pub last_refresh_ms: u64,
+    /// Hash of cached content (for change detection to avoid unnecessary timestamp bumps)
+    #[serde(skip)]
+    pub content_hash: Option<String>,
     /// Hash of tmux last 2 lines (for change detection)
     #[serde(skip)]
     pub tmux_last_lines_hash: Option<String>,
