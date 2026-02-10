@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Pilot — AI-Native Terminal IDE</title>
+    <meta name="description" content="Context Pilot is an AI-native terminal IDE that gives you full control over what your AI sees. Built with Rust and ratatui for blazing-fast performance.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav container">
+            <a href="/" class="logo">
+                <span class="logo-icon">⎈</span>
+                <span class="logo-text">Context Pilot</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#modules">Modules</a>
+                <a href="#getting-started">Get Started</a>
+                <a href="https://github.com/cortesi/context-pilot" class="nav-github">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge">AI-Native Terminal IDE</div>
+            <h1 class="hero-title">
+                You control what<br>
+                <span class="gradient-text">your AI sees.</span>
+            </h1>
+            <p class="hero-subtitle">
+                Context Pilot is a terminal-native AI coding environment built in Rust. 
+                Unlike other tools, <strong>you</strong> decide exactly what context your AI receives — 
+                files, git diffs, todos, memories, and more — all through an elegant TUI.
+            </p>
+            <div class="hero-actions">
+                <a href="#getting-started" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/cortesi/context-pilot" class="btn btn-secondary">View on GitHub</a>
+            </div>
+            <div class="hero-terminal">
+                <div class="terminal-bar">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                    <span class="terminal-title">context-pilot</span>
+                </div>
+                <div class="terminal-body">
+                    <pre class="terminal-content"><span class="t-dim">┌─ Context Panels ──────────────────────────────────┐</span>
+<span class="t-cyan">P1</span> <span class="t-green">Chat</span>         <span class="t-dim">│</span> 250 tokens   <span class="t-dim">│</span> Conversation
+<span class="t-cyan">P2</span> <span class="t-green">Tree</span>         <span class="t-dim">│</span> 1,884 tokens <span class="t-dim">│</span> Directory structure
+<span class="t-cyan">P3</span> <span class="t-green">Todos</span>        <span class="t-dim">│</span> 316 tokens   <span class="t-dim">│</span> Task tracking
+<span class="t-cyan">P4</span> <span class="t-green">Memories</span>     <span class="t-dim">│</span> 279 tokens   <span class="t-dim">│</span> Persistent notes
+<span class="t-cyan">P5</span> <span class="t-green">Overview</span>     <span class="t-dim">│</span> 1,104 tokens <span class="t-dim">│</span> Context usage
+<span class="t-cyan">P6</span> <span class="t-green">Git</span>          <span class="t-dim">│</span> 11 tokens    <span class="t-dim">│</span> Status &amp; diffs
+<span class="t-dim">└────────────────────────────────────────────────────┘</span>
+<span class="t-dim">  Context: 5,092 / 200,000 tokens (2.5%)</span>
+<span class="t-yellow">❯</span> <span class="t-blink">█</span></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">Why Context Pilot?</h2>
+            <p class="section-subtitle">Every token matters. Context Pilot gives you surgical control over your AI's context window.</p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Context Control</h3>
+                    <p>Open files, git diffs, grep results, and more as context panels. See exactly what your AI sees — token counts and all. Close what you don't need.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Blazing Fast</h3>
+                    <p>Built in Rust with ratatui. Sub-millisecond rendering. Instant file operations. No Electron, no web browser, no bloat — just raw terminal performance.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔌</div>
+                    <h3>Modular Architecture</h3>
+                    <p>Activate only the modules you need. Git, GitHub, files, tree, console, todos, memory, scratchpad — each module adds its own tools and panels.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>Multi-Provider</h3>
+                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok, Groq, and any OpenAI-compatible API. Switch providers mid-conversation.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Persistent Memory</h3>
+                    <p>Memories and todos persist across conversations. The AI remembers your preferences, project conventions, and ongoing tasks.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Auto-Continuation</h3>
+                    <p>The Spine module handles stream control with configurable guard rails — max tokens, cost limits, and automatic continuation for long tasks.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modules -->
+    <section id="modules" class="modules">
+        <div class="container">
+            <h2 class="section-title">Modular by Design</h2>
+            <p class="section-subtitle">Activate what you need. Deactivate what you don't. Each module is independent.</p>
+            
+            <div class="module-grid">
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">📁</span>
+                        <h3>Files</h3>
+                    </div>
+                    <p>Open, edit, and write files. Full file context with syntax awareness. Precise edits with search-and-replace.</p>
+                    <div class="module-tools">
+                        <code>file_open</code> <code>file_edit</code> <code>file_write</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🌳</span>
+                        <h3>Tree</h3>
+                    </div>
+                    <p>Directory tree with gitignore-style filtering. Annotate files with descriptions. Open and close folders.</p>
+                    <div class="module-tools">
+                        <code>tree_filter</code> <code>tree_toggle</code> <code>tree_describe</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🔀</span>
+                        <h3>Git</h3>
+                    </div>
+                    <p>Full git integration. Status, diffs, log, blame — all as live-updating context panels.</p>
+                    <div class="module-tools">
+                        <code>git_execute</code> <code>git_configure_p6</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🐙</span>
+                        <h3>GitHub</h3>
+                    </div>
+                    <p>GitHub CLI integration. View PRs, issues, create releases — all without leaving the terminal.</p>
+                    <div class="module-tools">
+                        <code>gh_execute</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🖥️</span>
+                        <h3>Console (tmux)</h3>
+                    </div>
+                    <p>Monitor terminal output in real-time. Run builds, tests, servers — the AI sees what you see.</p>
+                    <div class="module-tools">
+                        <code>console_create</code> <code>console_send_keys</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">✅</span>
+                        <h3>Todo</h3>
+                    </div>
+                    <p>Task tracking with nested todos. Plan work, track progress, and let the AI work through tasks autonomously.</p>
+                    <div class="module-tools">
+                        <code>todo_create</code> <code>todo_update</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🧠</span>
+                        <h3>Memory</h3>
+                    </div>
+                    <p>Persistent memories across conversations. Store preferences, conventions, and important context.</p>
+                    <div class="module-tools">
+                        <code>memory_create</code> <code>memory_update</code>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-icon">🦴</span>
+                        <h3>Spine</h3>
+                    </div>
+                    <p>Central nervous system. Manages notifications, auto-continuation, and guard rails for autonomous operation.</p>
+                    <div class="module-tools">
+                        <code>spine_configure</code> <code>notification_mark_processed</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agents & Presets -->
+    <section class="presets">
+        <div class="container">
+            <h2 class="section-title">Agents & Presets</h2>
+            <p class="section-subtitle">Switch AI personalities and tool configurations instantly.</p>
+            
+            <div class="preset-grid">
+                <div class="preset-card">
+                    <div class="preset-name">🏗️ Worker</div>
+                    <p>Focused implementation mode. File editing, git, and console. No exploration overhead.</p>
+                </div>
+                <div class="preset-card">
+                    <div class="preset-name">📋 Planner</div>
+                    <p>Task planning with todos and scratchpad. File writes disabled to prevent accidental changes.</p>
+                </div>
+                <div class="preset-card">
+                    <div class="preset-name">🔍 Context Builder</div>
+                    <p>All modules active for codebase exploration. Full read access, clean slate.</p>
+                </div>
+                <div class="preset-card">
+                    <div class="preset-name">🧹 Context Cleaner</div>
+                    <p>Minimal read-only mode. Clean up context, close panels, manage message history.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting Started -->
+    <section id="getting-started" class="getting-started">
+        <div class="container">
+            <h2 class="section-title">Getting Started</h2>
+            <p class="section-subtitle">Up and running in minutes.</p>
+            
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Clone & Build</h3>
+                        <div class="code-block">
+                            <pre><code>git clone https://github.com/cortesi/context-pilot.git
+cd context-pilot
+cargo build --release</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Configure API Key</h3>
+                        <div class="code-block">
+                            <pre><code># Create .env in your project directory
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+
+# Or export directly
+export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Launch</h3>
+                        <div class="code-block">
+                            <pre><code># Navigate to any project directory
+cd your-project
+
+# Launch Context Pilot (requires tmux)
+tmux new-session context-pilot</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="requirements">
+                <h3>Requirements</h3>
+                <ul>
+                    <li>Rust toolchain (for building from source)</li>
+                    <li>tmux (for console integration)</li>
+                    <li>An API key from a supported provider (Anthropic, OpenAI, etc.)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-icon">⎈</span>
+                    <span class="logo-text">Context Pilot</span>
+                    <p class="footer-tagline">AI-native terminal IDE. You control the context.</p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/cortesi/context-pilot">GitHub</a>
+                    <a href="https://github.com/cortesi/context-pilot/issues">Issues</a>
+                    <a href="https://github.com/cortesi/context-pilot/blob/master/CONTRIBUTING.md">Contributing</a>
+                    <a href="https://github.com/cortesi/context-pilot/blob/master/LICENSE">License (GPL-3.0)</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Built with 🦀 Rust + ratatui. Open source forever.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
