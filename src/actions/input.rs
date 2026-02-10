@@ -69,6 +69,10 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     // This works both during streaming (missed-message scenario) and when idle
     create_user_notification(state, &user_id_str, &content_preview);
 
+    // Any human input resets auto-continuation counters — human is back in the loop
+    state.spine_config.auto_continuation_count = 0;
+    state.spine_config.autonomous_start_ms = None;
+
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
     if state.is_streaming {
@@ -78,10 +82,6 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     state.messages.push(user_msg);
-
-    // Reset auto-continuation counter (human input breaks the auto-continue chain)
-    state.spine_config.auto_continuation_count = 0;
-    state.spine_config.autonomous_start_ms = None;
 
     // Reset per-stream and per-tick token counters for new user-initiated stream
     state.stream_cache_hit_tokens = 0;

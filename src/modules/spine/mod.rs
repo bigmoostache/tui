@@ -76,12 +76,39 @@ impl Module for SpineModule {
                 enabled: true,
                 category: ToolCategory::Spine,
             },
+            ToolDefinition {
+                id: "spine_configure".to_string(),
+                name: "Configure Spine".to_string(),
+                short_desc: "Configure auto-continuation and guard rails".to_string(),
+                description: "Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.".to_string(),
+                params: vec![
+                    ToolParam::new("max_tokens_auto_continue", ParamType::Boolean)
+                        .desc("Auto-continue when stream hits max_tokens (default: true)"),
+                    ToolParam::new("continue_until_todos_done", ParamType::Boolean)
+                        .desc("Keep auto-continuing until all todos are done (default: false)"),
+                    ToolParam::new("max_output_tokens", ParamType::Integer)
+                        .desc("Guard rail: max total output tokens before blocking. Null to disable."),
+                    ToolParam::new("max_cost", ParamType::Number)
+                        .desc("Guard rail: max cost in USD before blocking. Null to disable."),
+                    ToolParam::new("max_duration_secs", ParamType::Integer)
+                        .desc("Guard rail: max autonomous duration in seconds. Null to disable."),
+                    ToolParam::new("max_messages", ParamType::Integer)
+                        .desc("Guard rail: max conversation messages before blocking. Null to disable."),
+                    ToolParam::new("max_auto_retries", ParamType::Integer)
+                        .desc("Guard rail: max consecutive auto-continuations without human input. Null to disable."),
+                    ToolParam::new("reset_counters", ParamType::Boolean)
+                        .desc("Reset runtime counters (auto_continuation_count, autonomous_start_ms)"),
+                ],
+                enabled: true,
+                category: ToolCategory::Spine,
+            },
         ]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "notification_mark_processed" => Some(self::tools::execute_mark_processed(tool, state)),
+            "spine_configure" => Some(self::tools::execute_configure(tool, state)),
             _ => None,
         }
     }
