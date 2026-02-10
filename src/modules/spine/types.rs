@@ -89,6 +89,25 @@ pub struct SpineConfig {
 
 fn default_true() -> bool { true }
 
+impl Notification {
+    /// Create a new notification with the given fields
+    pub fn new(
+        id: String,
+        notification_type: NotificationType,
+        source: String,
+        content: String,
+    ) -> Self {
+        Self {
+            id,
+            notification_type,
+            source,
+            processed: false,
+            timestamp_ms: crate::core::panels::now_ms(),
+            content,
+        }
+    }
+}
+
 impl Default for SpineConfig {
     fn default() -> Self {
         Self {

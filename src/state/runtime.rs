@@ -387,4 +387,63 @@ impl State {
     pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
         tokens as f64 * price_per_mtok as f64 / 1_000_000.0
     }
+
+    // === Spine / Notification Helpers ===
+
+    /// Create a new notification and add it to the notification list.
+    /// Returns the notification ID.
+    pub fn create_notification(
+        &mut self,
+        notification_type: crate::modules::spine::types::NotificationType,
+        source: String,
+        content: String,
+    ) -> String {
+        let id = format!("N{}", self.next_notification_id);
+        self.next_notification_id += 1;
+        let notification = crate::modules::spine::types::Notification::new(
+            id.clone(),
+            notification_type,
+            source,
+            content,
+        );
+        self.notifications.push(notification);
+        // Mark spine panel as needing refresh
+        self.touch_panel(ContextType::Spine);
+        id
+    }
+
+    /// Mark a notification as processed by ID. Returns true if found.
+    pub fn mark_notification_processed(&mut self, id: &str) -> bool {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.processed = true;
+            self.touch_panel(ContextType::Spine);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get references to all unprocessed notifications
+    pub fn unprocessed_notifications(&self) -> Vec<&crate::modules::spine::types::Notification> {
+        self.notifications.iter().filter(|n| !n.processed).collect()
+    }
+
+    /// Check if there are any unprocessed notifications
+    pub fn has_unprocessed_notifications(&self) -> bool {
+        self.notifications.iter().any(|n| !n.processed)
+    }
+
+    /// Mark all UserMessage notifications as processed (called when a new stream starts)
+    pub fn mark_user_message_notifications_processed(&mut self) {
+        let mut changed = false;
+        for n in &mut self.notifications {
+            if !n.processed && n.notification_type == crate::modules::spine::types::NotificationType::UserMessage {
+                n.processed = true;
+                changed = true;
+            }
+        }
+        if changed {
+            self.touch_panel(ContextType::Spine);
+        }
+    }
 }
