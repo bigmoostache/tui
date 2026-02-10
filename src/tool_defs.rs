@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 pub enum ParamType {
     String,
     Integer,
+    Number,
     Boolean,
     Array(Box<ParamType>),
     Object(Vec<ToolParam>),
@@ -17,6 +18,7 @@ impl ParamType {
         match self {
             ParamType::String => json!({"type": "string"}),
             ParamType::Integer => json!({"type": "integer"}),
+            ParamType::Number => json!({"type": "number"}),
             ParamType::Boolean => json!({"type": "boolean"}),
             ParamType::Array(inner) => json!({
                 "type": "array",
