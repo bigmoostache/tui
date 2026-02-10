@@ -106,21 +106,12 @@ impl AutoContinuation for TodosAutomaticContinuation {
     fn name(&self) -> &str { "TodosAutomaticContinuation" }
 
     fn should_continue(&self, state: &State) -> bool {
-        use crate::modules::todo::types::TodoStatus;
-
         state.spine_config.continue_until_todos_done
-            && state.todos.iter().any(|t| {
-                matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress)
-            })
+            && state.has_incomplete_todos()
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {
-        use crate::modules::todo::types::TodoStatus;
-
-        let remaining: Vec<String> = state.todos.iter()
-            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
-            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
-            .collect();
+        let remaining = state.incomplete_todos_summary();
 
         let msg = format!(
             "/* Auto-continuation: {} todo(s) remaining:\n{}\nPlease continue working through these tasks. */",

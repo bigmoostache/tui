@@ -446,4 +446,21 @@ impl State {
             self.touch_panel(ContextType::Spine);
         }
     }
+
+    // === Todo helpers for spine (avoid spine importing todo types directly) ===
+
+    /// Check if there are any pending or in-progress todos
+    pub fn has_incomplete_todos(&self) -> bool {
+        use crate::modules::todo::types::TodoStatus;
+        self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+    }
+
+    /// Get a summary of incomplete todos for spine auto-continuation messages
+    pub fn incomplete_todos_summary(&self) -> Vec<String> {
+        use crate::modules::todo::types::TodoStatus;
+        self.todos.iter()
+            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
+            .collect()
+    }
 }
