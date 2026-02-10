@@ -1,4 +1,5 @@
 pub mod types;
+pub mod continuation;
 mod panel;
 pub(crate) mod tools;
 
