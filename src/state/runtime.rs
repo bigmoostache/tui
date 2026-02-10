@@ -10,6 +10,7 @@ use crate::modules::todo::types::TodoItem;
 use crate::modules::memory::types::MemoryItem;
 use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
+use crate::modules::spine::types::{Notification, SpineConfig};
 use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 use crate::modules::git::types::GitFileChange;
 use crate::tool_defs::ToolDefinition;
@@ -75,6 +76,12 @@ pub struct State {
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Next scratchpad cell ID (C1, C2, ...)
     pub next_scratchpad_id: usize,
+    /// Spine notifications
+    pub notifications: Vec<Notification>,
+    /// Next notification ID (N1, N2, ...)
+    pub next_notification_id: usize,
+    /// Spine module configuration (per-worker)
+    pub spine_config: SpineConfig,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs
@@ -219,6 +226,9 @@ impl Default for State {
             library_preview: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
+            notifications: vec![],
+            next_notification_id: 1,
+            spine_config: SpineConfig::default(),
             active_modules: crate::modules::default_active_modules(),
             tools: crate::modules::active_tool_definitions(&crate::modules::default_active_modules()),
             dirty: true, // Start dirty to ensure initial render
@@ -376,5 +386,163 @@ impl State {
     /// Calculate cost in USD for a given token count and price per MTok
     pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
         tokens as f64 * price_per_mtok as f64 / 1_000_000.0
+    }
+
+    // === Message Creation Helpers ===
+
+    /// Allocate the next user message ID and UID, returning (id, uid).
+    pub fn alloc_user_ids(&mut self) -> (String, String) {
+        let id = format!("U{}", self.next_user_id);
+        let uid = format!("UID_{}_U", self.global_next_uid);
+        self.next_user_id += 1;
+        self.global_next_uid += 1;
+        (id, uid)
+    }
+
+    /// Allocate the next assistant message ID and UID, returning (id, uid).
+    pub fn alloc_assistant_ids(&mut self) -> (String, String) {
+        let id = format!("A{}", self.next_assistant_id);
+        let uid = format!("UID_{}_A", self.global_next_uid);
+        self.next_assistant_id += 1;
+        self.global_next_uid += 1;
+        (id, uid)
+    }
+
+    /// Create a user message, add it to the conversation, update conversation token count,
+    /// and persist it. Returns the index into self.messages.
+    pub fn push_user_message(&mut self, content: String) -> usize {
+        let token_count = crate::state::estimate_tokens(&content);
+        let (id, uid) = self.alloc_user_ids();
+        let msg = Message::new_user(id, uid, content, token_count);
+        crate::persistence::save_message(&msg);
+
+        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+            ctx.token_count += token_count;
+            ctx.last_refresh_ms = crate::core::panels::now_ms();
+        }
+
+        self.messages.push(msg);
+        self.messages.len() - 1
+    }
+
+    /// Create an empty assistant message for streaming into, add it, return its index.
+    pub fn push_empty_assistant(&mut self) -> usize {
+        let (id, uid) = self.alloc_assistant_ids();
+        let msg = Message::new_assistant(id, uid);
+        self.messages.push(msg);
+        self.messages.len() - 1
+    }
+
+    /// Prepare state for a new stream: set is_streaming, clear stop reason, reset tick counters.
+    pub fn begin_streaming(&mut self) {
+        self.is_streaming = true;
+        self.last_stop_reason = None;
+        self.streaming_estimated_tokens = 0;
+        self.tick_cache_hit_tokens = 0;
+        self.tick_cache_miss_tokens = 0;
+        self.tick_output_tokens = 0;
+    }
+
+    // === Spine / Notification Helpers ===
+
+    /// Create a new notification and add it to the notification list.
+    /// Returns the notification ID.
+    pub fn create_notification(
+        &mut self,
+        notification_type: crate::modules::spine::types::NotificationType,
+        source: String,
+        content: String,
+    ) -> String {
+        let id = format!("N{}", self.next_notification_id);
+        self.next_notification_id += 1;
+        let notification = crate::modules::spine::types::Notification::new(
+            id.clone(),
+            notification_type,
+            source,
+            content,
+        );
+        self.notifications.push(notification);
+        // Garbage-collect old processed notifications (cap at 100)
+        self.gc_notifications(100);
+        // Mark spine panel as needing refresh
+        self.touch_panel(ContextType::Spine);
+        id
+    }
+
+    /// Mark a notification as processed by ID. Returns true if found.
+    pub fn mark_notification_processed(&mut self, id: &str) -> bool {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.processed = true;
+            self.touch_panel(ContextType::Spine);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get references to all unprocessed notifications
+    pub fn unprocessed_notifications(&self) -> Vec<&crate::modules::spine::types::Notification> {
+        self.notifications.iter().filter(|n| !n.processed).collect()
+    }
+
+    /// Check if there are any unprocessed notifications
+    pub fn has_unprocessed_notifications(&self) -> bool {
+        self.notifications.iter().any(|n| !n.processed)
+    }
+
+    /// Garbage-collect old processed notifications to prevent unbounded growth.
+    /// Keeps all unprocessed notifications and the most recent processed ones,
+    /// capping the total list at `max` entries.
+    pub fn gc_notifications(&mut self, max: usize) {
+        if self.notifications.len() <= max {
+            return;
+        }
+        // Remove oldest processed notifications first (they're at the front)
+        let excess = self.notifications.len() - max;
+        let mut removed = 0usize;
+        self.notifications.retain(|n| {
+            if removed >= excess {
+                return true;
+            }
+            if n.processed {
+                removed += 1;
+                return false;
+            }
+            true // Keep unprocessed
+        });
+        if removed > 0 {
+            self.touch_panel(ContextType::Spine);
+        }
+    }
+
+    /// Mark all UserMessage notifications as processed (called when a new stream starts)
+    pub fn mark_user_message_notifications_processed(&mut self) {
+        let mut changed = false;
+        for n in &mut self.notifications {
+            if !n.processed && n.notification_type == crate::modules::spine::types::NotificationType::UserMessage {
+                n.processed = true;
+                changed = true;
+            }
+        }
+        if changed {
+            self.touch_panel(ContextType::Spine);
+        }
+    }
+
+    // === Todo helpers for spine (avoid spine importing todo types directly) ===
+
+    /// Check if there are any pending or in-progress todos
+    pub fn has_incomplete_todos(&self) -> bool {
+        use crate::modules::todo::types::TodoStatus;
+        self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+    }
+
+    /// Get a summary of incomplete todos for spine auto-continuation messages
+    pub fn incomplete_todos_summary(&self) -> Vec<String> {
+        use crate::modules::todo::types::TodoStatus;
+        self.todos.iter()
+            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
+            .collect()
     }
 }

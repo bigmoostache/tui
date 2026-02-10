@@ -106,10 +106,16 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            // Set input and trigger submit to start streaming
-            self.state.input = "/* automatic post-reload message */".to_string();
-            self.state.input_cursor = self.state.input.len();
-            self.handle_action(Action::InputSubmit, &tx, &tldr_tx);
+            // Create a notification so the spine engine picks it up and resumes streaming.
+            // No synthetic user message needed — the conversation already has the tool
+            // result from system_reload, and the LLM should continue from there.
+            use crate::modules::spine::types::NotificationType;
+            self.state.create_notification(
+                NotificationType::ReloadResume,
+                "reload_resume".to_string(),
+                "Resuming after TUI reload".to_string(),
+            );
+            save_state(&self.state);
         }
 
         loop {
@@ -178,6 +184,7 @@ impl App {
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
             self.finalize_stream(&tldr_tx);
+            self.check_spine(&tx, &tldr_tx);
             self.process_api_check_results();
 
             // Check ownership periodically (every 1 second)
@@ -532,6 +539,8 @@ impl App {
             }
             ActionResult::Save => {
                 save_state(&self.state);
+                // Check spine synchronously for responsive auto-continuation
+                self.check_spine(tx, tldr_tx);
             }
             ActionResult::SaveMessage(id) => {
                 let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
@@ -834,6 +843,47 @@ impl App {
             }
             process_cache_request(request, self.cache_tx.clone());
             self.state.context[i].cache_in_flight = true;
+        }
+    }
+
+    /// Check the spine for auto-continuation decisions.
+    /// Evaluates guard rails and auto-continuation logic.
+    /// If a continuation fires, starts streaming.
+    fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
+        use crate::modules::spine::engine::{check_spine, apply_continuation, SpineDecision};
+
+        match check_spine(&mut self.state) {
+            SpineDecision::Idle => {}
+            SpineDecision::Blocked(_reason) => {
+                // Guard rail blocked — notification already created by engine
+                self.state.dirty = true;
+                save_state(&self.state);
+            }
+            SpineDecision::Continue(action) => {
+                // Auto-continuation fired — apply it and start streaming
+                let should_stream = apply_continuation(&mut self.state, action);
+                if should_stream {
+                    self.typewriter.reset();
+                    self.pending_tools.clear();
+                    // Generate TL;DR for synthetic user message
+                    if self.state.messages.len() >= 2 {
+                        let user_msg = &self.state.messages[self.state.messages.len() - 2];
+                        if user_msg.role == "user" && user_msg.tl_dr.is_none() {
+                            self.state.pending_tldrs += 1;
+                            generate_tldr(user_msg.id.clone(), user_msg.content.clone(), tldr_tx.clone());
+                        }
+                    }
+                    let ctx = prepare_stream_context(&mut self.state, false);
+                    let system_prompt = get_active_agent_content(&self.state);
+                    start_streaming(
+                        self.state.llm_provider,
+                        self.state.current_model(),
+                        ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
+                    );
+                    save_state(&self.state);
+                    self.state.dirty = true;
+                }
+            }
         }
     }
 
