@@ -55,15 +55,31 @@ impl AutoContinuation for NotificationsContinuation {
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {
-        // Build a synthetic message that tells the LLM about unprocessed notifications
         let unprocessed = state.unprocessed_notifications();
+
+        // If ALL unprocessed notifications are UserMessage, just relaunch —
+        // the user's message is already in the conversation, no need for a
+        // synthetic "you have notifications" wrapper message.
+        let all_user_messages = unprocessed.iter().all(|n| {
+            n.notification_type == super::types::NotificationType::UserMessage
+        });
+
+        if all_user_messages {
+            return ContinuationAction::Relaunch;
+        }
+
+        // Non-UserMessage notifications exist — build a synthetic message
+        // so the LLM knows WHY it was relaunched (e.g., max_tokens, todos).
+        let non_user: Vec<_> = unprocessed.iter()
+            .filter(|n| n.notification_type != super::types::NotificationType::UserMessage)
+            .collect();
         let mut parts = Vec::new();
-        for n in &unprocessed {
+        for n in &non_user {
             parts.push(format!("[{}] {} — {}", n.id, n.notification_type.label(), n.content));
         }
         let msg = format!(
-            "/* Auto-continuation: {} unprocessed notification(s):\n{}\nPlease address these. */",
-            unprocessed.len(),
+            "/* Auto-continuation: {} notification(s):\n{}\nPlease address these. */",
+            non_user.len(),
             parts.join("\n")
         );
         ContinuationAction::SyntheticMessage(msg)
