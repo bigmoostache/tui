@@ -2,7 +2,7 @@
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs;
+
 
 // ============================================================================
 // Prompts Configuration
@@ -165,22 +165,20 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 // Loading Functions
 // ============================================================================
 
-fn load_yaml<T: for<'de> Deserialize<'de>>(path: &str) -> T {
-    let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-    serde_yaml::from_str(&content)
-        .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
+    serde_yaml::from_str(content)
+        .unwrap_or_else(|e| panic!("Failed to parse {}: {}", name, e))
 }
 
 // ============================================================================
-// Global Configuration (Lazy Static)
+// Global Configuration (Lazy Static — embedded at compile time)
 // ============================================================================
 
 lazy_static! {
-    pub static ref PROMPTS: PromptsConfig = load_yaml("yamls/prompts.yaml");
-    pub static ref LIBRARY: LibraryConfig = load_yaml("yamls/library.yaml");
-    pub static ref UI: UiConfig = load_yaml("yamls/ui.yaml");
-    pub static ref THEMES: ThemesConfig = load_yaml("yamls/themes.yaml");
+    pub static ref PROMPTS: PromptsConfig = parse_yaml("prompts.yaml", include_str!("../yamls/prompts.yaml"));
+    pub static ref LIBRARY: LibraryConfig = parse_yaml("library.yaml", include_str!("../yamls/library.yaml"));
+    pub static ref UI: UiConfig = parse_yaml("ui.yaml", include_str!("../yamls/ui.yaml"));
+    pub static ref THEMES: ThemesConfig = parse_yaml("themes.yaml", include_str!("../yamls/themes.yaml"));
 }
 
 /// Get a theme by ID, falling back to default if not found
