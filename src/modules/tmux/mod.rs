@@ -84,9 +84,9 @@ impl Module for TmuxModule {
             },
             ToolDefinition {
                 id: "console_sleep".to_string(),
-                name: "Console Sleep".to_string(),
-                short_desc: "Wait 2 seconds".to_string(),
-                description: "Pauses execution for 2 seconds. Useful for waiting for terminal output or processes to complete.".to_string(),
+                name: "Sleep".to_string(),
+                short_desc: "Wait and refresh".to_string(),
+                description: "Pauses execution. Useful for waiting for terminal output or processes to complete.".to_string(),
                 params: vec![],
                 enabled: true,
                 category: ToolCategory::Console,
@@ -99,7 +99,7 @@ impl Module for TmuxModule {
             "console_create" => Some(self::tools::execute_create_pane(tool, state)),
             "console_edit" => Some(self::tools::execute_edit_config(tool, state)),
             "console_send_keys" => Some(self::tools::execute_send_keys(tool, state)),
-            "console_sleep" => Some(self::tools::execute_sleep(tool)),
+            "console_sleep" => Some(self::tools::execute_sleep(tool, state)),
             _ => None,
         }
     }

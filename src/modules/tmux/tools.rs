@@ -287,19 +287,48 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     match output {
         Ok(out) if out.status.success() => {
-            // Wait 0.5 seconds for output to appear
+            // Wait for command output to appear
             std::thread::sleep(std::time::Duration::from_millis(TMUX_SEND_DELAY_MS));
 
-            // Update last keys in context
-            if let Some(ctx) = state.context.iter_mut()
+            // Find the context element for this pane and synchronously capture fresh content
+            let context_id = if let Some(ctx) = state.context.iter_mut()
                 .find(|c| c.tmux_pane_id.as_deref() == Some(pane_id.as_str()))
             {
                 ctx.tmux_last_keys = Some(keys.to_string());
-            }
+                let ctx_id = ctx.id.clone();
+                let lines = ctx.tmux_lines.unwrap_or(50);
+
+                // Synchronously capture pane content
+                let start_line = format!("-{}", lines);
+                if let Ok(capture) = Command::new("tmux")
+                    .args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id])
+                    .output()
+                {
+                    if capture.status.success() {
+                        let content = String::from_utf8_lossy(&capture.stdout).to_string();
+                        let new_hash = crate::cache::hash_content(&content);
+                        ctx.token_count = crate::state::estimate_tokens(&content);
+                        ctx.total_pages = crate::state::compute_total_pages(ctx.token_count);
+                        ctx.current_page = 0;
+                        ctx.tmux_last_lines_hash = Some(new_hash.clone());
+                        ctx.cached_content = Some(content.clone());
+                        ctx.cache_deprecated = false;
+                        crate::core::panels::update_if_changed(ctx, &content);
+                    }
+                }
+
+                Some(ctx_id)
+            } else {
+                None
+            };
+
+            let panel_msg = context_id
+                .map(|id| format!(". Content up to date in panel {}", id))
+                .unwrap_or_default();
 
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Sent keys to pane {}: {}", pane_id, keys),
+                content: format!("Sent keys to pane {}: {}{}", pane_id, keys, panel_msg),
                 is_error: false,
             }
         }
@@ -321,8 +350,36 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute sleep tool (fixed duration from constants)
-pub fn execute_sleep(tool: &ToolUse) -> ToolResult {
+/// After sleeping, synchronously refreshes ALL tmux panels.
+pub fn execute_sleep(tool: &ToolUse, state: &mut State) -> ToolResult {
     std::thread::sleep(std::time::Duration::from_secs(SLEEP_DURATION_SECS));
+
+    // Synchronously refresh all tmux panels
+    for ctx in state.context.iter_mut() {
+        if ctx.context_type != ContextType::Tmux { continue; }
+        let pane_id = match &ctx.tmux_pane_id {
+            Some(id) => id.clone(),
+            None => continue,
+        };
+        let lines = ctx.tmux_lines.unwrap_or(50);
+        let start_line = format!("-{}", lines);
+        if let Ok(capture) = Command::new("tmux")
+            .args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id])
+            .output()
+        {
+            if capture.status.success() {
+                let content = String::from_utf8_lossy(&capture.stdout).to_string();
+                let new_hash = crate::cache::hash_content(&content);
+                ctx.token_count = crate::state::estimate_tokens(&content);
+                ctx.total_pages = crate::state::compute_total_pages(ctx.token_count);
+                ctx.current_page = 0;
+                ctx.tmux_last_lines_hash = Some(new_hash);
+                ctx.cached_content = Some(content.clone());
+                ctx.cache_deprecated = false;
+                crate::core::panels::update_if_changed(ctx, &content);
+            }
+        }
+    }
 
     ToolResult {
         tool_use_id: tool.id.clone(),

@@ -798,11 +798,14 @@ impl App {
 
             let panel = crate::core::panels::get_panel(ctx.context_type);
 
-            // Timer-based interval refresh: only for fixed panels (P0-P7) and the
-            // currently selected panel.  Dynamic panels that aren't selected don't
-            // need continuous background polling — they'll refresh when selected or
-            // when a watcher event marks them deprecated.
-            let interval_eligible = ctx.context_type.is_fixed() || i == self.state.selected_context;
+            // Timer-based interval refresh: for fixed panels (P0-P7), the currently
+            // selected panel, AND tmux panels (always, since capture is lightweight).
+            // Other dynamic panels that aren't selected don't need continuous background
+            // polling — they'll refresh when selected or when a watcher event marks them
+            // deprecated.
+            let interval_eligible = ctx.context_type.is_fixed()
+                || i == self.state.selected_context
+                || ctx.context_type == ContextType::Tmux;
             let interval_elapsed = if interval_eligible {
                 panel.cache_refresh_interval_ms()
                     .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
