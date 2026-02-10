@@ -14,8 +14,26 @@ pub struct StreamContext {
     pub tools: Vec<ToolDefinition>,
 }
 
-/// Refresh all context elements and prepare data for streaming
+/// Refresh all context elements and prepare data for streaming.
+///
+/// Every call to this function means the LLM is about to see the full
+/// conversation history (including any user messages that arrived during
+/// streaming). We therefore mark all UserMessage notifications as processed
+/// here — the LLM has "seen" them via the rebuilt context.
 pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> StreamContext {
+    // Mark UserMessage notifications as processed on every context rebuild.
+    // This prevents the spine from firing a redundant auto-continuation for
+    // messages the LLM already saw (e.g., user sent a message during a tool
+    // call pause — the message is in context, LLM responds, but without this
+    // the notification would still be "unprocessed" when the stream ends).
+    use crate::modules::spine::types::NotificationType;
+    for n in &mut state.notifications {
+        if !n.processed && n.notification_type == NotificationType::UserMessage {
+            n.processed = true;
+        }
+    }
+    state.touch_panel(ContextType::Spine);
+
     // Detach old conversation chunks before anything else
     detach_conversation_chunks(state);
 

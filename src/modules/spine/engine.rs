@@ -102,12 +102,9 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
     use crate::persistence::save_message;
     use crate::state::{Message, MessageStatus, MessageType, estimate_tokens};
 
-    // Auto-mark UserMessage notifications as processed when starting a new stream
-    for n in &mut state.notifications {
-        if !n.processed && n.notification_type == NotificationType::UserMessage {
-            n.processed = true;
-        }
-    }
+    // Note: UserMessage notifications are marked as processed in
+    // prepare_stream_context() — every context rebuild counts as "seen".
+    // No need to do it here; it will happen when the stream context is built.
 
     match action {
         ContinuationAction::SyntheticMessage(content) => {
