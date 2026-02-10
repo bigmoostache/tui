@@ -1,3 +1,5 @@
+use crate::core::panels::now_ms;
+use crate::modules::spine::types::{Notification, NotificationType};
 use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, PromptItem, State};
 
@@ -33,6 +35,14 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     state.next_user_id += 1;
     state.global_next_uid += 1;
 
+    // Capture info for notification before moving user_msg
+    let user_id_str = user_id.clone();
+    let content_preview = if content.len() > 80 {
+        format!("{}...", &content[..content.floor_char_boundary(80)])
+    } else {
+        content.clone()
+    };
+
     let user_msg = Message {
         id: user_id,
         uid: Some(user_uid),
@@ -56,51 +66,35 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
 
+    // Create a UserMessage notification — spine will detect this and start streaming
+    // This works both during streaming (missed-message scenario) and when idle
+    create_user_notification(state, &user_id_str, &content_preview);
+
     // During streaming: insert BEFORE the streaming assistant message
-    // Otherwise: append normally
+    // The notification will be picked up when the current stream ends
     if state.is_streaming {
-        // Insert before the last message (the streaming assistant message)
         let insert_pos = state.messages.len().saturating_sub(1);
         state.messages.insert(insert_pos, user_msg);
-        return ActionResult::SaveMessage(state.messages[insert_pos].uid.clone().unwrap_or_else(|| state.messages[insert_pos].id.clone()));
+        return ActionResult::Save;
     }
 
     state.messages.push(user_msg);
 
-    // Create assistant message and start streaming
-    let assistant_id = format!("A{}", state.next_assistant_id);
-    let assistant_uid = format!("UID_{}_A", state.global_next_uid);
-    state.next_assistant_id += 1;
-    state.global_next_uid += 1;
+    // Reset auto-continuation counter (human input breaks the auto-continue chain)
+    state.spine_config.auto_continuation_count = 0;
+    state.spine_config.autonomous_start_ms = None;
 
-    let assistant_msg = Message {
-        id: assistant_id,
-        uid: Some(assistant_uid),
-        role: "assistant".to_string(),
-        message_type: MessageType::TextMessage,
-        content: String::new(),
-        content_token_count: 0,
-        tl_dr: None,
-        tl_dr_token_count: 0,
-        status: MessageStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: crate::core::panels::now_ms(),
-    };
-    state.messages.push(assistant_msg);
-
-    state.is_streaming = true;
-    state.last_stop_reason = None;
-    state.streaming_estimated_tokens = 0;
-    // Reset per-stream and per-tick token counters
+    // Reset per-stream and per-tick token counters for new user-initiated stream
     state.stream_cache_hit_tokens = 0;
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;
     state.tick_cache_hit_tokens = 0;
     state.tick_cache_miss_tokens = 0;
     state.tick_output_tokens = 0;
-    ActionResult::StartStream
+
+    // Return Save — the spine check in handle_action will detect the unprocessed
+    // notification and start streaming synchronously for responsive feel.
+    ActionResult::Save
 }
 
 /// Handle ClearConversation action
@@ -118,6 +112,23 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
     ActionResult::Save
+}
+
+/// Create a UserMessage notification in the spine system.
+/// This is the primary trigger for starting a stream — the spine engine
+/// will detect the unprocessed notification and launch streaming.
+fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
+    let notif_id = format!("N{}", state.next_notification_id);
+    state.next_notification_id += 1;
+    state.notifications.push(Notification {
+        id: notif_id,
+        notification_type: NotificationType::UserMessage,
+        source: user_id.to_string(),
+        processed: false,
+        timestamp_ms: now_ms(),
+        content: content_preview.to_string(),
+    });
+    state.touch_panel(ContextType::Spine);
 }
 
 /// Replace /command-name tokens in input with command content.
