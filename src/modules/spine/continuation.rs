@@ -88,9 +88,11 @@ impl AutoContinuation for NotificationsContinuation {
                     );
                 }
             } else {
-                // Pure ReloadResume — just relaunch, the conversation already
-                // has the tool result from system_reload.
-                return ContinuationAction::Relaunch;
+                // Pure ReloadResume — use a synthetic message so the API
+                // always sees the conversation ending with a user turn.
+                return ContinuationAction::SyntheticMessage(
+                    "/* Reload complete */".to_string()
+                );
             }
         }
 

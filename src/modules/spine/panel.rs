@@ -114,6 +114,7 @@ impl Panel for SpinePanel {
                     NotificationType::MaxTokensTruncated => theme::warning(),
                     NotificationType::TodoIncomplete => theme::accent(),
                     NotificationType::Custom => theme::text_secondary(),
+                    NotificationType::ReloadResume => theme::text_muted(),
                 };
                 lines.push(Line::from(vec![
                     Span::styled("   ", base_style),
