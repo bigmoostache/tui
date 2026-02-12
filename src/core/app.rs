@@ -13,7 +13,7 @@ use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER
 use crate::events::handle_event;
 use crate::help::CommandPalette;
 use crate::core::panels::now_ms;
-use crate::persistence::{check_ownership, save_message, save_state};
+use crate::persistence::{check_ownership, save_state, build_save_batch, build_message_op, PersistenceWriter};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
@@ -56,6 +56,16 @@ pub struct App {
     resume_stream: bool,
     /// Command palette state
     pub command_palette: CommandPalette,
+    /// Timestamp (ms) when wait_for_panels started (for timeout)
+    wait_started_ms: u64,
+    /// Deferred tool results waiting for sleep timer to expire
+    deferred_tool_sleep_until_ms: u64,
+    /// Whether we're in a deferred sleep state (waiting for timer before continuing tool pipeline)
+    deferred_tool_sleeping: bool,
+    /// Whether to refresh tmux panels when deferred sleep expires (set by send_keys)
+    deferred_sleep_needs_tmux_refresh: bool,
+    /// Background persistence writer — offloads file I/O to a dedicated thread
+    writer: PersistenceWriter,
 }
 
 impl App {
@@ -83,6 +93,11 @@ impl App {
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
+            wait_started_ms: 0,
+            deferred_tool_sleep_until_ms: 0,
+            deferred_tool_sleeping: false,
+            deferred_sleep_needs_tmux_refresh: false,
+            writer: PersistenceWriter::new(),
         }
     }
 
@@ -106,9 +121,6 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            // Create a notification so the spine engine picks it up and resumes streaming.
-            // No synthetic user message needed — the conversation already has the tool
-            // result from system_reload, and the LLM should continue from there.
             use crate::modules::spine::types::NotificationType;
             self.state.create_notification(
                 NotificationType::ReloadResume,
@@ -146,6 +158,8 @@ impl App {
                 }
 
                 let Some(action) = handle_event(&evt, &self.state) else {
+                    // User quit — flush all pending writes and save final state synchronously
+                    self.writer.flush();
                     save_state(&self.state);
                     break;
                 };
@@ -176,13 +190,17 @@ impl App {
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
+            // Check if we're waiting for panels and they're ready (non-blocking)
+            self.check_waiting_for_panels(&tx);
+            // Check if deferred sleep timer has expired (non-blocking)
+            self.check_deferred_sleep(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
                 self.sync_gh_watches();
             }
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
+            self.handle_tool_execution(&tx, &tldr_tx);
             self.finalize_stream(&tldr_tx);
             self.check_spine(&tx, &tldr_tx);
             self.process_api_check_results();
@@ -296,7 +314,8 @@ impl App {
             if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
                 msg.tl_dr = Some(tldr.tl_dr);
                 msg.tl_dr_token_count = tldr.token_count;
-                save_message(msg);
+                let op = build_message_op(msg);
+                self.writer.send_message(op);
             }
         }
     }
@@ -308,13 +327,17 @@ impl App {
                 self.state.api_check_result = Some(result);
                 self.state.dirty = true;
                 self.api_check_rx = None;
-                save_state(&self.state);
+                self.save_state_async();
             }
         }
     }
 
-    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
+            return;
+        }
+        // Don't process new tools while waiting for panels or deferred sleep
+        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
         let _guard = crate::profile!("app::tool_exec");
@@ -328,7 +351,8 @@ impl App {
             if msg.role == "assistant" {
                 // Clean any LLM ID prefixes before saving
                 msg.content = clean_llm_id_prefix(&msg.content);
-                save_message(msg);
+                let op = build_message_op(msg);
+                self.writer.send_message(op);
                 if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
                     self.state.pending_tldrs += 1;
                     generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
@@ -362,7 +386,7 @@ impl App {
                 input_tokens: 0,
                 timestamp_ms: crate::core::panels::now_ms(),
             };
-            save_message(&tool_msg);
+            self.save_message_async(&tool_msg);
             self.state.messages.push(tool_msg);
 
             let result = execute_tool(tool, &mut self.state);
@@ -396,7 +420,7 @@ impl App {
             input_tokens: 0,
             timestamp_ms: crate::core::panels::now_ms(),
         };
-        save_message(&result_msg);
+        self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
 
         // Check if reload was requested - perform it after tool result is saved
@@ -442,14 +466,35 @@ impl App {
             self.state.total_output_tokens += output_tokens;
         }
 
-        save_state(&self.state);
+        self.save_state_async();
 
-        // Wait for any dirty file panels to be loaded before continuing
-        super::wait::wait_for_panels(&mut self.state, cache_rx, &self.cache_tx, terminal, |state, rx| {
-            Self::process_cache_updates_static(state, rx);
-        });
+        // Check if any tool requested a sleep (e.g., console_sleep)
+        if self.state.tool_sleep_until_ms > 0 {
+            // Defer everything — main loop will check timer and continue
+            self.deferred_tool_sleeping = true;
+            self.deferred_tool_sleep_until_ms = self.state.tool_sleep_until_ms;
+            self.deferred_sleep_needs_tmux_refresh = self.state.tool_sleep_needs_tmux_refresh;
+            self.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+            self.state.tool_sleep_needs_tmux_refresh = false;
+            return;
+        }
 
-        // Continue streaming
+        // Trigger background cache refresh for dirty file panels (non-blocking)
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+
+        // Check if we need to wait for panels before continuing stream
+        if super::wait::has_dirty_file_panels(&self.state) {
+            // Set waiting flag — main loop will check and continue streaming when ready
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            // No dirty panels — continue streaming immediately
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Continue streaming after tool execution (called when panels are ready).
+    fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
         let ctx = prepare_stream_context(&mut self.state, true);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
@@ -461,8 +506,85 @@ impl App {
         );
     }
 
+    /// Non-blocking check: if we're waiting for file panels to load,
+    /// check if they're ready (or timed out) and continue streaming.
+    fn check_waiting_for_panels(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.state.waiting_for_panels {
+            return;
+        }
+
+        let panels_ready = !super::wait::has_dirty_panels(&self.state);
+        let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
+
+        if panels_ready || timed_out {
+            self.state.waiting_for_panels = false;
+            self.state.dirty = true;
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: if a tool requested a sleep (e.g., console_sleep),
+    /// wait for the timer to expire, then deprecate tmux panels and continue
+    /// through the normal wait_for_panels → continue_streaming pipeline.
+    fn check_deferred_sleep(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.deferred_tool_sleeping {
+            return;
+        }
+
+        if now_ms() < self.deferred_tool_sleep_until_ms {
+            return; // Still sleeping — keep processing input normally
+        }
+
+        let needs_tmux = self.deferred_sleep_needs_tmux_refresh;
+        self.deferred_tool_sleeping = false;
+        self.deferred_tool_sleep_until_ms = 0;
+        self.deferred_sleep_needs_tmux_refresh = false;
+        self.state.dirty = true;
+
+        if needs_tmux {
+            // send_keys: deprecate tmux panels and wait for refresh
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::Tmux {
+                    ctx.cache_deprecated = true;
+                }
+            }
+            // Trigger tmux panel refreshes
+            for ctx in &self.state.context {
+                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
+                    let panel = crate::core::panels::get_panel(ctx.context_type);
+                    if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                        crate::cache::process_cache_request(request, self.cache_tx.clone());
+                    }
+                }
+            }
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
+                    ctx.cache_in_flight = true;
+                }
+            }
+            // Also check file panels
+            super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+
+            if super::wait::has_dirty_panels(&self.state) {
+                self.state.waiting_for_panels = true;
+                self.wait_started_ms = now_ms();
+            } else {
+                self.continue_streaming(tx);
+            }
+        } else {
+            // Pure sleep (console_sleep): just continue, no refresh needed
+            self.continue_streaming(tx);
+        }
+    }
+
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming {
+            return;
+        }
+        // Don't finalize while waiting for panels or deferred sleep —
+        // pending_done is still Some from the intermediate stream, and
+        // continue_streaming will clear it when the deferred state resolves.
+        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
 
@@ -473,7 +595,7 @@ impl App {
                 match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason }) {
                     ActionResult::SaveMessage(id) => {
                         let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                            save_message(msg);
+                            self.save_message_async(msg);
                             if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
                                 Some((msg.id.clone(), msg.content.clone()))
                             } else {
@@ -484,9 +606,9 @@ impl App {
                             self.state.pending_tldrs += 1;
                             generate_tldr(msg_id, content, tldr_tx.clone());
                         }
-                        save_state(&self.state);
+                        self.save_state_async();
                     }
-                    ActionResult::Save => save_state(&self.state),
+                    ActionResult::Save => self.save_state_async(),
                     _ => {}
                 }
                 // Reset retry count on successful completion
@@ -512,19 +634,19 @@ impl App {
                 self.pending_tools.clear();
                 if let Some(msg) = self.state.messages.last() {
                     if msg.role == "assistant" {
-                        save_message(msg);
+                        self.save_message_async(msg);
                     }
                 }
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::Save => {
-                save_state(&self.state);
+                self.save_state_async();
                 // Check spine synchronously for responsive auto-continuation
                 self.check_spine(tx, tldr_tx);
             }
             ActionResult::SaveMessage(id) => {
                 let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                    save_message(msg);
+                    self.save_message_async(msg);
                     if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
                         Some((msg.id.clone(), msg.content.clone()))
                     } else {
@@ -535,7 +657,7 @@ impl App {
                     self.state.pending_tldrs += 1;
                     generate_tldr(msg_id, content, tldr_tx.clone());
                 }
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::StartApiCheck => {
                 let (api_tx, api_rx) = std::sync::mpsc::channel();
@@ -545,7 +667,7 @@ impl App {
                     self.state.current_model(),
                     api_tx,
                 );
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::Nothing => {}
         }
@@ -850,7 +972,7 @@ impl App {
             SpineDecision::Blocked(_reason) => {
                 // Guard rail blocked — notification already created by engine
                 self.state.dirty = true;
-                save_state(&self.state);
+                self.save_state_async();
             }
             SpineDecision::Continue(action) => {
                 // Auto-continuation fired — apply it and start streaming
@@ -873,7 +995,7 @@ impl App {
                         self.state.current_model(),
                         ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
                     );
-                    save_state(&self.state);
+                    self.save_state_async();
                     self.state.dirty = true;
                 }
             }
@@ -903,6 +1025,18 @@ impl App {
             // Mark dirty to trigger re-render with new spinner frame
             self.state.dirty = true;
         }
+    }
+
+    /// Send state to background writer (debounced, non-blocking).
+    /// Preferred over `save_state()` in the main event loop.
+    fn save_state_async(&self) {
+        self.writer.send_batch(build_save_batch(&self.state));
+    }
+
+    /// Send a message to background writer (non-blocking).
+    /// Preferred over `save_message()` in the main event loop.
+    fn save_message_async(&self, msg: &Message) {
+        self.writer.send_message(build_message_op(msg));
     }
 
     /// Handle keyboard events when command palette is open
