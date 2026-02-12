@@ -23,6 +23,8 @@ pub struct State {
     pub input: String,
     /// Cursor position in input (byte index)
     pub input_cursor: usize,
+    /// Paste buffers: stored content for inline paste placeholders
+    pub paste_buffers: Vec<String>,
     pub selected_context: usize,
     pub is_streaming: bool,
     /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
@@ -204,6 +206,7 @@ impl Default for State {
             messages: vec![],
             input: String::new(),
             input_cursor: 0,
+            paste_buffers: vec![],
             selected_context: 0,
             is_streaming: false,
             last_stop_reason: None,

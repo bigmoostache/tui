@@ -24,8 +24,11 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     let content = replace_commands(&state.input, &state.commands);
+    // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
+    let content = expand_paste_sentinels(&content, &state.paste_buffers);
     state.input.clear();
     state.input_cursor = 0;
+    state.paste_buffers.clear();
     let user_token_estimate = estimate_tokens(&content);
 
     // Assign user display ID and UID
@@ -108,6 +111,53 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
         user_id.to_string(),
         content_preview.to_string(),
     );
+}
+
+/// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
+fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
+    if !input.contains('\x00') {
+        return input.to_string();
+    }
+
+    let mut result = String::new();
+    let bytes = input.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i] == 0 {
+            // Found sentinel start — find the index and closing \x00
+            let start = i;
+            i += 1;
+            let idx_start = i;
+            while i < bytes.len() && bytes[i] != 0 {
+                i += 1;
+            }
+            if i < bytes.len() {
+                // Found closing \x00
+                let idx_str = &input[idx_start..i];
+                i += 1; // skip closing \x00
+
+                if let Ok(idx) = idx_str.parse::<usize>() {
+                    if let Some(content) = paste_buffers.get(idx) {
+                        result.push_str(content);
+                    }
+                    // If index out of bounds, silently drop the sentinel
+                } else {
+                    // Invalid index — keep original bytes
+                    result.push_str(&input[start..i]);
+                }
+            } else {
+                // No closing \x00 — keep as-is
+                result.push_str(&input[start..]);
+            }
+        } else {
+            let ch = input[i..].chars().next().unwrap();
+            result.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+
+    result
 }
 
 /// Replace /command-name tokens in input with command content.
