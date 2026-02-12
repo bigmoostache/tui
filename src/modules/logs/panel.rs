@@ -4,22 +4,62 @@ use crate::core::panels::{ContextItem, Panel};
 use crate::state::{estimate_tokens, ContextType, State};
 use crate::ui::theme;
 
-/// Fixed panel for timestamped log entries.
+use super::types::LogEntry;
+
+/// Fixed panel for timestamped log entries with tree-structured summaries.
 /// Un-deletable, always present when the logs module is active.
 pub struct LogsPanel;
 
 impl LogsPanel {
-    fn format_logs_for_context(state: &State) -> String {
+    /// Build the text representation used for both LLM context and UI content.
+    /// Shows tree structure: top-level logs, summaries with collapse/expand,
+    /// and indented children when expanded.
+    fn format_logs_tree(state: &State) -> String {
         if state.logs.is_empty() {
             return "No logs".to_string();
         }
 
         let mut output = String::new();
-        for entry in &state.logs {
-            let time_str = format_timestamp(entry.timestamp_ms);
-            output.push_str(&format!("[{}] {} {}\n", entry.id, time_str, entry.content));
+        // Only show top-level logs (no parent_id)
+        let top_level: Vec<&LogEntry> = state.logs.iter()
+            .filter(|l| l.is_top_level())
+            .collect();
+
+        for log in &top_level {
+            format_log_entry(&mut output, log, &state.logs, &state.open_log_ids, 0);
         }
         output.trim_end().to_string()
+    }
+}
+
+/// Recursively format a log entry with indentation for tree display.
+fn format_log_entry(
+    output: &mut String,
+    entry: &LogEntry,
+    all_logs: &[LogEntry],
+    open_ids: &[String],
+    depth: usize,
+) {
+    let indent = "  ".repeat(depth);
+    let time_str = format_timestamp(entry.timestamp_ms);
+
+    if entry.is_summary() {
+        let is_open = open_ids.contains(&entry.id);
+        let icon = if is_open { "▼" } else { "▶" };
+        let child_count = entry.children_ids.len();
+        if is_open {
+            output.push_str(&format!("{}{} [{}] {} {}\n", indent, icon, entry.id, time_str, entry.content));
+            // Show children indented
+            for child_id in &entry.children_ids {
+                if let Some(child) = all_logs.iter().find(|l| l.id == *child_id) {
+                    format_log_entry(output, child, all_logs, open_ids, depth + 1);
+                }
+            }
+        } else {
+            output.push_str(&format!("{}{} [{}] {} {} ({} children)\n", indent, icon, entry.id, time_str, entry.content, child_count));
+        }
+    } else {
+        output.push_str(&format!("{}[{}] {} {}\n", indent, entry.id, time_str, entry.content));
     }
 }
 
@@ -29,7 +69,7 @@ impl Panel for LogsPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        let content = Self::format_logs_for_context(state);
+        let content = Self::format_logs_tree(state);
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
@@ -41,7 +81,7 @@ impl Panel for LogsPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let content = Self::format_logs_for_context(state);
+        let content = Self::format_logs_tree(state);
         let (id, last_refresh_ms) = state.context.iter()
             .find(|c| c.context_type == ContextType::Logs)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
@@ -60,24 +100,85 @@ impl Panel for LogsPanel {
         }
 
         let mut lines = Vec::new();
-        for entry in &state.logs {
-            let time_str = format_timestamp(entry.timestamp_ms);
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{} ", entry.id),
-                    Style::default().fg(theme::accent_dim()),
-                ),
-                Span::styled(
-                    format!("{} ", time_str),
-                    Style::default().fg(theme::text_muted()),
-                ),
-                Span::styled(
-                    entry.content.clone(),
-                    Style::default().fg(theme::text()),
-                ),
-            ]));
+        let top_level: Vec<&LogEntry> = state.logs.iter()
+            .filter(|l| l.is_top_level())
+            .collect();
+
+        for log in &top_level {
+            render_log_entry(&mut lines, log, &state.logs, &state.open_log_ids, 0);
         }
         lines
+    }
+}
+
+/// Recursively render a log entry as styled TUI lines.
+fn render_log_entry(
+    lines: &mut Vec<Line<'static>>,
+    entry: &LogEntry,
+    all_logs: &[LogEntry],
+    open_ids: &[String],
+    depth: usize,
+) {
+    let indent = "  ".repeat(depth);
+    let time_str = format_timestamp(entry.timestamp_ms);
+
+    if entry.is_summary() {
+        let is_open = open_ids.contains(&entry.id);
+        let icon = if is_open { "▼" } else { "▶" };
+        let child_count = entry.children_ids.len();
+
+        let mut spans = vec![
+            Span::styled(indent.clone(), Style::default()),
+            Span::styled(
+                format!("{} ", icon),
+                Style::default().fg(theme::accent()),
+            ),
+            Span::styled(
+                format!("{} ", entry.id),
+                Style::default().fg(theme::accent_dim()),
+            ),
+            Span::styled(
+                format!("{} ", time_str),
+                Style::default().fg(theme::text_muted()),
+            ),
+            Span::styled(
+                entry.content.clone(),
+                Style::default().fg(theme::text()),
+            ),
+        ];
+
+        if !is_open {
+            spans.push(Span::styled(
+                format!(" ({} children)", child_count),
+                Style::default().fg(theme::text_muted()),
+            ));
+        }
+
+        lines.push(Line::from(spans));
+
+        if is_open {
+            for child_id in &entry.children_ids {
+                if let Some(child) = all_logs.iter().find(|l| l.id == *child_id) {
+                    render_log_entry(lines, child, all_logs, open_ids, depth + 1);
+                }
+            }
+        }
+    } else {
+        lines.push(Line::from(vec![
+            Span::styled(indent, Style::default()),
+            Span::styled(
+                format!("{} ", entry.id),
+                Style::default().fg(theme::accent_dim()),
+            ),
+            Span::styled(
+                format!("{} ", time_str),
+                Style::default().fg(theme::text_muted()),
+            ),
+            Span::styled(
+                entry.content.clone(),
+                Style::default().fg(theme::text()),
+            ),
+        ]));
     }
 }
 

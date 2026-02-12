@@ -28,10 +28,10 @@ pub const CHARS_PER_TOKEN: f32 = 3.3;
 pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
 
 /// Number of oldest active messages to carve off into a ConversationHistory panel.
-pub const DETACH_CHUNK_MESSAGES: usize = 25;
+pub const DETACH_CHUNK_MESSAGES: usize = 50;
 
 /// Minimum messages to keep in the live conversation after detachment.
-pub const DETACH_KEEP_MESSAGES: usize = 10;
+pub const DETACH_KEEP_MESSAGES: usize = 20;
 
 // =============================================================================
 // SCROLLING
@@ -124,6 +124,12 @@ pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
 /// Presets subdirectory
 pub const PRESETS_DIR: &str = "presets";
+
+/// Logs subdirectory (chunked JSON files, global across workers)
+pub const LOGS_DIR: &str = "logs";
+
+/// Number of log entries per chunk file
+pub const LOGS_CHUNK_SIZE: usize = 1000;
 
 // =============================================================================
 // PANEL SIZE LIMITS

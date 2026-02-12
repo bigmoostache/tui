@@ -85,6 +85,8 @@ pub struct State {
     pub logs: Vec<LogEntry>,
     /// Next log entry ID (L1, L2, ...)
     pub next_log_id: usize,
+    /// IDs of log summaries whose children are expanded (per-worker)
+    pub open_log_ids: Vec<String>,
     /// Spine notifications
     pub notifications: Vec<Notification>,
     /// Next notification ID (N1, N2, ...)
@@ -243,6 +245,7 @@ impl Default for State {
             next_scratchpad_id: 1,
             logs: vec![],
             next_log_id: 1,
+            open_log_ids: vec![],
             notifications: vec![],
             next_notification_id: 1,
             spine_config: SpineConfig::default(),

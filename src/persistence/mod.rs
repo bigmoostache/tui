@@ -262,6 +262,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::constants::STATES_DIR),
         dir.join(crate::constants::PANELS_DIR),
         dir.join(crate::constants::MESSAGES_DIR),
+        dir.join(crate::constants::LOGS_DIR),
     ];
 
     // Build module data maps
@@ -298,6 +299,9 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
             content: json.into_bytes(),
         });
     }
+
+    // Chunked log files (global, shared across workers)
+    writes.extend(crate::modules::logs::build_log_write_ops(&state.logs, state.next_log_id));
 
     // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
