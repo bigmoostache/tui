@@ -87,6 +87,14 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
+    if agent.is_builtin {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Cannot edit built-in agent '{}'", id),
+            is_error: true,
+        };
+    }
+
     let mut changes = Vec::new();
 
     if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {

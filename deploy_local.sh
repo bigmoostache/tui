@@ -29,6 +29,9 @@ echo "      Build complete."
 
 # 2. Install binary
 echo "[2/4] Installing to $INSTALL_PATH..."
+# Remove old binary first to avoid "Text file busy" when the running process holds it open.
+# The running process keeps its inode alive, but the directory entry is freed for the new copy.
+rm -f "$INSTALL_PATH"
 cp "$SCRIPT_DIR/target/release/tui" "$INSTALL_PATH"
 chmod +x "$INSTALL_PATH"
 echo "      Installed. ($(du -h "$INSTALL_PATH" | cut -f1))"
