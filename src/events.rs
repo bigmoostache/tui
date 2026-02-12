@@ -73,6 +73,12 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             };
             Some(action)
         }
+        // Bracketed paste: store in buffer, insert placeholder sentinel
+        // Normalize line endings: terminals may send \r\n or \r instead of \n
+        Event::Paste(text) => {
+            let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+            Some(Action::PasteText(normalized))
+        }
         _ => Some(Action::None),
     }
 }

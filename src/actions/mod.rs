@@ -20,6 +20,7 @@ use crate::state::{ContextElement, ContextType, State};
 pub enum Action {
     InputChar(char),
     InsertText(String),
+    PasteText(String),
     InputBackspace,
     InputDelete,
     InputSubmit,
@@ -60,8 +61,6 @@ pub enum Action {
 
 pub enum ActionResult {
     Nothing,
-    #[allow(dead_code)]
-    StartStream,
     StopStream,
     StartApiCheck,
     Save,
@@ -85,15 +84,77 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input_cursor += text.len();
             ActionResult::Nothing
         }
+        Action::PasteText(text) => {
+            // Store in paste buffers and insert sentinel marker at cursor
+            let idx = state.paste_buffers.len();
+            state.paste_buffers.push(text);
+            let sentinel = format!("\x00{}\x00", idx);
+            state.input.insert_str(state.input_cursor, &sentinel);
+            state.input_cursor += sentinel.len();
+            ActionResult::Nothing
+        }
         Action::InputBackspace => {
             if state.input_cursor > 0 {
-                let prev = state.input[..state.input_cursor]
-                    .char_indices()
-                    .last()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-                state.input.remove(prev);
-                state.input_cursor = prev;
+                // Check if we're at the end of a paste sentinel (\x00{idx}\x00)
+                // The closing \x00 is at cursor-1
+                let bytes = state.input.as_bytes();
+                if bytes[state.input_cursor - 1] == 0 {
+                    // Find the opening \x00 by scanning backwards past the index digits
+                    let mut scan = state.input_cursor - 2; // skip closing \x00
+                    while scan > 0 && bytes[scan] != 0 {
+                        scan -= 1;
+                    }
+                    if bytes[scan] == 0 {
+                        // Remove the entire sentinel from scan..cursor
+                        state.input = format!(
+                            "{}{}",
+                            &state.input[..scan],
+                            &state.input[state.input_cursor..]
+                        );
+                        state.input_cursor = scan;
+                    }
+                } else if state.input_cursor >= 2 && bytes[state.input_cursor - 1].is_ascii_digit() {
+                    // Check if cursor is inside a sentinel (between \x00 and closing \x00)
+                    // Scan backwards to see if we hit \x00 before any non-digit
+                    let mut scan = state.input_cursor - 1;
+                    while scan > 0 && bytes[scan].is_ascii_digit() {
+                        scan -= 1;
+                    }
+                    if bytes[scan] == 0 {
+                        // We're inside a sentinel — find the closing \x00
+                        let mut end = state.input_cursor;
+                        while end < bytes.len() && bytes[end] != 0 {
+                            end += 1;
+                        }
+                        if end < bytes.len() && bytes[end] == 0 {
+                            end += 1; // include closing \x00
+                        }
+                        state.input = format!(
+                            "{}{}",
+                            &state.input[..scan],
+                            &state.input[end..]
+                        );
+                        state.input_cursor = scan;
+                    } else {
+                        // Not a sentinel — normal backspace
+                        let prev = state.input[..state.input_cursor]
+                            .char_indices()
+                            .last()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        state.input.remove(prev);
+                        state.input_cursor = prev;
+                    }
+                } else {
+                    // Normal backspace — remove one character
+                    let prev = state.input[..state.input_cursor]
+                        .char_indices()
+                        .last()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    state.input.remove(prev);
+                    state.input_cursor = prev;
+                }
             }
             ActionResult::Nothing
         }

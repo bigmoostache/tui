@@ -215,6 +215,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             ContextType::Skill => "skill",
             ContextType::ConversationHistory => "chat-history",
             ContextType::Spine => "spine",
+            ContextType::Logs => "logs",
         };
 
         let details = match ctx.context_type {
@@ -505,6 +506,10 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
             ToolCategory::Tree => ("TREE", tool_categories::tree_desc()),
             ToolCategory::Console => ("CONSOLE", tool_categories::console_desc()),
             ToolCategory::Context => ("CONTEXT", tool_categories::context_desc()),
+            ToolCategory::Skill => ("SKILL", "Manage knowledge skills"),
+            ToolCategory::Agent => ("AGENT", "Manage system prompt agents"),
+            ToolCategory::Command => ("COMMAND", "Manage input commands"),
+            ToolCategory::System => ("SYSTEM", "System configuration and control"),
             ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
             ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
             ToolCategory::Git => ("GIT", tool_categories::git_desc()),

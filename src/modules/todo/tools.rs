@@ -132,6 +132,15 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut not_found: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
 
+    // Collect all IDs being deleted in this batch to validate no orphans are created
+    let delete_ids: std::collections::HashSet<String> = updates.iter()
+        .filter(|u| {
+            u.get("delete").and_then(|v| v.as_bool()).unwrap_or(false)
+                || u.get("status").and_then(|v| v.as_str()) == Some("deleted")
+        })
+        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .collect();
+
     for update_value in updates {
         let id = match update_value.get("id").and_then(|v| v.as_str()) {
             Some(i) => i,
@@ -146,6 +155,32 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             || update_value.get("status").and_then(|v| v.as_str()) == Some("deleted");
 
         if should_delete {
+            // Check that all children are also being deleted in this batch
+            fn collect_descendants(id: &str, todos: &[TodoItem]) -> Vec<String> {
+                let mut desc = Vec::new();
+                for t in todos {
+                    if t.parent_id.as_deref() == Some(id) {
+                        desc.push(t.id.clone());
+                        desc.extend(collect_descendants(&t.id, todos));
+                    }
+                }
+                desc
+            }
+
+            let descendants = collect_descendants(id, &state.todos);
+            let orphans: Vec<&String> = descendants.iter()
+                .filter(|d| !delete_ids.contains(d.as_str()))
+                .collect();
+
+            if !orphans.is_empty() {
+                errors.push(format!(
+                    "{}: cannot delete — children {} would be orphaned. Delete them too, or delete all at once.",
+                    id,
+                    orphans.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                ));
+                continue;
+            }
+
             let initial_len = state.todos.len();
             state.todos.retain(|t| t.id != id);
             if state.todos.len() < initial_len {
@@ -192,6 +227,27 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             None // no change
         };
 
+        // Pre-check: if setting status to done, verify all children are done
+        let status_str = update_value.get("status").and_then(|v| v.as_str());
+        if let Some(s) = status_str {
+            if let Some(status) = TodoStatus::from_str(s) {
+                if status == TodoStatus::Done {
+                    let undone_children: Vec<String> = state.todos.iter()
+                        .filter(|c| c.parent_id.as_deref() == Some(id) && c.status != TodoStatus::Done)
+                        .map(|c| format!("{} ({})", c.id, c.name))
+                        .collect();
+                    if !undone_children.is_empty() {
+                        errors.push(format!(
+                            "{}: cannot mark done — children not done: {}",
+                            id,
+                            undone_children.join(", ")
+                        ));
+                        continue;
+                    }
+                }
+            }
+        }
+
         // Find and update the todo
         let todo = state.todos.iter_mut().find(|t| t.id == id);
 
@@ -232,8 +288,34 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
+    // Auto-propagate in_progress to parent chain
+    // If any todo was set to in_progress, walk up its parent chain and mark pending parents as in_progress
+    let mut propagated: Vec<String> = Vec::new();
+    for update_value in updates {
+        let status_str = update_value.get("status").and_then(|v| v.as_str());
+        if status_str == Some("in_progress") || status_str == Some("~") {
+            if let Some(id) = update_value.get("id").and_then(|v| v.as_str()) {
+                // Walk up parent chain
+                let mut current_id = state.todos.iter()
+                    .find(|t| t.id == id)
+                    .and_then(|t| t.parent_id.clone());
+                while let Some(pid) = current_id {
+                    if let Some(parent) = state.todos.iter_mut().find(|t| t.id == pid) {
+                        if parent.status == TodoStatus::Pending {
+                            parent.status = TodoStatus::InProgress;
+                            propagated.push(parent.id.clone());
+                        }
+                        current_id = parent.parent_id.clone();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Update Todo panel timestamp if anything changed
-    if !updated.is_empty() || !deleted.is_empty() {
+    if !updated.is_empty() || !deleted.is_empty() || !propagated.is_empty() {
         state.touch_panel(crate::state::ContextType::Todo);
     }
 
@@ -241,6 +323,13 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !updated.is_empty() {
         output.push_str(&format!("Updated {}:\n{}", updated.len(), updated.join("\n")));
+    }
+
+    if !propagated.is_empty() {
+        if !output.is_empty() {
+            output.push_str("\n\n");
+        }
+        output.push_str(&format!("Auto-propagated in_progress to parents: {}", propagated.join(", ")));
     }
 
     if !deleted.is_empty() {
@@ -267,6 +356,89 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: output,
-        is_error: updated.is_empty() && deleted.is_empty(),
+        is_error: updated.is_empty() && deleted.is_empty() && propagated.is_empty(),
+    }
+}
+
+pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
+        Some(i) => i,
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing 'id' parameter".to_string(),
+                is_error: true,
+            }
+        }
+    };
+
+    // Normalize after_id: treat null, "none", "null", "" as None (move to top)
+    let after_id = tool.input.get("after_id")
+        .and_then(|v| {
+            if v.is_null() { return None; }
+            v.as_str()
+        })
+        .filter(|s| {
+            let lower = s.to_lowercase();
+            !s.is_empty() && lower != "none" && lower != "null"
+        });
+
+    // Find the todo to move
+    let move_idx = match state.todos.iter().position(|t| t.id == id) {
+        Some(idx) => idx,
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Todo '{}' not found", id),
+                is_error: true,
+            }
+        }
+    };
+
+    // Validate after_id exists if specified
+    if let Some(aid) = after_id {
+        if aid == id {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot move '{}' after itself", id),
+                is_error: true,
+            };
+        }
+        if !state.todos.iter().any(|t| t.id == aid) {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Target '{}' not found", aid),
+                is_error: true,
+            };
+        }
+    }
+
+    // Remove the todo from its current position
+    let item = state.todos.remove(move_idx);
+
+    // Insert at new position
+    let insert_idx = match after_id {
+        None => 0, // move to top
+        Some(aid) => {
+            // Find the after_id position (may have shifted after remove)
+            match state.todos.iter().position(|t| t.id == aid) {
+                Some(idx) => idx + 1, // insert after it
+                None => 0, // shouldn't happen, we validated above
+            }
+        }
+    };
+
+    state.todos.insert(insert_idx, item);
+    state.touch_panel(crate::state::ContextType::Todo);
+
+    let position_desc = match after_id {
+        None => "top".to_string(),
+        Some(aid) => format!("after {}", aid),
+    };
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Moved {} to {}", id, position_desc),
+        is_error: false,
     }
 }

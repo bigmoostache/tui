@@ -10,6 +10,7 @@ use crate::modules::todo::types::TodoItem;
 use crate::modules::memory::types::MemoryItem;
 use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
+use crate::modules::logs::types::LogEntry;
 use crate::modules::spine::types::{Notification, SpineConfig};
 use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 use crate::modules::git::types::GitFileChange;
@@ -22,6 +23,8 @@ pub struct State {
     pub input: String,
     /// Cursor position in input (byte index)
     pub input_cursor: usize,
+    /// Paste buffers: stored content for inline paste placeholders
+    pub paste_buffers: Vec<String>,
     pub selected_context: usize,
     pub is_streaming: bool,
     /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
@@ -60,6 +63,8 @@ pub struct State {
     pub memories: Vec<MemoryItem>,
     /// Next memory ID (M1, M2, ...)
     pub next_memory_id: usize,
+    /// IDs of memories whose full contents are shown (per-worker)
+    pub open_memory_ids: Vec<String>,
     /// Agent prompt items
     pub agents: Vec<PromptItem>,
     /// Active agent ID (None = default)
@@ -76,6 +81,10 @@ pub struct State {
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Next scratchpad cell ID (C1, C2, ...)
     pub next_scratchpad_id: usize,
+    /// Log entries (timestamped short notes)
+    pub logs: Vec<LogEntry>,
+    /// Next log entry ID (L1, L2, ...)
+    pub next_log_id: usize,
     /// Spine notifications
     pub notifications: Vec<Notification>,
     /// Next notification ID (N1, N2, ...)
@@ -197,6 +206,7 @@ impl Default for State {
             messages: vec![],
             input: String::new(),
             input_cursor: 0,
+            paste_buffers: vec![],
             selected_context: 0,
             is_streaming: false,
             last_stop_reason: None,
@@ -218,6 +228,7 @@ impl Default for State {
             next_todo_id: 1,
             memories: vec![],
             next_memory_id: 1,
+            open_memory_ids: vec![],
             agents: vec![],
             active_agent_id: None,
             skills: vec![],
@@ -226,6 +237,8 @@ impl Default for State {
             library_preview: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
+            logs: vec![],
+            next_log_id: 1,
             notifications: vec![],
             next_notification_id: 1,
             spine_config: SpineConfig::default(),
@@ -515,11 +528,13 @@ impl State {
         }
     }
 
-    /// Mark all UserMessage notifications as processed (called when a new stream starts)
+    /// Mark all "transparent" notifications (UserMessage, ReloadResume) as processed.
+    /// Called when a new stream starts — the LLM sees them via rebuilt context.
     pub fn mark_user_message_notifications_processed(&mut self) {
+        use crate::modules::spine::types::NotificationType;
         let mut changed = false;
         for n in &mut self.notifications {
-            if !n.processed && n.notification_type == crate::modules::spine::types::NotificationType::UserMessage {
+            if !n.processed && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume) {
                 n.processed = true;
                 changed = true;
             }

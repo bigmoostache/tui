@@ -171,28 +171,6 @@ impl Module for CoreModule {
                 enabled: true,
                 category: ToolCategory::Context,
             },
-            ToolDefinition {
-                id: "context_message_status".to_string(),
-                name: "Message Status".to_string(),
-                short_desc: "Manage message visibility".to_string(),
-                description: "Changes message status to control what's sent to the LLM. Batched.".to_string(),
-                params: vec![
-                    ToolParam::new("changes", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("message_id", ParamType::String)
-                            .desc("Message ID (e.g., U1, A3)")
-                            .required(),
-                        ToolParam::new("status", ParamType::String)
-                            .desc("full | summarized | deleted")
-                            .required(),
-                        ToolParam::new("tl_dr", ParamType::String)
-                            .desc("Required when status is 'summarized'"),
-                    ]))))
-                        .desc("Array of status changes")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
 
             // System tools (reload stays in core)
             ToolDefinition {
@@ -202,7 +180,7 @@ impl Module for CoreModule {
                 description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
                 params: vec![],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
 
             // Meta tools
@@ -225,7 +203,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
         ];
 
@@ -257,7 +235,6 @@ impl Module for CoreModule {
         match tool.name.as_str() {
             // Context tools
             "context_close" => Some(self::tools::close_context::execute(tool, state)),
-            "context_message_status" => Some(self::tools::message_status::execute(tool, state)),
             "panel_goto_page" => Some(self::tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)

@@ -103,6 +103,21 @@ impl Module for TodoModule {
                 enabled: true,
                 category: ToolCategory::Todo,
             },
+            ToolDefinition {
+                id: "todo_move".to_string(),
+                name: "Move Todo".to_string(),
+                short_desc: "Reorder a task".to_string(),
+                description: "Moves a todo to a new position in the list. Place it after another todo, or at the top if after_id is null.".to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String)
+                        .desc("Todo ID to move (e.g., X1)")
+                        .required(),
+                    ToolParam::new("after_id", ParamType::String)
+                        .desc("Place after this todo ID. Null or omit to move to top."),
+                ],
+                enabled: true,
+                category: ToolCategory::Todo,
+            },
         ]
     }
 
@@ -110,6 +125,7 @@ impl Module for TodoModule {
         match tool.name.as_str() {
             "todo_create" => Some(self::tools::execute_create(tool, state)),
             "todo_update" => Some(self::tools::execute_update(tool, state)),
+            "todo_move" => Some(self::tools::execute_move(tool, state)),
             _ => None,
         }
     }

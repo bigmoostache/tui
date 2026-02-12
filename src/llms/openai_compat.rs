@@ -247,7 +247,7 @@ pub fn build_messages(
                 if included_tool_ids.contains(&result.tool_use_id) {
                     out.push(OaiMessage {
                         role: "tool".to_string(),
-                        content: Some(format!("[{}]:\n{}", msg.id, result.content)),
+                        content: Some(result.content.clone()),
                         tool_calls: None,
                         tool_call_id: Some(result.tool_use_id.clone()),
                     });
@@ -283,7 +283,11 @@ pub fn build_messages(
                 });
 
                 if should_merge {
-                    out.last_mut().unwrap().tool_calls.as_mut().unwrap().extend(calls);
+                    if let Some(last) = out.last_mut() {
+                        if let Some(ref mut existing_calls) = last.tool_calls {
+                            existing_calls.extend(calls);
+                        }
+                    }
                 } else {
                     out.push(OaiMessage {
                         role: "assistant".to_string(),
@@ -305,7 +309,7 @@ pub fn build_messages(
         if !message_content.is_empty() {
             out.push(OaiMessage {
                 role: msg.role.clone(),
-                content: Some(format!("[{}]:\n{}", msg.id, message_content)),
+                content: Some(message_content),
                 tool_calls: None,
                 tool_call_id: None,
             });

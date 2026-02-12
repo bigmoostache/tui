@@ -4,6 +4,7 @@ pub mod git;
 pub mod github;
 pub mod glob;
 pub mod grep;
+pub mod logs;
 pub mod memory;
 pub mod preset;
 pub mod scratchpad;
@@ -116,6 +117,7 @@ const FIXED_PANEL_ORDER: &[ContextType] = &[
     ContextType::Scratchpad,   // P7
     ContextType::Library,      // P8
     ContextType::Spine,        // P9
+    ContextType::Logs,         // P10
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -199,6 +201,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(scratchpad::ScratchpadModule),
         Box::new(preset::PresetModule),
         Box::new(spine::SpineModule),
+        Box::new(logs::LogsModule),
     ]
 }
 
@@ -317,7 +320,7 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
             .required(),
         ],
         enabled: true,
-        category: ToolCategory::Context,
+        category: ToolCategory::System,
     }
 }
 
@@ -370,7 +373,8 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     state.active_modules.insert(module_id.to_string());
                     // Rebuild tools list
                     rebuild_tools(state);
-                    let module = all_mods.iter().find(|m| m.id() == module_id).unwrap();
+                    let module = all_mods.iter().find(|m| m.id() == module_id)
+                        .expect("module_id was validated against known_ids but not found");
                     successes.push(format!("activated '{}' ({})", module.name(), module.description()));
                 }
             }
@@ -381,7 +385,8 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     match check_can_deactivate(module_id, &state.active_modules) {
                         Ok(()) => {
                             // Find panel types to remove
-                            let module = all_mods.iter().find(|m| m.id() == module_id).unwrap();
+                            let module = all_mods.iter().find(|m| m.id() == module_id)
+                                .expect("module_id was validated against known_ids but not found");
                             let fixed_types = module.fixed_panel_types();
                             let dynamic_types = module.dynamic_panel_types();
 
