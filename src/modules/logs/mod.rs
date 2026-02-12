@@ -1,14 +1,113 @@
 pub mod panel;
 pub mod types;
 
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+use crate::constants::{STORE_DIR, LOGS_DIR, LOGS_CHUNK_SIZE, MEMORY_TLDR_MAX_TOKENS};
 use crate::core::panels::Panel;
 use crate::modules::Module;
+use crate::persistence::writer::WriteOp;
 use crate::state::{ContextType, State, estimate_tokens};
 use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
-use crate::constants::MEMORY_TLDR_MAX_TOKENS;
 
 use types::LogEntry;
+
+/// Directory for chunked log files
+fn logs_dir() -> PathBuf {
+    PathBuf::from(STORE_DIR).join(LOGS_DIR)
+}
+
+/// Get chunk index for a log ID number
+fn chunk_index(log_id_num: usize) -> usize {
+    log_id_num / LOGS_CHUNK_SIZE
+}
+
+/// Build WriteOps for chunked log persistence (CPU only — no I/O).
+/// Called from save_module_data to integrate with the PersistenceWriter batch system.
+pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<WriteOp> {
+    let dir = logs_dir();
+    let mut ops = Vec::new();
+
+    // Group logs by chunk
+    let mut chunks: HashMap<usize, Vec<&LogEntry>> = HashMap::new();
+    for log in logs {
+        if let Some(num) = log.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()) {
+            chunks.entry(chunk_index(num)).or_default().push(log);
+        }
+    }
+
+    // Build WriteOp for each chunk
+    for (idx, chunk_logs) in &chunks {
+        let path = dir.join(format!("chunk_{}.json", idx));
+        if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
+            ops.push(WriteOp {
+                path,
+                content: json.into_bytes(),
+            });
+        }
+    }
+
+    // Build WriteOp for next_id.json
+    let next_id_path = dir.join("next_id.json");
+    let json = serde_json::json!({ "next_log_id": next_log_id });
+    if let Ok(s) = serde_json::to_string_pretty(&json) {
+        ops.push(WriteOp {
+            path: next_id_path,
+            content: s.into_bytes(),
+        });
+    }
+
+    ops
+}
+
+/// Load all logs from chunked JSON files in .context-pilot/logs/
+fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
+    let dir = logs_dir();
+    let mut all_logs: Vec<LogEntry> = Vec::new();
+    let mut next_log_id: usize = 1;
+
+    // Load next_id.json
+    let next_id_path = dir.join("next_id.json");
+    if let Ok(content) = fs::read_to_string(&next_id_path) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64()) {
+                next_log_id = v as usize;
+            }
+        }
+    }
+
+    // Load all chunk files
+    if let Ok(entries) = fs::read_dir(&dir) {
+        let mut chunk_files: Vec<(usize, PathBuf)> = entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let path = e.path();
+                let stem = path.file_stem()?.to_str()?;
+                let idx = stem.strip_prefix("chunk_")?.parse::<usize>().ok()?;
+                Some((idx, path))
+            })
+            .collect();
+        chunk_files.sort_by_key(|(idx, _)| *idx);
+
+        for (_, path) in chunk_files {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content) {
+                    all_logs.extend(logs);
+                }
+            }
+        }
+    }
+
+    // Sort by ID number for consistent ordering
+    all_logs.sort_by_key(|l| {
+        l.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()).unwrap_or(0)
+    });
+
+    (all_logs, next_log_id)
+}
 
 pub struct LogsModule;
 
@@ -17,24 +116,35 @@ impl Module for LogsModule {
     fn name(&self) -> &'static str { "Logs" }
     fn description(&self) -> &'static str { "Timestamped log entries and conversation history management" }
     fn is_core(&self) -> bool { false }
-    fn is_global(&self) -> bool { false }
+    fn is_global(&self) -> bool { true }
     fn dependencies(&self) -> &[&'static str] { &["core"] }
 
-    fn save_module_data(&self, state: &State) -> serde_json::Value {
+    fn save_module_data(&self, _state: &State) -> serde_json::Value {
+        // Logs are saved via build_log_write_ops() integrated into the WriteBatch,
+        // not through the module data JSON. See persistence/mod.rs build_save_batch().
+        serde_json::Value::Null
+    }
+
+    fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
+        // Load logs from chunked files on disk
+        let (logs, next_log_id) = load_logs_chunked();
+        if !logs.is_empty() || next_log_id > 1 {
+            state.logs = logs;
+            state.next_log_id = next_log_id;
+        }
+    }
+
+    fn save_worker_data(&self, state: &State) -> serde_json::Value {
         serde_json::json!({
-            "logs": state.logs,
-            "next_log_id": state.next_log_id,
+            "open_log_ids": state.open_log_ids,
         })
     }
 
-    fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("logs") {
-            if let Ok(logs) = serde_json::from_value::<Vec<LogEntry>>(arr.clone()) {
-                state.logs = logs;
-            }
-        }
-        if let Some(v) = data.get("next_log_id").and_then(|v| v.as_u64()) {
-            state.next_log_id = v as usize;
+    fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
+        if let Some(arr) = data.get("open_log_ids").and_then(|v| v.as_array()) {
+            state.open_log_ids = arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect();
         }
     }
 
@@ -52,6 +162,41 @@ impl Module for LogsModule {
                             .required(),
                     ]))))
                         .desc("Array of log entries to create (timestamped automatically)")
+                        .required(),
+                ],
+                enabled: true,
+                category: ToolCategory::Context,
+            },
+
+            ToolDefinition {
+                id: "log_summarize".to_string(),
+                name: "Summarize Logs".to_string(),
+                short_desc: "Summarize multiple logs into a parent log".to_string(),
+                description: "Summarizes multiple top-level log entries into a single parent summary log. The original logs become children hidden under the summary. Only top-level logs (no parent) can be summarized. Minimum 10 entries required.".to_string(),
+                params: vec![
+                    ToolParam::new("log_ids", ParamType::Array(Box::new(ParamType::String)))
+                        .desc("Array of log IDs to summarize (e.g., ['L27', 'L28', 'L29']). Minimum 10 entries. All must be top-level (no parent).")
+                        .required(),
+                    ToolParam::new("content", ParamType::String)
+                        .desc("Summary text for the new parent log entry")
+                        .required(),
+                ],
+                enabled: true,
+                category: ToolCategory::Context,
+            },
+
+            ToolDefinition {
+                id: "log_toggle".to_string(),
+                name: "Toggle Log Summary".to_string(),
+                short_desc: "Expand or collapse a log summary".to_string(),
+                description: "Expands or collapses a log summary to show or hide its children. Can only toggle logs that have children (are summaries).".to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String)
+                        .desc("Log ID to toggle (e.g., 'L42')")
+                        .required(),
+                    ToolParam::new("action", ParamType::String)
+                        .desc("Action to perform")
+                        .enum_vals(&["expand", "collapse"])
                         .required(),
                 ],
                 enabled: true,
@@ -92,7 +237,8 @@ impl Module for LogsModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "log_create" => Some(execute_log_create(tool, state)),
-
+            "log_summarize" => Some(execute_log_summarize(tool, state)),
+            "log_toggle" => Some(execute_log_toggle(tool, state)),
             "close_conversation_history" => Some(execute_close_conversation_history(tool, state)),
             _ => None,
         }
@@ -174,6 +320,159 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Created {} log(s)", count),
+        is_error: false,
+    }
+}
+
+fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
+    // Parse log_ids
+    let log_ids: Vec<String> = match tool.input.get("log_ids").and_then(|v| v.as_array()) {
+        Some(arr) => arr.iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect(),
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing required 'log_ids' array".to_string(),
+                is_error: true,
+            };
+        }
+    };
+
+    // Parse content
+    let content = match tool.input.get("content").and_then(|v| v.as_str()) {
+        Some(c) if !c.is_empty() => c.to_string(),
+        _ => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing required 'content' parameter".to_string(),
+                is_error: true,
+            };
+        }
+    };
+
+    // Guardrail: minimum 10 entries
+    if log_ids.len() < 10 {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Must summarize at least 10 logs, got {}", log_ids.len()),
+            is_error: true,
+        };
+    }
+
+    // Validate: all IDs exist and are top-level
+    for id in &log_ids {
+        match state.logs.iter().find(|l| l.id == *id) {
+            None => {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Log '{}' not found", id),
+                    is_error: true,
+                };
+            }
+            Some(log) => {
+                if log.parent_id.is_some() {
+                    return ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: format!("Log '{}' already has a parent — only top-level logs can be summarized", id),
+                        is_error: true,
+                    };
+                }
+            }
+        }
+    }
+
+    // Compute timestamp = max of children timestamps
+    let max_timestamp = log_ids.iter()
+        .filter_map(|id| state.logs.iter().find(|l| l.id == *id))
+        .map(|l| l.timestamp_ms)
+        .max()
+        .unwrap_or(0);
+
+    // Create the summary log
+    let summary_id = format!("L{}", state.next_log_id);
+    state.next_log_id += 1;
+    let summary = LogEntry {
+        id: summary_id.clone(),
+        timestamp_ms: max_timestamp,
+        content,
+        parent_id: None,
+        children_ids: log_ids.clone(),
+    };
+    state.logs.push(summary);
+
+    // Set parent_id on all children
+    for id in &log_ids {
+        if let Some(log) = state.logs.iter_mut().find(|l| l.id == *id) {
+            log.parent_id = Some(summary_id.clone());
+        }
+    }
+
+    deprecate_logs_cache(state);
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Created summary {} with {} children", summary_id, log_ids.len()),
+        is_error: false,
+    }
+}
+
+fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing required 'id' parameter".to_string(),
+                is_error: true,
+            };
+        }
+    };
+
+    let action = match tool.input.get("action").and_then(|v| v.as_str()) {
+        Some(a) if a == "expand" || a == "collapse" => a.to_string(),
+        _ => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(),
+                is_error: true,
+            };
+        }
+    };
+
+    // Validate: log exists and is a summary (has children)
+    match state.logs.iter().find(|l| l.id == id) {
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Log '{}' not found", id),
+                is_error: true,
+            };
+        }
+        Some(log) => {
+            if log.children_ids.is_empty() {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Log '{}' has no children — can only toggle summaries", id),
+                    is_error: true,
+                };
+            }
+        }
+    }
+
+    if action == "expand" {
+        if !state.open_log_ids.contains(&id) {
+            state.open_log_ids.push(id.clone());
+        }
+    } else {
+        state.open_log_ids.retain(|i| i != &id);
+    }
+
+    deprecate_logs_cache(state);
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
         is_error: false,
     }
 }

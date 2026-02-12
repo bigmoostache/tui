@@ -6,6 +6,12 @@ pub struct LogEntry {
     pub id: String,
     pub timestamp_ms: u64,
     pub content: String,
+    /// If this log was summarized into a parent, the parent's ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// IDs of children logs that this entry summarizes (empty for leaf logs).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children_ids: Vec<String>,
 }
 
 impl LogEntry {
@@ -18,6 +24,8 @@ impl LogEntry {
             id,
             timestamp_ms,
             content,
+            parent_id: None,
+            children_ids: vec![],
         }
     }
 
@@ -27,6 +35,18 @@ impl LogEntry {
             id,
             timestamp_ms,
             content,
+            parent_id: None,
+            children_ids: vec![],
         }
+    }
+
+    /// Whether this log is a summary (has children).
+    pub fn is_summary(&self) -> bool {
+        !self.children_ids.is_empty()
+    }
+
+    /// Whether this log is top-level (no parent).
+    pub fn is_top_level(&self) -> bool {
+        self.parent_id.is_none()
     }
 }
