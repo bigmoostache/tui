@@ -42,7 +42,7 @@
                 <a href="context.html" class="sidebar-link">Context System</a>
                 <a href="modules.html" class="sidebar-link">Modules</a>
                 <a href="tools.html" class="sidebar-link active">Tool Reference</a>
-                <a href="tools.html#context" class="sidebar-link sub">Context</a>
+                <a href="tools.html#context" class="sidebar-link sub">Context & Logs</a>
                 <a href="tools.html#file" class="sidebar-link sub">File</a>
                 <a href="tools.html#tree" class="sidebar-link sub">Tree</a>
                 <a href="tools.html#git" class="sidebar-link sub">Git</a>
@@ -87,6 +87,26 @@
                 <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
                 <tbody>
                     <tr><td><code>entries</code></td><td>object[]</td><td>✓</td><td>Array of <code>{content: string}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>log_summarize</code></h3>
+            <p>Summarizes multiple top-level log entries into a single parent summary. Original logs become children hidden under the summary. Minimum 10 entries required.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>log_ids</code></td><td>string[]</td><td>✓</td><td>Log IDs to summarize (min 10, must be top-level)</td></tr>
+                    <tr><td><code>content</code></td><td>string</td><td>✓</td><td>Summary text for the new parent log</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>log_toggle</code></h3>
+            <p>Expands or collapses a log summary to show or hide its children.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>id</code></td><td>string</td><td>✓</td><td>Log ID (must be a summary with children)</td></tr>
+                    <tr><td><code>action</code></td><td>string</td><td>✓</td><td><code>expand</code> or <code>collapse</code></td></tr>
                 </tbody>
             </table>
 

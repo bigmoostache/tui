@@ -226,7 +226,24 @@
             <p>Both refresh every ~30 seconds and respect gitignore patterns.</p>
 
             <h3>Logs</h3>
-            <p>Timestamped event log (P10). The AI creates log entries to record decisions, actions, and events. Also provides <code>close_conversation_history</code> for cleaning up old conversation panels while preserving important information.</p>
+            <p>Timestamped event log (P10) with <strong>tree-structured summarization</strong>. The AI creates log entries to record decisions, actions, and events. As logs accumulate, they can be summarized into collapsible parent entries — keeping the log panel manageable while preserving full history.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>log_create</code></td><td>Create timestamped log entries</td></tr>
+                    <tr><td><code>log_summarize</code></td><td>Collapse 10+ top-level logs into a parent summary</td></tr>
+                    <tr><td><code>log_toggle</code></td><td>Expand or collapse a log summary</td></tr>
+                    <tr><td><code>close_conversation_history</code></td><td>Close a history panel, preserving info as logs/memories</td></tr>
+                </tbody>
+            </table>
+
+            <h4>Log summarization</h4>
+            <p>When the log grows long, use <code>log_summarize</code> to group related entries under a single parent. The original logs become children hidden under a collapsible summary (▶/▼). Each worker has its own expand/collapse state. Logs are persisted globally in chunked JSON files (batches of 1000).</p>
+
+            <div class="info-box tip">
+                <div class="info-label">Best Practice</div>
+                <p>Summarize logs periodically to keep the Logs panel compact. Only top-level logs (not already children) can be summarized, with a minimum of 10 entries per summary.</p>
+            </div>
 
             <h3>Prompt</h3>
             <p>The Prompt module manages agents, skills, and commands. It owns the System panel (P0) and Library panel (P8). See <a href="agents.html">Agents & Skills</a>.</p>
