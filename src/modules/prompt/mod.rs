@@ -95,7 +95,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("System prompt content").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Agent,
             },
             ToolDefinition {
                 id: "agent_edit".to_string(),
@@ -109,7 +109,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Agent,
             },
             ToolDefinition {
                 id: "agent_delete".to_string(),
@@ -120,7 +120,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Agent,
             },
             ToolDefinition {
                 id: "agent_load".to_string(),
@@ -131,7 +131,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to activate. Empty to use default."),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Agent,
             },
             // === Skill tools ===
             ToolDefinition {
@@ -145,7 +145,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Skill content (instructions/knowledge)").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Skill,
             },
             ToolDefinition {
                 id: "skill_edit".to_string(),
@@ -159,7 +159,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Skill,
             },
             ToolDefinition {
                 id: "skill_delete".to_string(),
@@ -170,7 +170,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Skill,
             },
             ToolDefinition {
                 id: "skill_load".to_string(),
@@ -181,7 +181,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to load").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Skill,
             },
             ToolDefinition {
                 id: "skill_unload".to_string(),
@@ -192,7 +192,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to unload").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Skill,
             },
             // === Command tools ===
             ToolDefinition {
@@ -206,7 +206,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Content to replace the /command with").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Command,
             },
             ToolDefinition {
                 id: "command_edit".to_string(),
@@ -220,7 +220,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Command,
             },
             ToolDefinition {
                 id: "command_delete".to_string(),
@@ -231,7 +231,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Command ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::Command,
             },
         ]
     }

@@ -320,7 +320,7 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
             .required(),
         ],
         enabled: true,
-        category: ToolCategory::Context,
+        category: ToolCategory::System,
     }
 }
 

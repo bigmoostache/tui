@@ -180,7 +180,7 @@ impl Module for CoreModule {
                 description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
                 params: vec![],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
 
             // Meta tools
@@ -203,7 +203,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
         ];
 

@@ -40,7 +40,7 @@ impl Module for PresetModule {
                         .desc("Name of existing preset to overwrite. Required if a preset with this name already exists."),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
             ToolDefinition {
                 id: "preset_load".to_string(),
@@ -56,7 +56,7 @@ impl Module for PresetModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: ToolCategory::System,
             },
         ]
     }
