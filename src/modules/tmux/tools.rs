@@ -278,6 +278,16 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
+    // Reject git/gh commands — use the dedicated git_execute and gh_execute tools instead
+    let trimmed = keys.trim_start();
+    if trimmed.starts_with("git ") || trimmed == "git" || trimmed.starts_with("gh ") || trimmed == "gh" {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "Use the git_execute or gh_execute tools instead of running git/gh commands through console_send_keys.".to_string(),
+            is_error: true,
+        };
+    }
+
     // Send keys to the pane (always followed by Enter)
     let args = vec!["send-keys".to_string(), "-t".to_string(), pane_id.clone(), keys.to_string(), "Enter".to_string()];
 
