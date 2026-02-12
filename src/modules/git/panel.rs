@@ -910,7 +910,7 @@ impl Panel for GitResultPanel {
         if let Some(ctx) = state.context.get(state.selected_context) {
             if ctx.context_type == ContextType::GitResult {
                 if let Some(cmd) = &ctx.result_command {
-                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
+                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
                     return short;
                 }
             }

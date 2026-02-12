@@ -48,7 +48,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         });
 
         let preview = if content.len() > 40 {
-            format!("{}...", &content[..37])
+            format!("{}...", &content[..content.floor_char_boundary(37)])
         } else {
             content
         };

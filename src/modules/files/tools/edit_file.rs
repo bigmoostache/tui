@@ -98,7 +98,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
         if total_score > 0 {
             if best_match.is_none() || total_score > best_match.as_ref().unwrap().1 {
                 let preview = if norm_line.len() > 60 {
-                    format!("{}...", &norm_line[..60])
+                    format!("{}...", &norm_line[..norm_line.floor_char_boundary(60)])
                 } else {
                     norm_line.to_string()
                 };
@@ -202,7 +202,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         let needle_preview = if old_string.len() > 50 {
-            format!("{}...", &old_string[..50])
+            format!("{}...", &old_string[..old_string.floor_char_boundary(50)])
         } else {
             old_string.to_string()
         };

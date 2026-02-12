@@ -233,7 +233,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         };
 
         let truncated_details = if details.len() > 40 {
-            format!("{}...", &details[..37])
+            format!("{}...", &details[..details.floor_char_boundary(37)])
         } else {
             details
         };
@@ -335,13 +335,13 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
         };
 
         let display_name = if agent.name.len() > 20 {
-            format!("{}...", &agent.name[..17])
+            format!("{}...", &agent.name[..agent.name.floor_char_boundary(17)])
         } else {
             agent.name.clone()
         };
 
         let display_desc = if agent.description.len() > 35 {
-            format!("{}...", &agent.description[..32])
+            format!("{}...", &agent.description[..agent.description.floor_char_boundary(32)])
         } else {
             agent.description.clone()
         };
@@ -451,13 +451,13 @@ pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
         };
 
         let display_name = if p.name.len() > 25 {
-            format!("{}...", &p.name[..22])
+            format!("{}...", &p.name[..p.name.floor_char_boundary(22)])
         } else {
             p.name.clone()
         };
 
         let display_desc = if p.description.len() > 35 {
-            format!("{}...", &p.description[..32])
+            format!("{}...", &p.description[..p.description.floor_char_boundary(32)])
         } else {
             p.description.clone()
         };

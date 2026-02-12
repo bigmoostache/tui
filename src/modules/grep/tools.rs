@@ -141,7 +141,7 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
 
             if regex.is_match(&line) {
                 let line_display = if line.len() > 200 {
-                    format!("{}...", &line[..197])
+                    format!("{}...", &line[..line.floor_char_boundary(197)])
                 } else {
                     line
                 };
