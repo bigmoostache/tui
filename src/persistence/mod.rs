@@ -10,10 +10,12 @@ pub mod config;
 pub mod worker;
 pub mod panel;
 pub mod message;
+pub mod writer;
 
 // Re-export commonly used functions
 pub use message::{load_message, save_message, delete_message};
 pub use config::current_pid;
+pub use writer::{PersistenceWriter, WriteBatch, WriteOp, DeleteOp};
 
 use std::fs;
 use std::path::PathBuf;
@@ -247,11 +249,20 @@ fn load_state_new() -> State {
     state
 }
 
-/// Save state using new multi-file format
-pub fn save_state(state: &State) {
-    let _guard = crate::profile!("persist::save_state");
+/// Build a WriteBatch from the current state (CPU work only — no I/O).
+/// This serializes all config, worker state, panels, and history messages
+/// into a batch of file write/delete operations.
+pub fn build_save_batch(state: &State) -> WriteBatch {
+    let _guard = crate::profile!("persist::build_save_batch");
     let dir = PathBuf::from(STORE_DIR);
-    fs::create_dir_all(&dir).ok();
+    let mut writes = Vec::new();
+    let mut deletes = Vec::new();
+    let ensure_dirs = vec![
+        dir.clone(),
+        dir.join(crate::constants::STATES_DIR),
+        dir.join(crate::constants::PANELS_DIR),
+        dir.join(crate::constants::MESSAGES_DIR),
+    ];
 
     // Build module data maps
     let mut global_modules = HashMap::new();
@@ -265,15 +276,13 @@ pub fn save_state(state: &State) {
                 worker_modules.insert(module.id().to_string(), data);
             }
         }
-
-        // Always save worker-specific data to worker state
         let worker_data = module.save_worker_data(state);
         if !worker_data.is_null() {
             worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
     }
 
-    // Create SharedConfig (infrastructure + global module data)
+    // SharedConfig
     let shared_config = SharedConfig {
         reload_requested: false,
         active_theme: state.active_theme.clone(),
@@ -283,8 +292,14 @@ pub fn save_state(state: &State) {
         draft_cursor: state.input_cursor,
         modules: global_modules,
     };
+    if let Ok(json) = serde_json::to_string_pretty(&shared_config) {
+        writes.push(WriteOp {
+            path: dir.join(CONFIG_FILE),
+            content: json.into_bytes(),
+        });
+    }
 
-    // Build important_panel_uids from fixed context elements (all except System and Library)
+    // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
         if ctx.context_type.is_fixed() && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library {
@@ -294,39 +309,36 @@ pub fn save_state(state: &State) {
         }
     }
 
-    // Build panel_uid_to_local_id for dynamic panels (P8+)
+    // Build panel_uid_to_local_id
     let panel_uid_to_local_id: HashMap<String, String> = state.context.iter()
         .filter(|c| c.uid.is_some() && !c.context_type.is_fixed())
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
 
-    // Create WorkerState (infrastructure + worker module data)
+    // WorkerState
     let worker_state = WorkerState {
         worker_id: DEFAULT_WORKER_ID.to_string(),
-        important_panel_uids: important_uids.clone(),
+        important_panel_uids: important_uids,
         panel_uid_to_local_id,
         next_tool_id: state.next_tool_id,
         next_result_id: state.next_result_id,
         modules: worker_modules,
     };
+    if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
+        writes.push(WriteOp {
+            path: dir.join(crate::constants::STATES_DIR).join(format!("{}.json", DEFAULT_WORKER_ID)),
+            content: json.into_bytes(),
+        });
+    }
 
-    // Save shared config
-    config::save_config(&shared_config);
-
-    // Save worker state
-    worker::save_worker(&worker_state);
-
-    // Save ALL panels to panels/ folder (except System P0 which comes from systems[])
-    // Collect known UIDs so we can delete orphans afterwards.
+    // Panels
+    let panels_dir = dir.join(crate::constants::PANELS_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in state.context.iter() {
-        // Skip System panel (P0) and Library panel (P8) — both are derived from state, not panels/
         if ctx.context_type == ContextType::System || ctx.context_type == ContextType::Library {
             continue;
         }
-
-        // All other panels need a UID to be saved
         if let Some(uid) = &ctx.uid {
             known_uids.insert(uid.clone());
             let panel_data = PanelData {
@@ -335,21 +347,14 @@ pub fn save_state(state: &State) {
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
-                // Conversation panel gets message_uids from state.messages
-                // ConversationHistory panels get message_uids from history_messages
                 message_uids: if ctx.context_type == ContextType::Conversation {
                     state.messages.iter()
                         .map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone()))
                         .collect()
                 } else if ctx.context_type == ContextType::ConversationHistory {
-                    if let Some(ref msgs) = ctx.history_messages {
-                        // Ensure each history message has a UID and is persisted
-                        msgs.iter()
-                            .map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone()))
-                            .collect()
-                    } else {
-                        vec![]
-                    }
+                    ctx.history_messages.as_ref()
+                        .map(|msgs| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
+                        .unwrap_or_default()
                 } else {
                     vec![]
                 },
@@ -366,25 +371,80 @@ pub fn save_state(state: &State) {
                 result_command_hash: ctx.result_command_hash.clone(),
                 skill_prompt_id: ctx.skill_prompt_id.clone(),
             };
-            panel::save_panel(&panel_data);
+            if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
+                writes.push(WriteOp {
+                    path: panels_dir.join(format!("{}.json", uid)),
+                    content: json.into_bytes(),
+                });
+            }
         }
     }
 
-    // Save history messages for ConversationHistory panels
-    // These messages were removed from state.messages during detachment but need to persist.
+    // History messages for ConversationHistory panels
+    let messages_dir = dir.join(crate::constants::MESSAGES_DIR);
     for ctx in &state.context {
         if ctx.context_type == ContextType::ConversationHistory {
             if let Some(ref msgs) = ctx.history_messages {
                 for msg in msgs {
-                    save_message(msg);
+                    let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                    if let Ok(yaml) = serde_yaml::to_string(msg) {
+                        writes.push(WriteOp {
+                            path: messages_dir.join(format!("{}.yaml", file_id)),
+                            content: yaml.into_bytes(),
+                        });
+                    }
                 }
             }
         }
     }
 
-    // Delete orphan panel files that are no longer referenced by any context element.
-    // This prevents stale files from accumulating on disk after panels are closed.
-    panel::delete_orphan_panels(&known_uids);
+    // Orphan panel deletion
+    if let Ok(entries) = fs::read_dir(&panels_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                if !known_uids.contains(stem) {
+                    deletes.push(DeleteOp { path });
+                }
+            }
+        }
+    }
+
+    WriteBatch { writes, deletes, ensure_dirs }
+}
+
+/// Build a WriteOp for a single message (CPU work only — no I/O).
+pub fn build_message_op(msg: &Message) -> WriteOp {
+    let dir = PathBuf::from(STORE_DIR).join(crate::constants::MESSAGES_DIR);
+    let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+    let yaml = serde_yaml::to_string(msg).unwrap_or_default();
+    WriteOp {
+        path: dir.join(format!("{}.yaml", file_id)),
+        content: yaml.into_bytes(),
+    }
+}
+
+/// Save state synchronously (blocking I/O on calling thread).
+/// Used for shutdown paths and places where the PersistenceWriter is not available.
+/// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
+pub fn save_state(state: &State) {
+    let batch = build_save_batch(state);
+    // Execute synchronously
+    for dir in &batch.ensure_dirs {
+        let _ = fs::create_dir_all(dir);
+    }
+    for op in &batch.writes {
+        if let Some(parent) = op.path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&op.path, &op.content);
+    }
+    for op in &batch.deletes {
+        let _ = fs::remove_file(&op.path);
+    }
 }
 
 /// Check if we still own the state file (another instance may have taken over)

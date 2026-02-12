@@ -13,7 +13,7 @@ use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER
 use crate::events::handle_event;
 use crate::help::CommandPalette;
 use crate::core::panels::now_ms;
-use crate::persistence::{check_ownership, save_message, save_state};
+use crate::persistence::{check_ownership, save_state, build_save_batch, build_message_op, PersistenceWriter};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
@@ -62,6 +62,8 @@ pub struct App {
     deferred_tool_sleep_until_ms: u64,
     /// Whether we're in a deferred sleep state (waiting for timer before continuing tool pipeline)
     deferred_tool_sleeping: bool,
+    /// Background persistence writer — offloads file I/O to a dedicated thread
+    writer: PersistenceWriter,
 }
 
 impl App {
@@ -92,6 +94,7 @@ impl App {
             wait_started_ms: 0,
             deferred_tool_sleep_until_ms: 0,
             deferred_tool_sleeping: false,
+            writer: PersistenceWriter::new(),
         }
     }
 
@@ -115,9 +118,6 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            // Create a notification so the spine engine picks it up and resumes streaming.
-            // No synthetic user message needed — the conversation already has the tool
-            // result from system_reload, and the LLM should continue from there.
             use crate::modules::spine::types::NotificationType;
             self.state.create_notification(
                 NotificationType::ReloadResume,
@@ -155,6 +155,8 @@ impl App {
                 }
 
                 let Some(action) = handle_event(&evt, &self.state) else {
+                    // User quit — flush all pending writes and save final state synchronously
+                    self.writer.flush();
                     save_state(&self.state);
                     break;
                 };
@@ -309,7 +311,8 @@ impl App {
             if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
                 msg.tl_dr = Some(tldr.tl_dr);
                 msg.tl_dr_token_count = tldr.token_count;
-                save_message(msg);
+                let op = build_message_op(msg);
+                self.writer.send_message(op);
             }
         }
     }
@@ -321,7 +324,7 @@ impl App {
                 self.state.api_check_result = Some(result);
                 self.state.dirty = true;
                 self.api_check_rx = None;
-                save_state(&self.state);
+                self.save_state_async();
             }
         }
     }
@@ -341,7 +344,8 @@ impl App {
             if msg.role == "assistant" {
                 // Clean any LLM ID prefixes before saving
                 msg.content = clean_llm_id_prefix(&msg.content);
-                save_message(msg);
+                let op = build_message_op(msg);
+                self.writer.send_message(op);
                 if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
                     self.state.pending_tldrs += 1;
                     generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
@@ -375,7 +379,7 @@ impl App {
                 input_tokens: 0,
                 timestamp_ms: crate::core::panels::now_ms(),
             };
-            save_message(&tool_msg);
+            self.save_message_async(&tool_msg);
             self.state.messages.push(tool_msg);
 
             let result = execute_tool(tool, &mut self.state);
@@ -409,7 +413,7 @@ impl App {
             input_tokens: 0,
             timestamp_ms: crate::core::panels::now_ms(),
         };
-        save_message(&result_msg);
+        self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
 
         // Check if reload was requested - perform it after tool result is saved
@@ -455,7 +459,7 @@ impl App {
             self.state.total_output_tokens += output_tokens;
         }
 
-        save_state(&self.state);
+        self.save_state_async();
 
         // Check if any tool requested a sleep (e.g., console_sleep)
         if self.state.tool_sleep_until_ms > 0 {
@@ -575,7 +579,7 @@ impl App {
                 match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason }) {
                     ActionResult::SaveMessage(id) => {
                         let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                            save_message(msg);
+                            self.save_message_async(msg);
                             if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
                                 Some((msg.id.clone(), msg.content.clone()))
                             } else {
@@ -586,9 +590,9 @@ impl App {
                             self.state.pending_tldrs += 1;
                             generate_tldr(msg_id, content, tldr_tx.clone());
                         }
-                        save_state(&self.state);
+                        self.save_state_async();
                     }
-                    ActionResult::Save => save_state(&self.state),
+                    ActionResult::Save => self.save_state_async(),
                     _ => {}
                 }
                 // Reset retry count on successful completion
@@ -614,19 +618,19 @@ impl App {
                 self.pending_tools.clear();
                 if let Some(msg) = self.state.messages.last() {
                     if msg.role == "assistant" {
-                        save_message(msg);
+                        self.save_message_async(msg);
                     }
                 }
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::Save => {
-                save_state(&self.state);
+                self.save_state_async();
                 // Check spine synchronously for responsive auto-continuation
                 self.check_spine(tx, tldr_tx);
             }
             ActionResult::SaveMessage(id) => {
                 let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                    save_message(msg);
+                    self.save_message_async(msg);
                     if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
                         Some((msg.id.clone(), msg.content.clone()))
                     } else {
@@ -637,7 +641,7 @@ impl App {
                     self.state.pending_tldrs += 1;
                     generate_tldr(msg_id, content, tldr_tx.clone());
                 }
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::StartApiCheck => {
                 let (api_tx, api_rx) = std::sync::mpsc::channel();
@@ -647,7 +651,7 @@ impl App {
                     self.state.current_model(),
                     api_tx,
                 );
-                save_state(&self.state);
+                self.save_state_async();
             }
             ActionResult::Nothing => {}
         }
@@ -952,7 +956,7 @@ impl App {
             SpineDecision::Blocked(_reason) => {
                 // Guard rail blocked — notification already created by engine
                 self.state.dirty = true;
-                save_state(&self.state);
+                self.save_state_async();
             }
             SpineDecision::Continue(action) => {
                 // Auto-continuation fired — apply it and start streaming
@@ -975,7 +979,7 @@ impl App {
                         self.state.current_model(),
                         ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
                     );
-                    save_state(&self.state);
+                    self.save_state_async();
                     self.state.dirty = true;
                 }
             }
@@ -1005,6 +1009,18 @@ impl App {
             // Mark dirty to trigger re-render with new spinner frame
             self.state.dirty = true;
         }
+    }
+
+    /// Send state to background writer (debounced, non-blocking).
+    /// Preferred over `save_state()` in the main event loop.
+    fn save_state_async(&self) {
+        self.writer.send_batch(build_save_batch(&self.state));
+    }
+
+    /// Send a message to background writer (non-blocking).
+    /// Preferred over `save_message()` in the main event loop.
+    fn save_message_async(&self, msg: &Message) {
+        self.writer.send_message(build_message_op(msg));
     }
 
     /// Handle keyboard events when command palette is open
