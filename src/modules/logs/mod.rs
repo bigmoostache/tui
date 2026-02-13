@@ -415,7 +415,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    deprecate_logs_cache(state);
+    touch_logs_panel(state);
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -475,7 +475,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.open_log_ids.retain(|i| i != &id);
     }
 
-    deprecate_logs_cache(state);
+    touch_logs_panel(state);
 
     ToolResult {
         tool_use_id: tool.id.clone(),
