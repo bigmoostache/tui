@@ -2,133 +2,118 @@
 
 # Context Pilot
 
-### The AI coding assistant that manages its own brain.
-
 [![Stars](https://img.shields.io/github/stars/bigmoostache/context-pilot?style=social)](https://github.com/bigmoostache/context-pilot/stargazers)
 [![CI](https://github.com/bigmoostache/context-pilot/actions/workflows/rust.yml/badge.svg)](https://github.com/bigmoostache/context-pilot/actions)
 ![Rust](https://img.shields.io/badge/rust-1.83+-orange.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
-**35 tools · 5 LLM providers · Runs in your terminal · No Electron · No browser · No VS Code**
+<br/>
 
-<img src="docs/image copy.png" alt="Context Pilot Screenshot" width="900"/>
+<img src="docs/image copy.png" alt="Context Pilot" width="900"/>
+
+<br/>
+
+### Your AI coding assistant has amnesia. This one doesn't.
+
+[Get Started](#install) · [How It Works](#how-it-works) · [Website](https://bigmoostache.github.io/context-pilot/)
 
 </div>
 
 ---
 
-## The Problem
+## The idea
 
-You open Cursor, Copilot, or ChatGPT. You paste code. You explain the project. You paste more code. The AI forgets what you showed it 5 messages ago. You paste it again. The context fills up. You start a new chat. Repeat.
+Every AI coding tool has the same problem: context is invisible. You paste code, the AI forgets it three messages later, you paste it again. The context window fills up and nobody — not you, not the AI — knows what's in it or what got pushed out.
 
-**Context Pilot is what happens when you let the AI manage its own brain.**
+Context Pilot makes context **visible**. Every piece of information the AI touches — every file, search result, terminal pane, memory — is a **panel** with a live token count in a sidebar. The AI can see its own brain. It opens what it needs, closes what it doesn't, takes notes on what it read, and when the conversation gets long, it archives old messages to make room.
 
-It explores your codebase on its own. It opens files, reads them, takes notes, closes them when it's done. It searches, greps, runs commands in the terminal. When the conversation gets long, it summarizes old messages and frees the space. It **never** runs out of context because it cleans up after itself.
+The result: **90+ files explored in a single session, ending at 14% context usage.** It read everything, understood it, annotated it, and freed the space. Not because we told it to — because it could see it needed to. ([Full writeup](docs/retex.md))
 
-> *"I explored 90 files in one session and ended at 14% context usage. I read everything, understood it, wrote descriptions, and freed the space."*
-> — The AI, after its first full codebase review ([full writeup](docs/retex.md))
+## How it works
 
-## Why Context Pilot?
+```
+┌── Sidebar ──────┐  ┌── Main Panel ──────────────────────────┐
+│                  │  │                                        │
+│  ◉ Conversation  │  │   Currently viewing: src/core/app.rs   │
+│  P1 Todo         │  │                                        │
+│  P2 Library      │  │   fn handle_action(&mut self, ...) {   │
+│  P3 Overview     │  │       match action {                   │
+│  P4 Tree         │  │           Action::Key(key) => {        │
+│  P5 Memory       │  │               self.process_key(key);   │
+│  P6 Spine        │  │           }                            │
+│  P7 Logs         │  │           ...                          │
+│  P8 Git          │  │       }                                │
+│  P9 Scratchpad   │  │   }                                    │
+│  ─────────────── │  │                                        │
+│  P10 app.rs  6K  │  │                                        │
+│  P11 grep    2K  │  │                                        │
+│  P12 git log 1K  │  │                                        │
+│  P13 tmux %1 3K  │  │                                        │
+│                  │  │                                        │
+│  8,231 / 200K    │  │                                        │
+│  ████░░░░░░ 4%   │  │                                        │
+└──────────────────┘  └────────────────────────────────────────┘
+```
 
-| | Cursor / Copilot | Claude Code CLI | Aider | **Context Pilot** |
-|---|---|---|---|---|
-| Context management | Manual copy-paste | Automatic but opaque | File-level | **AI-driven: open, read, annotate, close, summarize** |
-| Token visibility | Hidden | Hidden | Partial | **Real-time sidebar with per-element token counts** |
-| Tool count | Limited | ~15 | ~10 | **35 tools across 14 modules** |
-| Terminal integration | Embedded terminal | Spawns processes | No | **Full tmux pane management** |
-| File exploration | File tree | Auto-read | Manual add | **Glob, grep, tree with annotations** |
-| Git workflow | Basic | Good | Great | **Full git + GitHub CLI with cache invalidation** |
-| Memory across turns | None | CLAUDE.md | None | **Persistent memories, todos, scratchpad, prompt library** |
-| Multi-provider | No | Claude only | Many | **Claude, DeepSeek, Grok, Groq** |
-| Architecture | Plugin / Cloud | CLI | Python | **Rust TUI, single binary, ~50ms frames** |
+**Fixed panels** (P1–P9) are always there — todos, memories, tree, git, scratchpad. **Dynamic panels** (P10+) are created and destroyed by the AI as it works: open a file, run a search, start a terminal, check a PR.
 
-## What can it do?
+The token count at the bottom is real. The AI reads it. When `app.rs` is eating 6K tokens and it's done reading, it closes the panel. When conversation history grows too large, it gets automatically archived into browsable history panels. No manual context management, ever.
 
-### 🔍 Explore
-Opens files, navigates your directory tree, searches with glob and regex. Annotates everything it finds so it remembers later — even after closing the file.
+## What makes it different
 
-### 🛠️ Build
-Edits files, creates new ones, runs terminal commands, manages git branches, opens pull requests. All from within the conversation.
+**The AI manages its own context.** This isn't a feature — it's the architecture. Other tools give the AI a hidden context window and hope for the best. Context Pilot gives the AI a visible, manipulable workspace with 47 tools:
 
-### 🧠 Think
-Keeps todo lists, scratchpad notes, persistent memories. Plans before it acts. Breaks down complex tasks into steps.
-
-### ♻️ Stay Sharp
-Tracks every token in real-time. When things get heavy, it summarizes old messages, closes files it doesn't need, archives conversation history. You never have to say "you're running out of context."
-
-## Tools
+- **Explore** — open files, navigate directories, glob and grep. Annotate everything with descriptions that persist after closing.
+- **Edit** — surgical text replacement. The AI sees exact file content and matches it.
+- **Run** — full tmux integration. Terminal panes as context panels. Build, test, interact with running processes.
+- **Git** — full git + GitHub CLI. Branch, commit, diff, push, open PRs. Mutating commands auto-refresh affected panels.
+- **Remember** — memories persist across sessions. Todos, scratchpad, timestamped logs. Old conversation chunks get archived, not lost.
+- **Configure** — switch agent personalities, load skill documents, save/restore workspace presets, enable/disable individual tools.
 
 <details>
-<summary><b>35 tools across 9 categories</b> (click to expand)</summary>
+<summary><b>Full tool list (47)</b></summary>
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| **Context** | `context_close`, `context_message_status`, `system_reload`, `tool_manage`, `module_toggle`, `panel_goto_page` | Manage what's in the AI's working memory |
-| **System Prompts** | `system_create`, `system_edit`, `system_delete`, `system_load` | Create and switch between AI personalities |
-| **Files** | `file_open`, `file_edit`, `file_write` | Full file system access with syntax highlighting |
-| **Search** | `file_glob`, `file_grep` | Find files by pattern, search contents with regex |
-| **Tree** | `tree_filter`, `tree_toggle`, `tree_describe` | Directory exploration with persistent annotations |
-| **Git** | `git_execute`, `git_configure_p6` | Full git CLI with smart cache invalidation |
-| **GitHub** | `gh_execute` | Full GitHub CLI — PRs, issues, releases, actions |
-| **Console** | `console_create`, `console_edit`, `console_send_keys`, `console_sleep` | Tmux terminal management |
-| **Notes** | `todo_create`, `todo_update`, `memory_create`, `memory_update`, `scratchpad_create_cell`, `scratchpad_edit_cell`, `scratchpad_wipe` | Persistent memory across the conversation |
-| **Presets** | `preset_snapshot_myself`, `preset_load` | Save and restore complete workspace configurations |
+| Category | Tools |
+|----------|-------|
+| **Context** | `context_close` · `system_reload` · `tool_manage` · `module_toggle` · `panel_goto_page` |
+| **Agents & Skills** | `agent_create` · `agent_edit` · `agent_delete` · `agent_load` · `skill_create` · `skill_edit` · `skill_delete` · `skill_load` · `skill_unload` · `command_create` · `command_edit` · `command_delete` |
+| **Files** | `file_open` · `file_edit` · `file_write` · `file_glob` · `file_grep` |
+| **Tree** | `tree_filter` · `tree_toggle` · `tree_describe` |
+| **Git & GitHub** | `git_execute` · `git_configure_p6` · `gh_execute` |
+| **Terminal** | `console_create` · `console_edit` · `console_send_keys` · `console_sleep` |
+| **Notes** | `todo_create` · `todo_update` · `todo_move` · `memory_create` · `memory_update` · `scratchpad_create_cell` · `scratchpad_edit_cell` · `scratchpad_wipe` |
+| **Presets** | `preset_snapshot_myself` · `preset_load` |
+| **Spine** | `notification_mark_processed` · `spine_configure` |
+| **Logs** | `log_create` · `log_summarize` · `log_toggle` · `close_conversation_history` |
 
 </details>
 
-## How It Works
+## Under the hood
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Context Pilot                     │
-│                                                      │
-│  ┌─ Sidebar ──┐  ┌─ Main Panel ──────────────────┐  │
-│  │ P0 System  │  │                                │  │
-│  │ P1 Chat    │  │   Active panel content with    │  │
-│  │ P2 Tree    │  │   syntax highlighting,         │  │
-│  │ P3 Todos   │  │   markdown rendering,          │  │
-│  │ P4 Memory  │  │   and live updates             │  │
-│  │ P5 World   │  │                                │  │
-│  │ P6 Git     │  │                                │  │
-│  │ P7 Scratch │  │                                │  │
-│  │ ────────── │  │                                │  │
-│  │ P8 file.rs │  │                                │  │
-│  │ P9 grep    │  │                                │  │
-│  │ P10 git log│  │                                │  │
-│  │ P11 tmux   │  │                                │  │
-│  │            │  │                                │  │
-│  │ 6547/200K  │  │                                │  │
-│  │ ████░░ 3%  │  │                                │  │
-│  └────────────┘  └────────────────────────────────┘  │
-│  ┌─ Status Bar ──────────────────────────────────┐   │
-│  │ Claude 3.5 Sonnet │ master +3/-1 │ 142 chars  │   │
-│  └───────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
+Rust. Single binary. ~15K lines. [Ratatui](https://github.com/ratatui/ratatui) + crossterm.
 
-Each panel is a live context element with its own token count.
-The AI opens and closes panels as needed to stay within budget.
-```
+- **14 modules** — each provides tools and panels: core, files, git, github, glob, grep, logs, memory, preset, prompt, scratchpad, spine, tmux, todo, tree
+- **5 LLM providers** — Anthropic, Claude Code (OAuth), DeepSeek, Grok (xAI), Groq
+- **Smart caching** — SHA-256 change detection, background refresh, inotify file watching. Open files auto-update when changed on disk.
+- **Autonomous mode** — the Spine module can auto-continue across multiple turns with guard rails: token limits, cost caps, duration limits, message caps
+- **Conversation detachment** — old messages are automatically archived into browsable history panels based on both message count and token thresholds
 
-Every context element — files, search results, terminal output, notes — lives as a **panel** with a real-time token count. The AI sees exactly what's consuming its context and can close anything it doesn't need anymore.
-
-## Get Started
+## Install
 
 ### Prerequisites
-- Rust 1.83+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-- tmux (`apt install tmux` / `brew install tmux`)
-- At least one API key (Anthropic, xAI, Groq, or DeepSeek)
+- **Rust 1.83+** — `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **tmux** — `apt install tmux` / `brew install tmux`
+- **An API key** — Anthropic, xAI, Groq, or DeepSeek
 
-### Install
+### Setup
 
 ```bash
 git clone https://github.com/bigmoostache/context-pilot.git
 cd context-pilot
 
-# Add your API key(s) to .env
+# Add your API key(s)
 cat > .env << 'EOF'
 ANTHROPIC_API_KEY=your_key_here
-# Optional: add more providers
 # XAI_API_KEY=your_key
 # GROQ_API_KEY=your_key
 # DEEPSEEK_API_KEY=your_key
@@ -139,53 +124,38 @@ cargo build --release
 ./run.sh
 ```
 
-That's it. Talk to it. Ask it to explore your codebase.
+### First session
 
-### First things to try
+Just talk to it:
 
 ```
-> explore this codebase and describe what you find
-> find all TODO comments in the project
-> create a new feature branch and implement X
-> review the recent git history and summarize changes
+> explore this codebase and tell me what you find
+> find all TODO comments and create a plan to fix them
+> create a branch, implement the fix, and open a PR
 ```
 
-## Architecture
-
-Built in **Rust** with [Ratatui](https://github.com/ratatui/ratatui) for the terminal UI. Single-threaded event loop with background workers for caching, file watching, and LLM streaming.
-
-- **14 modules** — core, files, git, github, glob, grep, memory, preset, prompt, scratchpad, tmux, todo, tree, plus a module system for adding your own
-- **5 LLM providers** — Anthropic (direct API), Claude Code (OAuth), DeepSeek, Grok (xAI), Groq
-- **Smart caching** — SHA-256 hash-based change detection, background refresh, inotify file watching
-- **Git-aware** — Regex-based cache invalidation (mutating git commands invalidate affected read-only panels)
-- **Preset system** — Save and load complete workspace configurations (modules, tools, panel states)
+Watch the sidebar. You'll see it open files, read them, annotate the tree, close them, and move on. That's the whole point.
 
 ## Contribute
 
-This project is young and moving fast. Your PR won't sit in a queue for 3 months.
+This project is young and moving fast.
 
-**Ideas for contributions:**
-- 🆕 New LLM provider (OpenAI, Gemini, local models via Ollama)
-- 🎨 New color themes (it's just YAML — see `yamls/themes.yaml`)
-- 📖 Better markdown rendering
+- 🆕 New LLM providers (OpenAI, Gemini, Ollama)
+- 🎨 Color themes (see `yamls/themes.yaml` — 14 built-in)
 - 🧪 Test coverage
-- 📝 Tutorials and guides
+- 📖 Tutorials and guides
 - 🐛 Bug reports and feature requests
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-[AGPL-3.0](LICENSE) for open source. Commercial license available — [open an issue](https://github.com/bigmoostache/context-pilot/issues/new) to discuss.
+[AGPL-3.0](LICENSE) — open source. Commercial license available — [open an issue](https://github.com/bigmoostache/context-pilot/issues/new).
 
 ---
 
 <div align="center">
 
-**Built with Rust. Runs in your terminal. The AI manages its own context.**
-
-⭐ **If this is useful to you, star the repo** — it helps others find it.
-
-[Get Started](#get-started) · [Read the AI's Self-Review](docs/retex.md) · [Contribute](#contribute)
+⭐ **Star the repo if this is useful** — it helps others find it.
 
 </div>
