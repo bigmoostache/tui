@@ -799,9 +799,10 @@ impl App {
             }
             state.context.insert(idx, ctx);
 
-            if changed {
-                state.dirty = true;
-            }
+            // Always mark dirty — even unchanged updates may have populated
+            // cached_content from None (initial load after reload), which
+            // needs a repaint to clear "Loading..." in the UI.
+            state.dirty = true;
         }
     }
 
