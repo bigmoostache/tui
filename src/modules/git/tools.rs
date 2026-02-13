@@ -91,7 +91,34 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             let mut cmd = Command::new("git");
             cmd.args(&args)
                 .env("GIT_TERMINAL_PROMPT", "0");
+
+            // If GITHUB_TOKEN is available, create a temporary askpass script
+            // so git push/pull/fetch can authenticate via HTTPS automatically.
+            let _askpass_tempfile = if let Some(ref token) = state.github_token {
+                let mut tmp = std::env::temp_dir();
+                tmp.push(format!("cpilot_askpass_{}", std::process::id()));
+                let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
+                if std::fs::write(&tmp, &script).is_ok() {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700));
+                    }
+                    cmd.env("GIT_ASKPASS", &tmp);
+                    Some(tmp) // kept alive until end of scope, then cleaned up
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
+
+            // Clean up temp askpass script
+            if let Some(ref path) = _askpass_tempfile {
+                let _ = std::fs::remove_file(path);
+            }
 
             // Heuristic-based cache invalidation for GitResult panels
             let invalidations = super::cache_invalidation::find_invalidations(command);
