@@ -49,9 +49,10 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         id_a.cmp(&id_b)
     });
 
-    // Separate fixed (P0-P6) and dynamic (P7+) contexts
+    // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
+        .filter(|&i| state.context[i].context_type != crate::state::ContextType::Conversation)
         .partition(|&i| state.context[i].context_type.is_fixed());
 
     // Render fixed contexts (always visible)
