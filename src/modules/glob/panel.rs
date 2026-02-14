@@ -5,7 +5,6 @@ use crate::cache::{CacheRequest, CacheUpdate};
 use crate::core::panels::{paginate_content, ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use super::GLOB_DEPRECATION_MS;
 use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
 use crate::ui::{theme, chars};
 
@@ -64,9 +63,6 @@ impl Panel for GlobPanel {
         true
     }
 
-    fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        Some(GLOB_DEPRECATION_MS)
-    }
 
     fn refresh(&self, _state: &mut State) {
         // Glob refresh is handled by background cache system via refresh_cache

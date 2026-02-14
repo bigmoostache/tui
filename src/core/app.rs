@@ -816,7 +816,16 @@ impl App {
                         mark_panels_dirty(&mut self.state, ContextType::GitResult);
                     } else {
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
+                            let should_dirty = match ctx.context_type {
+                                ContextType::File => ctx.file_path.as_deref() == Some(path.as_str()),
+                                // File content change affects grep results
+                                ContextType::Grep => {
+                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
+                                    path.starts_with(base)
+                                }
+                                _ => false,
+                            };
+                            if should_dirty {
                                 ctx.cache_deprecated = true;
                                 refresh_indices.push(i);
                             }
@@ -833,8 +842,22 @@ impl App {
                         mark_panels_dirty(&mut self.state, ContextType::Git);
                         mark_panels_dirty(&mut self.state, ContextType::GitResult);
                     } else {
+                        // Directory changed: invalidate Tree, Glob, and Grep panels
+                        // whose search paths overlap with the changed directory.
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            if ctx.context_type == ContextType::Tree {
+                            let should_dirty = match ctx.context_type {
+                                ContextType::Tree => true,
+                                ContextType::Glob => {
+                                    let base = ctx.glob_path.as_deref().unwrap_or(".");
+                                    path.starts_with(base) || base.starts_with(path.as_str())
+                                }
+                                ContextType::Grep => {
+                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
+                                    path.starts_with(base) || base.starts_with(path.as_str())
+                                }
+                                _ => false,
+                            };
+                            if should_dirty {
                                 ctx.cache_deprecated = true;
                                 refresh_indices.push(i);
                             }
@@ -933,20 +956,37 @@ impl App {
         }
     }
 
-    /// Ensure all File context panels have an active file watcher registered.
-    /// This is called every timer tick to catch panels whose cache was populated
-    /// via wait_for_panels (during tool execution) before the normal needs_initial
-    /// watcher registration path could run.
+    /// Ensure all File/Glob/Grep panels have active file/directory watchers.
+    /// Called every timer tick to catch panels created during tool execution.
     fn ensure_file_watchers(&mut self) {
         let Some(watcher) = &mut self.file_watcher else { return };
 
         for ctx in &self.state.context {
+            // File panels: watch individual files
             if ctx.context_type == ContextType::File
                 && let Some(path) = &ctx.file_path
                     && !self.watched_file_paths.contains(path)
                         && watcher.watch_file(path).is_ok() {
                             self.watched_file_paths.insert(path.clone());
                         }
+
+            // Glob panels: watch base directory
+            if ctx.context_type == ContextType::Glob {
+                let dir = ctx.glob_path.as_deref().unwrap_or(".");
+                if !self.watched_dir_paths.contains(dir)
+                    && watcher.watch_dir(dir).is_ok() {
+                        self.watched_dir_paths.insert(dir.to_string());
+                    }
+            }
+
+            // Grep panels: watch search directory
+            if ctx.context_type == ContextType::Grep {
+                let dir = ctx.grep_path.as_deref().unwrap_or(".");
+                if !self.watched_dir_paths.contains(dir)
+                    && watcher.watch_dir(dir).is_ok() {
+                        self.watched_dir_paths.insert(dir.to_string());
+                    }
+            }
         }
     }
 

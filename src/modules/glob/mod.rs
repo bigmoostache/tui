@@ -1,8 +1,6 @@
 mod panel;
 pub mod tools;
 
-/// Deprecation timer for glob panels (milliseconds)
-pub const GLOB_DEPRECATION_MS: u64 = 30_000; // 30 seconds
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};

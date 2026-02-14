@@ -1,8 +1,6 @@
 mod panel;
 pub mod tools;
 
-/// Deprecation timer for grep panels (milliseconds)
-pub const GREP_DEPRECATION_MS: u64 = 30_000; // 30 seconds
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
