@@ -289,15 +289,19 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], 
                 let sentinel_len = i - start;
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
-                    let (token_count, line_count) = paste_buffers.get(idx)
-                        .map(|s| (crate::state::estimate_tokens(s), s.lines().count().max(1)))
-                        .unwrap_or((0, 0));
                     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
-                    let placeholder = if let Some(cmd_name) = label {
-                        format!("{}⚡/{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, cmd_name, line_count, token_count, PASTE_PLACEHOLDER_END)
+                    let display_text = if let Some(cmd_name) = label {
+                        // Command: show full content
+                        let content = paste_buffers.get(idx).map(|s| s.as_str()).unwrap_or("");
+                        format!("{}⚡/{}\n{}{}", PASTE_PLACEHOLDER_START, cmd_name, content, PASTE_PLACEHOLDER_END)
                     } else {
+                        // Paste: show line/token stats
+                        let (token_count, line_count) = paste_buffers.get(idx)
+                            .map(|s| (crate::state::estimate_tokens(s), s.lines().count().max(1)))
+                            .unwrap_or((0, 0));
                         format!("{}📋 Paste #{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, idx + 1, line_count, token_count, PASTE_PLACEHOLDER_END)
                     };
+                    let placeholder = &display_text;
                     let placeholder_len = placeholder.len();
 
                     // Adjust cursor if it's after this sentinel
