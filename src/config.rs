@@ -226,8 +226,15 @@ pub fn active_theme() -> &'static Theme {
             get_theme(DEFAULT_THEME)
         }
     } else {
-        // Standard theme from THEME_ORDER
-        let theme_id = THEME_ORDER.get(idx - 1).unwrap_or(&DEFAULT_THEME);
+        // Standard theme from THEME_ORDER (idx is 1-based)
+        debug_assert!(idx > 0 && idx <= THEME_ORDER.len(), 
+            "Invalid theme index: {}. THEME_ORDER has {} entries.", idx, THEME_ORDER.len());
+        
+        let theme_id = THEME_ORDER.get(idx - 1).unwrap_or_else(|| {
+            // This should never happen if set_active_theme is used correctly
+            // Fall back to default theme to prevent panic
+            &DEFAULT_THEME
+        });
         get_theme(theme_id)
     }
 }
