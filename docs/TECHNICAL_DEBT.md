@@ -214,9 +214,6 @@ match serde_json::from_str::<Value>(&json) {
 - Maintains config file structure and formatting
 - Prevents corruption from whitespace variations
 - Backwards compatible with malformed configs
-let updated = serde_json::to_string_pretty(&config)?;
-fs::write(&config_path, updated)?;
-```
 
 ---
 
