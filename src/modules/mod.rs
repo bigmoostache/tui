@@ -434,6 +434,49 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn all_active() -> HashSet<String> {
+        default_active_modules()
+    }
+
+    #[test]
+    fn cannot_deactivate_core_module() {
+        let active = all_active();
+        let result = check_can_deactivate("core", &active);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("core"));
+    }
+
+    #[test]
+    fn cannot_deactivate_with_dependent() {
+        // github depends on git — deactivating git while github is active should fail
+        let active = all_active();
+        let result = check_can_deactivate("git", &active);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("github"));
+    }
+
+    #[test]
+    fn can_deactivate_independent_module() {
+        let active = all_active();
+        // tmux has no dependents
+        let result = check_can_deactivate("tmux", &active);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_deactivate_when_dependent_inactive() {
+        // git can be deactivated if github is not active
+        let mut active = all_active();
+        active.remove("github");
+        let result = check_can_deactivate("git", &active);
+        assert!(result.is_ok());
+    }
+}
+
 /// Rebuild the tools list from active modules and preserved disabled_tools.
 fn rebuild_tools(state: &mut State) {
     // Preserve currently disabled tool IDs

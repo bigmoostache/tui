@@ -62,7 +62,7 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
             .collect();
 
         let new_hash_list: Vec<String> = panel_hashes.iter()
-            .map(|(_, h, _)| h.clone())
+            .map(|(id, h, _)| format!("{}:{}", id, h))
             .collect();
 
         // Find max prefix match index
