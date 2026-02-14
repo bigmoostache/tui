@@ -1,17 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
+    #[default]
     TextMessage,
     ToolCall,
     ToolResult,
-}
-
-impl Default for MessageType {
-    fn default() -> Self {
-        Self::TextMessage
-    }
 }
 
 /// Message status for context management

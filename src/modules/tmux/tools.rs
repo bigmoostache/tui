@@ -284,7 +284,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Reject git/gh commands — use the dedicated git_execute and gh_execute tools instead.
     // Check all segments of compound commands (split on &&, ||, ;, |) to catch
     // patterns like "cd /foo && git push" or "echo done; gh pr list".
-    let has_git_gh = keys.split(|c: char| c == '&' || c == '|' || c == ';')
+    let has_git_gh = keys.split(['&', '|', ';'])
         .map(|segment| segment.trim())
         .filter(|s| !s.is_empty())
         .any(|segment| {

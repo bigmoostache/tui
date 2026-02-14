@@ -11,7 +11,8 @@ use ratatui::style::Color;
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
 static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
-static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<Vec<Vec<(Color, String)>>>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+type HighlightResult = Vec<Vec<(Color, String)>>;
+static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Convert syntect color to ratatui color
 fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
@@ -20,7 +21,7 @@ fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
 
 /// Get syntax-highlighted spans for a file
 /// Returns Vec of lines, where each line is Vec of (color, text) pairs
-pub fn highlight_file(path: &str, content: &str) -> Arc<Vec<Vec<(Color, String)>>> {
+pub fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> {
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
     {

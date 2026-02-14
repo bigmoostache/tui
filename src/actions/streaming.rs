@@ -6,8 +6,8 @@ use super::ActionResult;
 
 /// Handle AppendChars action — append streaming text to assistant message
 pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
-    if let Some(msg) = state.messages.last_mut() {
-        if msg.role == "assistant" {
+    if let Some(msg) = state.messages.last_mut()
+        && msg.role == "assistant" {
             msg.content.push_str(text);
 
             // Update estimated token count during streaming
@@ -21,7 +21,6 @@ pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
                 state.streaming_estimated_tokens = new_estimate;
             }
         }
-    }
     ActionResult::Nothing
 }
 
@@ -63,8 +62,8 @@ pub fn handle_stream_done(
     state.streaming_estimated_tokens = 0;
 
     // Store actual token count on message and clean up LLM prefixes
-    if let Some(msg) = state.messages.last_mut() {
-        if msg.role == "assistant" {
+    if let Some(msg) = state.messages.last_mut()
+        && msg.role == "assistant" {
             // Remove any [A##]: prefixes the LLM mistakenly added
             msg.content = clean_llm_id_prefix(&msg.content);
             msg.content_token_count = output_tokens;
@@ -72,7 +71,6 @@ pub fn handle_stream_done(
             let id = msg.id.clone();
             return ActionResult::SaveMessage(id);
         }
-    }
     ActionResult::Save
 }
 
@@ -89,12 +87,11 @@ pub fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     // Log error to file
     let error_file = log_error(error);
 
-    if let Some(msg) = state.messages.last_mut() {
-        if msg.role == "assistant" {
+    if let Some(msg) = state.messages.last_mut()
+        && msg.role == "assistant" {
             msg.content = format!("[Error occurred. See details in {}]", error_file);
             let id = msg.id.clone();
             return ActionResult::SaveMessage(id);
         }
-    }
     ActionResult::Save
 }

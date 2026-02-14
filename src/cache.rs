@@ -84,6 +84,7 @@ pub enum CacheUpdate {
 
 /// Request for background cache operations
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum CacheRequest {
     /// Refresh a file's cache
     RefreshFile {
@@ -226,11 +227,10 @@ impl CachePool {
                         match job {
                             Ok((request, tx)) => {
                                 let context_type = request.context_type();
-                                if let Some(panel) = crate::modules::create_panel(context_type) {
-                                    if let Some(update) = panel.refresh_cache(request) {
+                                if let Some(panel) = crate::modules::create_panel(context_type)
+                                    && let Some(update) = panel.refresh_cache(request) {
                                         let _ = tx.send(update);
                                     }
-                                }
                             }
                             Err(_) => break, // Channel closed, pool shutting down
                         }

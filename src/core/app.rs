@@ -278,11 +278,10 @@ impl App {
             // Still streaming, retry the request
             if self.state.is_streaming {
                 // Clear any partial assistant message content before retrying
-                if let Some(msg) = self.state.messages.last_mut() {
-                    if msg.role == "assistant" {
+                if let Some(msg) = self.state.messages.last_mut()
+                    && msg.role == "assistant" {
                         msg.content.clear();
                     }
-                }
                 let ctx = prepare_stream_context(&mut self.state, true);
                 let system_prompt = get_active_agent_content(&self.state);
                 self.typewriter.reset();
@@ -299,12 +298,11 @@ impl App {
 
     fn process_typewriter(&mut self) {
         let _guard = crate::profile!("app::typewriter");
-        if self.state.is_streaming {
-            if let Some(chars) = self.typewriter.take_chars() {
+        if self.state.is_streaming
+            && let Some(chars) = self.typewriter.take_chars() {
                 apply_action(&mut self.state, Action::AppendChars(chars));
                 self.state.dirty = true;
             }
-        }
     }
 
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
@@ -321,15 +319,14 @@ impl App {
     }
 
     fn process_api_check_results(&mut self) {
-        if let Some(rx) = &self.api_check_rx {
-            if let Ok(result) = rx.try_recv() {
+        if let Some(rx) = &self.api_check_rx
+            && let Ok(result) = rx.try_recv() {
                 self.state.api_check_in_progress = false;
                 self.state.api_check_result = Some(result);
                 self.state.dirty = true;
                 self.api_check_rx = None;
                 self.save_state_async();
             }
-        }
     }
 
     fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
@@ -347,8 +344,8 @@ impl App {
         let mut tool_results: Vec<ToolResult> = Vec::new();
 
         // Finalize current assistant message
-        if let Some(msg) = self.state.messages.last_mut() {
-            if msg.role == "assistant" {
+        if let Some(msg) = self.state.messages.last_mut()
+            && msg.role == "assistant" {
                 // Clean any LLM ID prefixes before saving
                 msg.content = clean_llm_id_prefix(&msg.content);
                 let op = build_message_op(msg);
@@ -358,7 +355,6 @@ impl App {
                     generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
                 }
             }
-        }
 
         // Create tool call messages
         for tool in &tools {
@@ -588,8 +584,8 @@ impl App {
             return;
         }
 
-        if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) = self.pending_done {
-            if self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
+        if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) = self.pending_done
+            && self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
                 self.state.dirty = true;
                 let stop_reason = stop_reason.clone();
                 match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason }) {
@@ -616,7 +612,6 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
             }
-        }
     }
 
     fn handle_action(
@@ -640,11 +635,10 @@ impl App {
                 // so auto-continuation resumes when the user sends a new message.
                 self.state.spine_config.user_stopped = true;
                 self.state.touch_panel(ContextType::Spine);
-                if let Some(msg) = self.state.messages.last() {
-                    if msg.role == "assistant" {
+                if let Some(msg) = self.state.messages.last()
+                    && msg.role == "assistant" {
                         self.save_message_async(msg);
                     }
-                }
                 self.save_state_async();
             }
             ActionResult::Save => {
@@ -687,24 +681,20 @@ impl App {
 
         // Watch files in File contexts
         for ctx in &self.state.context {
-            if ctx.context_type == ContextType::File {
-                if let Some(path) = &ctx.file_path {
-                    if !self.watched_file_paths.contains(path) {
-                        if watcher.watch_file(path).is_ok() {
+            if ctx.context_type == ContextType::File
+                && let Some(path) = &ctx.file_path
+                    && !self.watched_file_paths.contains(path)
+                        && watcher.watch_file(path).is_ok() {
                             self.watched_file_paths.insert(path.clone());
                         }
-                    }
-                }
-            }
         }
 
         // Watch directories for Tree panel (only open folders)
         for folder in &self.state.tree_open_folders {
-            if !self.watched_dir_paths.contains(folder) {
-                if watcher.watch_dir(folder).is_ok() {
+            if !self.watched_dir_paths.contains(folder)
+                && watcher.watch_dir(folder).is_ok() {
                     self.watched_dir_paths.insert(folder.clone());
                 }
-            }
         }
 
         // Watch .git/ paths for GitResult panel deprecation
@@ -950,11 +940,10 @@ impl App {
             // interval_elapsed: scheduled refresh — only for fixed + selected panels
             // deprecated w/o interval: File/Tree panels — refresh immediately when watcher triggers
             // Note: cache_deprecated still affects build_cache_request (forces full refresh vs hash check)
-            if needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval) {
-                if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+            if (needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval))
+                && let Some(request) = panel.build_cache_request(ctx, &self.state) {
                     requests.push((i, request));
                 }
-            }
         }
 
         // Mutable pass: send requests, mark in-flight
@@ -972,15 +961,12 @@ impl App {
         let Some(watcher) = &mut self.file_watcher else { return };
 
         for ctx in &self.state.context {
-            if ctx.context_type == ContextType::File {
-                if let Some(path) = &ctx.file_path {
-                    if !self.watched_file_paths.contains(path) {
-                        if watcher.watch_file(path).is_ok() {
+            if ctx.context_type == ContextType::File
+                && let Some(path) = &ctx.file_path
+                    && !self.watched_file_paths.contains(path)
+                        && watcher.watch_file(path).is_ok() {
                             self.watched_file_paths.insert(path.clone());
                         }
-                    }
-                }
-            }
         }
     }
 

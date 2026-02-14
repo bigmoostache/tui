@@ -31,20 +31,18 @@ impl Module for TreeModule {
         if let Some(v) = data.get("tree_filter").and_then(|v| v.as_str()) {
             state.tree_filter = v.to_string();
         }
-        if let Some(arr) = data.get("tree_descriptions") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("tree_descriptions")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.tree_descriptions = v;
             }
-        }
         // Legacy: load tree_open_folders from global config if present (migration)
-        if let Some(arr) = data.get("tree_open_folders") {
-            if let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
+        if let Some(arr) = data.get("tree_open_folders")
+            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
                 state.tree_open_folders = v;
                 if !state.tree_open_folders.contains(&".".to_string()) {
                     state.tree_open_folders.insert(0, ".".to_string());
                 }
             }
-        }
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
@@ -54,15 +52,14 @@ impl Module for TreeModule {
     }
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("tree_open_folders") {
-            if let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
+        if let Some(arr) = data.get("tree_open_folders")
+            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
                 state.tree_open_folders = v;
                 // Ensure root is always open
                 if !state.tree_open_folders.contains(&".".to_string()) {
                     state.tree_open_folders.insert(0, ".".to_string());
                 }
             }
-        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

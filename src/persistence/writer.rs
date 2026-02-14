@@ -1,12 +1,11 @@
-/// Background persistence writer
-///
-/// Receives serialized write operations from the main thread and executes
-/// them on a dedicated I/O thread. Debounces rapid saves (coalesces writes
-/// within 50ms) to reduce disk I/O during high-frequency save_state calls.
-///
-/// The main thread does the CPU work (serialization), the writer thread
-/// does the I/O work (file writes). This keeps the event loop responsive.
-
+//! Background persistence writer
+//!
+//! Receives serialized write operations from the main thread and executes
+//! them on a dedicated I/O thread. Debounces rapid saves (coalesces writes
+//! within 50ms) to reduce disk I/O during high-frequency save_state calls.
+//!
+//! The main thread does the CPU work (serialization), the writer thread
+//! does the I/O work (file writes). This keeps the event loop responsive.
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -218,23 +217,21 @@ fn execute_batch(batch: Option<WriteBatch>) {
 
     // Execute deletes
     for op in &batch.deletes {
-        if let Err(e) = fs::remove_file(&op.path) {
-            if e.kind() != std::io::ErrorKind::NotFound {
+        if let Err(e) = fs::remove_file(&op.path)
+            && e.kind() != std::io::ErrorKind::NotFound {
                 eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
             }
-        }
     }
 }
 
 /// Write a file, creating parent directories if needed.
 /// Logs errors instead of silently swallowing them.
 fn write_file(path: &PathBuf, content: &[u8]) {
-    if let Some(parent) = path.parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
+    if let Some(parent) = path.parent()
+        && let Err(e) = fs::create_dir_all(parent) {
             eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
             return;
         }
-    }
     if let Err(e) = fs::write(path, content) {
         eprintln!("[persistence] failed to write {}: {}", path.display(), e);
     }

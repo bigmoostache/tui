@@ -72,8 +72,8 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     spans.push(Span::styled(" ", base_style));
 
     // Stop reason from last stream (highlight max_tokens as warning)
-    if !state.is_streaming {
-        if let Some(ref reason) = state.last_stop_reason {
+    if !state.is_streaming
+        && let Some(ref reason) = state.last_stop_reason {
             let (label, style) = if reason == "max_tokens" {
                 ("MAX_TOKENS".to_string(), Style::default().fg(theme::bg_base()).bg(theme::error()).bold())
             } else {
@@ -82,7 +82,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             spans.push(Span::styled(format!(" {} ", label), style));
             spans.push(Span::styled(" ", base_style));
         }
-    }
 
     // Active agent card
     if let Some(ref agent_id) = state.active_agent_id {

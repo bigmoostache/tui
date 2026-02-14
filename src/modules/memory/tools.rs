@@ -175,12 +175,11 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     changes.push("contents");
                 }
 
-                if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str()) {
-                    if let Some(importance) = MemoryImportance::from_str(importance_str) {
+                if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str())
+                    && let Some(importance) = MemoryImportance::from_str(importance_str) {
                         m.importance = importance;
                         changes.push("importance");
                     }
-                }
 
                 if let Some(labels_arr) = update_value.get("labels").and_then(|v| v.as_array()) {
                     m.labels = labels_arr.iter()

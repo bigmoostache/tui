@@ -1,11 +1,10 @@
-/// Persistence module for multi-worker state management
-///
-/// This module handles the file-based persistence of:
-/// - SharedConfig (config.json) - Global settings shared across workers
-/// - WorkerState (states/{worker}.json) - Worker-specific state
-/// - PanelData (panels/{uid}.json) - Dynamic panel metadata
-/// - Messages (messages/{uid}.yaml) - Conversation messages
-
+//! Persistence module for multi-worker state management
+//!
+//! This module handles the file-based persistence of:
+//! - SharedConfig (config.json) - Global settings shared across workers
+//! - WorkerState (states/{worker}.json) - Worker-specific state
+//! - PanelData (panels/{uid}.json) - Dynamic panel metadata
+//! - Messages (messages/{uid}.yaml) - Conversation messages
 pub mod config;
 pub mod worker;
 pub mod panel;
@@ -98,11 +97,10 @@ fn load_state_new() -> State {
     let important = &worker_state.important_panel_uids;
 
     // Load Conversation panel (special: not in FIXED_PANEL_ORDER, uses id "chat")
-    if let Some(uid) = important.get(&ContextType::Conversation) {
-        if let Some(panel_data) = panel::load_panel(uid) {
+    if let Some(uid) = important.get(&ContextType::Conversation)
+        && let Some(panel_data) = panel::load_panel(uid) {
             context.push(panel_to_context(&panel_data, "chat"));
         }
-    }
 
     // Load fixed panels in canonical order (P0-P7) from module registry
     let defaults = crate::modules::all_fixed_panel_defaults();
@@ -111,11 +109,10 @@ fn load_state_new() -> State {
         if *ct == ContextType::System {
             // System panel is not stored in panels/ - comes from systems[]
             context.push(crate::modules::make_default_context_element(&id, *ct, name, *cache_deprecated));
-        } else if let Some(uid) = important.get(ct) {
-            if let Some(panel_data) = panel::load_panel(uid) {
+        } else if let Some(uid) = important.get(ct)
+            && let Some(panel_data) = panel::load_panel(uid) {
                 context.push(panel_to_context(&panel_data, &id));
             }
-        }
     }
 
     // Load dynamic panels from panel_uid_to_local_id (P8+)
@@ -285,11 +282,10 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     for ctx in &state.context {
         let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::Conversation)
             && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library;
-        if dominated {
-            if let Some(uid) = &ctx.uid {
+        if dominated
+            && let Some(uid) = &ctx.uid {
                 important_uids.insert(ctx.context_type, uid.clone());
             }
-        }
     }
 
     // Build panel_uid_to_local_id (dynamic panels only — excludes fixed and Conversation)
@@ -369,8 +365,8 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     // History messages for ConversationHistory panels
     let messages_dir = dir.join(crate::constants::MESSAGES_DIR);
     for ctx in &state.context {
-        if ctx.context_type == ContextType::ConversationHistory {
-            if let Some(ref msgs) = ctx.history_messages {
+        if ctx.context_type == ContextType::ConversationHistory
+            && let Some(ref msgs) = ctx.history_messages {
                 for msg in msgs {
                     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
                     if let Ok(yaml) = serde_yaml::to_string(msg) {
@@ -381,7 +377,6 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                     }
                 }
             }
-        }
     }
 
     // Orphan panel deletion
@@ -391,11 +386,10 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
                 continue;
             }
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                if !known_uids.contains(stem) {
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                && !known_uids.contains(stem) {
                     deletes.push(DeleteOp { path });
                 }
-            }
         }
     }
 
@@ -425,33 +419,30 @@ pub fn save_state(state: &State) {
         }
     }
     for op in &batch.writes {
-        if let Some(parent) = op.path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
+        if let Some(parent) = op.path.parent()
+            && let Err(e) = fs::create_dir_all(parent) {
                 eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
                 continue;
             }
-        }
         if let Err(e) = fs::write(&op.path, &op.content) {
             eprintln!("[persistence] failed to write {}: {}", op.path.display(), e);
         }
     }
     for op in &batch.deletes {
-        if let Err(e) = fs::remove_file(&op.path) {
-            if e.kind() != std::io::ErrorKind::NotFound {
+        if let Err(e) = fs::remove_file(&op.path)
+            && e.kind() != std::io::ErrorKind::NotFound {
                 eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
             }
-        }
     }
 }
 
 /// Check if we still own the state file (another instance may have taken over)
 /// Returns false if another process has claimed ownership
 pub fn check_ownership() -> bool {
-    if let Some(cfg) = config::load_config() {
-        if let Some(owner) = cfg.owner_pid {
+    if let Some(cfg) = config::load_config()
+        && let Some(owner) = cfg.owner_pid {
             return owner == current_pid();
         }
-    }
     // If we can't read the file or there's no owner, assume we're still the owner
     true
 }

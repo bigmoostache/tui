@@ -43,21 +43,18 @@ impl FileWatcher {
                         let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
 
                         // Check if it's a watched file
-                        if let Ok(files) = files_clone.lock() {
-                            if let Some(original_path) = files.get(&canonical) {
+                        if let Ok(files) = files_clone.lock()
+                            && let Some(original_path) = files.get(&canonical) {
                                 let _ = tx.send(WatchEvent::FileChanged(original_path.clone()));
                                 continue;
                             }
-                        }
 
                         // Check if it's in a watched directory
-                        if let Ok(dirs) = dirs_clone.lock() {
-                            if let Some(parent) = canonical.parent() {
-                                if let Some(original_path) = dirs.get(&parent.to_path_buf()) {
+                        if let Ok(dirs) = dirs_clone.lock()
+                            && let Some(parent) = canonical.parent()
+                                && let Some(original_path) = dirs.get(&parent.to_path_buf()) {
                                     let _ = tx.send(WatchEvent::DirChanged(original_path.clone()));
                                 }
-                            }
-                        }
                     }
                 }
             },
@@ -82,12 +79,11 @@ impl FileWatcher {
         // Canonicalize for storage and comparison
         let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
 
-        if let Ok(mut files) = self.watched_files.lock() {
-            if !files.contains_key(&canonical) {
+        if let Ok(mut files) = self.watched_files.lock()
+            && !files.contains_key(&canonical) {
                 files.insert(canonical.clone(), path.to_string());
                 self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
             }
-        }
         Ok(())
     }
 
@@ -101,12 +97,11 @@ impl FileWatcher {
         // Canonicalize for storage and comparison
         let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
 
-        if let Ok(mut dirs) = self.watched_dirs.lock() {
-            if !dirs.contains_key(&canonical) {
+        if let Ok(mut dirs) = self.watched_dirs.lock()
+            && !dirs.contains_key(&canonical) {
                 dirs.insert(canonical.clone(), path.to_string());
                 self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
             }
-        }
         Ok(())
     }
 
@@ -119,12 +114,11 @@ impl FileWatcher {
 
         let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
 
-        if let Ok(mut dirs) = self.watched_dirs.lock() {
-            if !dirs.contains_key(&canonical) {
+        if let Ok(mut dirs) = self.watched_dirs.lock()
+            && !dirs.contains_key(&canonical) {
                 dirs.insert(canonical.clone(), path.to_string());
                 self.watcher.watch(&canonical, RecursiveMode::Recursive)?;
             }
-        }
         Ok(())
     }
 

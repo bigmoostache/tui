@@ -68,17 +68,15 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
         let replace_path = preset_file_path(replace_name);
         if replace_path.exists() {
             // Check if it's a built-in preset
-            if let Ok(contents) = fs::read_to_string(&replace_path) {
-                if let Ok(existing) = serde_json::from_str::<Preset>(&contents) {
-                    if existing.built_in {
+            if let Ok(contents) = fs::read_to_string(&replace_path)
+                && let Ok(existing) = serde_json::from_str::<Preset>(&contents)
+                    && existing.built_in {
                         return ToolResult {
                             tool_use_id: tool.id.clone(),
                             content: format!("Cannot replace built-in preset '{}'", replace_name),
                             is_error: true,
                         };
                     }
-                }
-            }
             let _ = fs::remove_file(&replace_path);
         }
     } else if file_path.exists() {
@@ -250,12 +248,11 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ws = &preset.worker_state;
 
     // 1. Set active_agent_id (only if the referenced system exists)
-    if let Some(ref sys_id) = ws.active_agent_id {
-        if state.agents.iter().any(|s| s.id == *sys_id) {
+    if let Some(ref sys_id) = ws.active_agent_id
+        && state.agents.iter().any(|s| s.id == *sys_id) {
             state.active_agent_id = Some(sys_id.clone());
         }
         // If system doesn't exist, keep current active_agent_id
-    }
 
     // 2. Set active_modules — ensure core modules are always included
     let modules = crate::modules::all_modules();
@@ -300,22 +297,20 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Load preset module data for non-global modules
     for module in &modules {
-        if !module.is_global() {
-            if let Some(data) = ws.modules.get(module.id()) {
+        if !module.is_global()
+            && let Some(data) = ws.modules.get(module.id()) {
                 module.load_module_data(data, state);
             }
-        }
     }
 
     // 5. Remove existing dynamic panels (kill tmux panes first)
     for ctx in &state.context {
-        if ctx.context_type == crate::state::ContextType::Tmux {
-            if let Some(pane_id) = &ctx.tmux_pane_id {
+        if ctx.context_type == crate::state::ContextType::Tmux
+            && let Some(pane_id) = &ctx.tmux_pane_id {
                 let _ = std::process::Command::new("tmux")
                     .args(["kill-window", "-t", pane_id])
                     .output();
             }
-        }
     }
     state
         .context
@@ -371,13 +366,11 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // 6c. Populate cached_content for restored skill panels
     for ctx in &mut state.context {
-        if ctx.context_type == crate::state::ContextType::Skill {
-            if let Some(ref skill_id) = ctx.skill_prompt_id {
-                if let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id) {
+        if ctx.context_type == crate::state::ContextType::Skill
+            && let Some(ref skill_id) = ctx.skill_prompt_id
+                && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id) {
                     ctx.cached_content = Some(skill.content.clone());
                 }
-            }
-        }
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules
@@ -437,15 +430,14 @@ pub fn list_presets_with_info() -> Vec<PresetInfo> {
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
                 continue;
             }
-            if let Ok(contents) = fs::read_to_string(&path) {
-                if let Ok(preset) = serde_json::from_str::<Preset>(&contents) {
+            if let Ok(contents) = fs::read_to_string(&path)
+                && let Ok(preset) = serde_json::from_str::<Preset>(&contents) {
                     presets.push(PresetInfo {
                         name: preset.preset_name,
                         description: preset.description,
                         built_in: preset.built_in,
                     });
                 }
-            }
         }
     }
     presets.sort_by(|a, b| a.name.cmp(&b.name));

@@ -77,8 +77,8 @@ impl Panel for FilePanel {
             return None;
         }
         // Hard byte limit: refuse to load oversized files
-        if let Ok(meta) = fs::metadata(&path) {
-            if meta.len() as usize > PANEL_MAX_LOAD_BYTES {
+        if let Ok(meta) = fs::metadata(&path)
+            && meta.len() as usize > PANEL_MAX_LOAD_BYTES {
                 let msg = format!(
                     "[File too large to load: {} bytes (limit: {} bytes). Close this panel and use grep or other tools to inspect portions of the file.]",
                     meta.len(), PANEL_MAX_LOAD_BYTES
@@ -91,7 +91,6 @@ impl Panel for FilePanel {
                     token_count,
                 });
             }
-        }
         let content = fs::read_to_string(&path).ok()?;
         let new_hash = hash_content(&content);
         if current_hash.as_ref() == Some(&new_hash) {

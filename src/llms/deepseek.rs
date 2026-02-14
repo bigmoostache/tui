@@ -183,11 +183,10 @@ impl LlmClient for DeepSeekClient {
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
-                        if let Some(content) = delta.content {
-                            if !content.is_empty() {
+                        if let Some(content) = delta.content
+                            && !content.is_empty() {
                                 let _ = tx.send(StreamEvent::Chunk(content));
                             }
-                        }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
                                 tool_acc.feed(call);

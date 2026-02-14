@@ -80,31 +80,26 @@ impl Module for CoreModule {
         if let Some(v) = data.get("dev_mode").and_then(|v| v.as_bool()) {
             state.dev_mode = v;
         }
-        if let Some(v) = data.get("llm_provider") {
-            if let Ok(p) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("llm_provider")
+            && let Ok(p) = serde_json::from_value(v.clone()) {
                 state.llm_provider = p;
             }
-        }
-        if let Some(v) = data.get("anthropic_model") {
-            if let Ok(m) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("anthropic_model")
+            && let Ok(m) = serde_json::from_value(v.clone()) {
                 state.anthropic_model = m;
             }
-        }
-        if let Some(v) = data.get("grok_model") {
-            if let Ok(m) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("grok_model")
+            && let Ok(m) = serde_json::from_value(v.clone()) {
                 state.grok_model = m;
             }
-        }
-        if let Some(v) = data.get("groq_model") {
-            if let Ok(m) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("groq_model")
+            && let Ok(m) = serde_json::from_value(v.clone()) {
                 state.groq_model = m;
             }
-        }
-        if let Some(v) = data.get("deepseek_model") {
-            if let Ok(m) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("deepseek_model")
+            && let Ok(m) = serde_json::from_value(v.clone()) {
                 state.deepseek_model = m;
             }
-        }
         if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {
             state.cleaning_threshold = v as f32;
         }

@@ -10,15 +10,12 @@ impl Panel for SkillPanel {
     fn title(&self, state: &State) -> String {
         // Find the skill name from the selected context element
         let selected = state.context.get(state.selected_context);
-        if let Some(ctx) = selected {
-            if ctx.context_type == crate::state::ContextType::Skill {
-                if let Some(skill_id) = &ctx.skill_prompt_id {
-                    if let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id) {
+        if let Some(ctx) = selected
+            && ctx.context_type == crate::state::ContextType::Skill
+                && let Some(skill_id) = &ctx.skill_prompt_id
+                    && let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id) {
                         return format!("Skill: {}", skill.name);
                     }
-                }
-            }
-        }
         "Skill".to_string()
     }
 
@@ -27,9 +24,9 @@ impl Panel for SkillPanel {
 
         // Find the skill panel context element that is currently selected
         let selected = state.context.get(state.selected_context);
-        if let Some(ctx) = selected {
-            if let Some(skill_id) = &ctx.skill_prompt_id {
-                if let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id) {
+        if let Some(ctx) = selected
+            && let Some(skill_id) = &ctx.skill_prompt_id
+                && let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id) {
                     lines.push(Line::from(vec![
                         Span::styled("Skill: ", Style::default().fg(theme::text_muted())),
                         Span::styled(format!("[{}] {}", skill.id, skill.name), Style::default().fg(theme::accent()).bold()),
@@ -41,8 +38,6 @@ impl Panel for SkillPanel {
                     }
                     return lines;
                 }
-            }
-        }
 
         lines.push(Line::from(Span::styled("Skill not found", Style::default().fg(theme::error()))));
         lines
@@ -73,11 +68,10 @@ impl Panel for SkillPanel {
         // Skill panels are sent to LLM as context
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type == crate::state::ContextType::Skill {
-                if let Some(content) = &ctx.cached_content {
+            if ctx.context_type == crate::state::ContextType::Skill
+                && let Some(content) = &ctx.cached_content {
                     items.push(ContextItem::new(&ctx.id, &ctx.name, content.clone(), ctx.last_refresh_ms));
                 }
-            }
         }
         items
     }

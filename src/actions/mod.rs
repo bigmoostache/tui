@@ -122,8 +122,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     word_start -= 1;
                 }
                 let word = &state.input[word_start..before_space];
-                if let Some(cmd_name) = word.strip_prefix('/') {
-                    if let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name) {
+                if let Some(cmd_name) = word.strip_prefix('/')
+                    && let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name) {
                         let content = cmd.content.clone();
                         let label = cmd_name.to_string();
                         let idx = state.paste_buffers.len();
@@ -139,7 +139,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         );
                         state.input_cursor = word_start + sentinel.len() + 1;
                     }
-                }
             }
 
             ActionResult::Nothing
@@ -401,11 +400,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;
-                if let Some(msg) = state.messages.last_mut() {
-                    if msg.role == "assistant" && !msg.content.is_empty() {
+                if let Some(msg) = state.messages.last_mut()
+                    && msg.role == "assistant" && !msg.content.is_empty() {
                         msg.content.push_str("\n[Stopped]");
                     }
-                }
                 ActionResult::StopStream
             } else {
                 ActionResult::Nothing

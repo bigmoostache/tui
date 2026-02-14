@@ -34,24 +34,22 @@ pub fn ensure_default_agent(state: &mut State) {
     state.commands = commands;
 
     // Ensure there's always an active agent
-    if state.active_agent_id.is_none() {
-        state.active_agent_id = Some(default_id.to_string());
-    } else {
+    if let Some(active_id) = &state.active_agent_id {
         // Verify the active agent still exists
-        let active_id = state.active_agent_id.as_ref().unwrap();
-        if !state.agents.iter().any(|s| &s.id == active_id) {
+        if !state.agents.iter().any(|s| s.id == *active_id) {
             state.active_agent_id = Some(default_id.to_string());
         }
+    } else {
+        state.active_agent_id = Some(default_id.to_string());
     }
 }
 
 /// Get the active agent's content (system prompt)
 pub fn get_active_agent_content(state: &State) -> String {
-    if let Some(active_id) = &state.active_agent_id {
-        if let Some(agent) = state.agents.iter().find(|s| &s.id == active_id) {
+    if let Some(active_id) = &state.active_agent_id
+        && let Some(agent) = state.agents.iter().find(|s| &s.id == active_id) {
             return agent.content.clone();
         }
-    }
     // Fallback to default
     library::agents().first()
         .map(|a| a.content.clone())

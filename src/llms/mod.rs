@@ -339,6 +339,7 @@ pub fn start_api_check(
 }
 
 /// Start streaming with the specified provider and model
+#[allow(clippy::too_many_arguments)]
 pub fn start_streaming(
     provider: LlmProvider,
     model: String,

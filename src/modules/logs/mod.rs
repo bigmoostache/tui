@@ -71,13 +71,11 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 
     // Load next_id.json
     let next_id_path = dir.join("next_id.json");
-    if let Ok(content) = fs::read_to_string(&next_id_path) {
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-            if let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64()) {
+    if let Ok(content) = fs::read_to_string(&next_id_path)
+        && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64()) {
                 next_log_id = v as usize;
             }
-        }
-    }
 
     // Load all chunk files
     if let Ok(entries) = fs::read_dir(&dir) {
@@ -93,11 +91,10 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
         chunk_files.sort_by_key(|(idx, _)| *idx);
 
         for (_, path) in chunk_files {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content) {
+            if let Ok(content) = fs::read_to_string(&path)
+                && let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content) {
                     all_logs.extend(logs);
                 }
-            }
         }
     }
 
@@ -312,12 +309,11 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let mut count = 0;
     for entry_obj in entries {
-        if let Some(content) = entry_obj.get("content").and_then(|v| v.as_str()) {
-            if !content.is_empty() {
+        if let Some(content) = entry_obj.get("content").and_then(|v| v.as_str())
+            && !content.is_empty() {
                 push_log(state, content.to_string());
                 count += 1;
             }
-        }
     }
 
     if count > 0 {
@@ -532,10 +528,9 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     // 3. Validate that logs are provided (at least one non-empty entry)
     let logs_array = tool.input.get("logs").and_then(|v| v.as_array());
     let has_logs = logs_array
-        .map(|arr| arr.iter().any(|e| {
-            e.get("content").and_then(|v| v.as_str()).map_or(false, |s| !s.is_empty())
-        }))
-        .unwrap_or(false);
+        .is_some_and(|arr| arr.iter().any(|e| {
+            e.get("content").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty())
+        }));
 
     if !has_logs {
         return ToolResult {
@@ -551,8 +546,8 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     if let Some(logs_array) = logs_array {
         let mut log_count = 0;
         for log_obj in logs_array {
-            if let Some(content) = log_obj.get("content").and_then(|v| v.as_str()) {
-                if !content.is_empty() {
+            if let Some(content) = log_obj.get("content").and_then(|v| v.as_str())
+                && !content.is_empty() {
                     if last_msg_timestamp > 0 {
                         push_log_with_timestamp(state, content.to_string(), last_msg_timestamp);
                     } else {
@@ -560,7 +555,6 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                     }
                     log_count += 1;
                 }
-            }
         }
         if log_count > 0 {
             output_parts.push(format!("Created {} log(s)", log_count));
@@ -572,8 +566,8 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     if let Some(memories_array) = tool.input.get("memories").and_then(|v| v.as_array()) {
         let mut mem_count = 0;
         for mem_obj in memories_array {
-            if let Some(content) = mem_obj.get("content").and_then(|v| v.as_str()) {
-                if !content.is_empty() {
+            if let Some(content) = mem_obj.get("content").and_then(|v| v.as_str())
+                && !content.is_empty() {
                     // Validate tl_dr length
                     let tokens = estimate_tokens(content);
                     if tokens > MEMORY_TLDR_MAX_TOKENS {
@@ -610,7 +604,6 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                     });
                     mem_count += 1;
                 }
-            }
         }
         if mem_count > 0 {
             output_parts.push(format!("Created {} memory(ies)", mem_count));

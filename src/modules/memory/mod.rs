@@ -29,19 +29,17 @@ impl Module for MemoryModule {
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("memories") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("memories")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.memories = v;
             }
-        }
         if let Some(v) = data.get("next_memory_id").and_then(|v| v.as_u64()) {
             state.next_memory_id = v as usize;
         }
-        if let Some(arr) = data.get("open_memory_ids") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("open_memory_ids")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.open_memory_ids = v;
             }
-        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

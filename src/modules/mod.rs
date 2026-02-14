@@ -230,11 +230,10 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
     }
 
     for module in all_modules() {
-        if active_modules.contains(module.id()) {
-            if let Some(result) = module.execute_tool(tool, state) {
+        if active_modules.contains(module.id())
+            && let Some(result) = module.execute_tool(tool, state) {
                 return result;
             }
-        }
     }
 
     ToolResult {
@@ -283,14 +282,13 @@ pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), St
 
     // Check if any other active module depends on this one
     for module in all_modules() {
-        if module.id() != id && active.contains(module.id()) {
-            if module.dependencies().contains(&id) {
+        if module.id() != id && active.contains(module.id())
+            && module.dependencies().contains(&id) {
                 return Err(format!(
                     "Cannot deactivate '{}': required by '{}'",
                     id, module.id()
                 ));
             }
-        }
     }
 
     Ok(())

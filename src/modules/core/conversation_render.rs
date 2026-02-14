@@ -315,7 +315,7 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], 
                         }
                     }
 
-                    result.push_str(&placeholder);
+                    result.push_str(placeholder);
                 } else {
                     // Invalid index — keep as-is
                     result.push_str(&input[start..i]);
@@ -382,7 +382,7 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
                 let mut spans = if in_paste_block {
                     // Inside a paste/command block — render entire line in accent, strip markers
-                    let clean = line_text.replace(PASTE_PLACEHOLDER_START, "").replace(PASTE_PLACEHOLDER_END, "");
+                    let clean = line_text.replace([PASTE_PLACEHOLDER_START, PASTE_PLACEHOLDER_END], "");
                     if clean.contains(cursor_char) {
                         let parts: Vec<&str> = clean.splitn(2, cursor_char).collect();
                         vec![
@@ -444,7 +444,7 @@ fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String])
     for segment in segments {
         match segment {
             InputSegment::Text(text) => {
-                spans.extend(build_text_spans(&text, cursor_char, command_ids, &line_text));
+                spans.extend(build_text_spans(&text, cursor_char, command_ids, line_text));
             }
             InputSegment::PastePlaceholder(text) => {
                 // Render as colored placeholder — check if cursor is inside
@@ -578,7 +578,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         // No command — render with normal text color + cursor
         if text.contains(cursor_char) {
             let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
-            spans.push(Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::text())));
+            spans.push(Span::styled(parts.first().unwrap_or(&"").to_string(), Style::default().fg(theme::text())));
             spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
             if let Some(rest) = parts.get(1) {
                 spans.push(Span::styled(rest.to_string(), Style::default().fg(theme::text())));

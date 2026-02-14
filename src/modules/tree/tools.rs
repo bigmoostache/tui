@@ -378,27 +378,23 @@ fn build_tree_new(
                     desc_map,
                     output,
                 );
+            } else if let Some(desc) = folder_desc {
+                output.push_str(&format!("{}{}{}/ - {}\n", prefix, connector, name_str, desc));
             } else {
-                if let Some(desc) = folder_desc {
-                    output.push_str(&format!("{}{}{}/ - {}\n", prefix, connector, name_str, desc));
-                } else {
-                    output.push_str(&format!("{}{}{}/\n", prefix, connector, name_str));
-                }
+                output.push_str(&format!("{}{}{}/\n", prefix, connector, name_str));
             }
-        } else {
-            if let Some(desc) = desc_map.get(&entry_path) {
-                // Check if description is stale
-                let current_hash = compute_file_hash(&entry.path()).unwrap_or_default();
-                let is_stale = !desc.file_hash.is_empty() && desc.file_hash != current_hash;
+        } else if let Some(desc) = desc_map.get(&entry_path) {
+            // Check if description is stale
+            let current_hash = compute_file_hash(&entry.path()).unwrap_or_default();
+            let is_stale = !desc.file_hash.is_empty() && desc.file_hash != current_hash;
 
-                let stale_marker = if is_stale { " [!]" } else { "" };
-                output.push_str(&format!(
-                    "{}{}{}{} - {}\n",
-                    prefix, connector, name_str, stale_marker, desc.description
-                ));
-            } else {
-                output.push_str(&format!("{}{}{}\n", prefix, connector, name_str));
-            }
+            let stale_marker = if is_stale { " [!]" } else { "" };
+            output.push_str(&format!(
+                "{}{}{}{} - {}\n",
+                prefix, connector, name_str, stale_marker, desc.description
+            ));
+        } else {
+            output.push_str(&format!("{}{}{}\n", prefix, connector, name_str));
         }
     }
 }

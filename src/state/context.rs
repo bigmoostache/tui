@@ -21,11 +21,10 @@ static CACHE_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
     let mut set = HashSet::new();
     for module in crate::modules::all_modules() {
         for ct in module.fixed_panel_types().into_iter().chain(module.dynamic_panel_types()) {
-            if let Some(panel) = module.create_panel(ct) {
-                if panel.needs_cache() {
+            if let Some(panel) = module.create_panel(ct)
+                && panel.needs_cache() {
                     set.insert(ct);
                 }
-            }
         }
     }
     set
@@ -196,7 +195,7 @@ pub fn estimate_tokens(text: &str) -> usize {
 /// Compute total pages for a given token count using PANEL_PAGE_TOKENS
 pub fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::constants::PANEL_PAGE_TOKENS;
-    if token_count <= max { 1 } else { (token_count + max - 1) / max }
+    if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }
 
 #[cfg(test)]

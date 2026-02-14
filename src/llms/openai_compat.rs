@@ -278,16 +278,15 @@ pub fn build_messages(
             if !calls.is_empty() {
                 // Try to merge into the last assistant message so consecutive
                 // tool calls become one assistant message (required by OpenAI APIs)
-                let should_merge = out.last().map_or(false, |last| {
+                let should_merge = out.last().is_some_and(|last| {
                     last.role == "assistant" && last.tool_calls.is_some()
                 });
 
                 if should_merge {
-                    if let Some(last) = out.last_mut() {
-                        if let Some(ref mut existing_calls) = last.tool_calls {
+                    if let Some(last) = out.last_mut()
+                        && let Some(ref mut existing_calls) = last.tool_calls {
                             existing_calls.extend(calls);
                         }
-                    }
                 } else {
                     out.push(OaiMessage {
                         role: "assistant".to_string(),

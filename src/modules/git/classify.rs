@@ -15,9 +15,9 @@ pub fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
     let mut current = String::new();
     let mut in_single = false;
     let mut in_double = false;
-    let mut chars = command.chars().peekable();
+    let chars = command.chars().peekable();
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             '\'' if !in_double => {
                 in_single = !in_single;
@@ -231,14 +231,14 @@ pub fn classify_git(args: &[String]) -> CommandClass {
         }
         "symbolic-ref" => {
             // Query (no set action) = ReadOnly; with --short or single arg
-            if rest.len() <= 1 || rest.iter().any(|a| *a == "--short") {
+            if rest.len() <= 1 || rest.contains(&"--short") {
                 CommandClass::ReadOnly
             } else {
                 CommandClass::Mutating
             }
         }
         "hash-object" => {
-            if rest.iter().any(|a| *a == "-w") {
+            if rest.contains(&"-w") {
                 CommandClass::Mutating
             } else {
                 CommandClass::ReadOnly
