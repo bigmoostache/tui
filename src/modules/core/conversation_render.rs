@@ -364,6 +364,7 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
         ]));
     } else {
         let mut is_first_line = true;
+        let mut in_paste_block = false;
         for line in input_with_cursor.lines() {
             if line.is_empty() {
                 lines.push(Line::from(vec![
@@ -374,10 +375,32 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
             let wrapped = wrap_text(line, wrap_width);
             for line_text in wrapped.iter() {
-                let mut spans = build_input_spans(line_text, cursor_char, command_ids);
+                // Check if this line enters or exits a paste placeholder block
+                let has_start = line_text.contains(PASTE_PLACEHOLDER_START);
+                let has_end = line_text.contains(PASTE_PLACEHOLDER_END);
+                if has_start { in_paste_block = true; }
+
+                let mut spans = if in_paste_block {
+                    // Inside a paste/command block — render entire line in accent, strip markers
+                    let clean = line_text.replace(PASTE_PLACEHOLDER_START, "").replace(PASTE_PLACEHOLDER_END, "");
+                    if clean.contains(cursor_char) {
+                        let parts: Vec<&str> = clean.splitn(2, cursor_char).collect();
+                        vec![
+                            Span::styled(parts[0].to_string(), Style::default().fg(theme::accent())),
+                            Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()),
+                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::accent())),
+                        ]
+                    } else {
+                        vec![Span::styled(clean, Style::default().fg(theme::accent()))]
+                    }
+                } else {
+                    build_input_spans(line_text, cursor_char, command_ids)
+                };
+
+                if has_end { in_paste_block = false; }
 
                 // Add command hints if this line segment contains the cursor and starts with /
-                if line_text.contains(cursor_char) {
+                if line_text.contains(cursor_char) && !in_paste_block {
                     let clean_line = line_text.replace(cursor_char, "");
                     let hints = build_command_hints(&clean_line, command_ids);
                     spans.extend(hints);
