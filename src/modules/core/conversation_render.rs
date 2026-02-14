@@ -343,6 +343,10 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
     let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
     let cursor_char = "\u{258e}";
 
+    // Keep originals before shadowing (needed for send-hint condition)
+    let original_input = input;
+    let original_cursor = cursor;
+
     // Pre-process: expand paste sentinels to display placeholders
     let (display_input, display_cursor) = expand_paste_sentinels(input, cursor, paste_buffers, paste_buffer_labels);
     let input = &display_input;
@@ -430,6 +434,18 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
             ]));
         }
     }
+
+    // Show hint when next Enter will send
+    let at_end = original_cursor >= original_input.len();
+    let ends_with_empty_line = original_input.ends_with('\n')
+        || original_input.lines().last().map(|l| l.trim().is_empty()).unwrap_or(false);
+    if !original_input.is_empty() && at_end && ends_with_empty_line {
+        lines.push(Line::from(Span::styled(
+            "  ↵ Enter to send",
+            Style::default().fg(theme::text_muted()),
+        )));
+    }
+
     lines.push(Line::from(""));
     lines
 }
