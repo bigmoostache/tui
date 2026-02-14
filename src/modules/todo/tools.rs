@@ -53,8 +53,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .map(|s| s.to_string());
 
         // Validate parent exists if specified
-        if let Some(ref pid) = parent_id {
-            if !state.todos.iter().any(|t| t.id == *pid) {
+        if let Some(ref pid) = parent_id
+            && !state.todos.iter().any(|t| t.id == *pid) {
                 let available: Vec<&str> = state.todos.iter().map(|t| t.id.as_str()).collect();
                 let available_str = if available.is_empty() {
                     "no todos exist yet".to_string()
@@ -64,7 +64,6 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 errors.push(format!("Parent '{}' not found for '{}' ({})", pid, name, available_str));
                 continue;
             }
-        }
 
         let status = todo_value.get("status")
             .and_then(|v| v.as_str())
@@ -229,9 +228,9 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         // Pre-check: if setting status to done, verify all children are done
         let status_str = update_value.get("status").and_then(|v| v.as_str());
-        if let Some(s) = status_str {
-            if let Some(status) = TodoStatus::from_str(s) {
-                if status == TodoStatus::Done {
+        if let Some(s) = status_str
+            && let Some(status) = TodoStatus::from_str(s)
+                && status == TodoStatus::Done {
                     let undone_children: Vec<String> = state.todos.iter()
                         .filter(|c| c.parent_id.as_deref() == Some(id) && c.status != TodoStatus::Done)
                         .map(|c| format!("{} ({})", c.id, c.name))
@@ -245,8 +244,6 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                         continue;
                     }
                 }
-            }
-        }
 
         // Find and update the todo
         let todo = state.todos.iter_mut().find(|t| t.id == id);
@@ -271,12 +268,11 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     changes.push("parent");
                 }
 
-                if let Some(status_str) = update_value.get("status").and_then(|v| v.as_str()) {
-                    if let Some(status) = TodoStatus::from_str(status_str) {
+                if let Some(status_str) = update_value.get("status").and_then(|v| v.as_str())
+                    && let Some(status) = TodoStatus::from_str(status_str) {
                         t.status = status;
                         changes.push("status");
                     }
-                }
 
                 if !changes.is_empty() {
                     updated.push(format!("{}: {}", id, changes.join(", ")));
@@ -293,8 +289,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut propagated: Vec<String> = Vec::new();
     for update_value in updates {
         let status_str = update_value.get("status").and_then(|v| v.as_str());
-        if status_str == Some("in_progress") || status_str == Some("~") {
-            if let Some(id) = update_value.get("id").and_then(|v| v.as_str()) {
+        if (status_str == Some("in_progress") || status_str == Some("~"))
+            && let Some(id) = update_value.get("id").and_then(|v| v.as_str()) {
                 // Walk up parent chain
                 let mut current_id = state.todos.iter()
                     .find(|t| t.id == id)
@@ -311,7 +307,6 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     }
                 }
             }
-        }
     }
 
     // Update Todo panel timestamp if anything changed

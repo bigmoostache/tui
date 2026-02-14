@@ -142,15 +142,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    if let Some(cmd) = state.commands.iter().find(|c| c.id == id) {
-        if cmd.is_builtin {
+    if let Some(cmd) = state.commands.iter().find(|c| c.id == id)
+        && cmd.is_builtin {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot delete built-in command '{}'", id),
                 is_error: true,
             };
         }
-    }
 
     let idx = match state.commands.iter().position(|c| c.id == id) {
         Some(i) => i,

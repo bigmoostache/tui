@@ -134,11 +134,10 @@ fn parse_diff_by_file(diff_output: &str, diff_contents: &mut HashMap<String, Str
     let mut current_diff = String::new();
     for line in diff_output.lines() {
         if line.starts_with("diff --git") {
-            if let Some(file) = current_file.take() {
-                if !current_diff.is_empty() {
+            if let Some(file) = current_file.take()
+                && !current_diff.is_empty() {
                     diff_contents.insert(file, current_diff.clone());
                 }
-            }
             current_diff.clear();
             if let Some(b_part) = line.split(" b/").nth(1) {
                 current_file = Some(b_part.to_string());
@@ -150,11 +149,10 @@ fn parse_diff_by_file(diff_output: &str, diff_contents: &mut HashMap<String, Str
             current_diff.push('\n');
         }
     }
-    if let Some(file) = current_file {
-        if !current_diff.is_empty() {
+    if let Some(file) = current_file
+        && !current_diff.is_empty() {
             diff_contents.insert(file, current_diff);
         }
-    }
 }
 
 /// Parse git diff --numstat output and add to file_changes map
@@ -384,22 +382,19 @@ impl Panel for GitPanel {
         if !file_changes.is_empty() {
             if let Some(ref base) = diff_base {
                 // When diff_base is set, compare against that ref
-                if let Ok(output) = Command::new("git").args(["diff", base, "--numstat"]).output() {
-                    if output.status.success() {
+                if let Ok(output) = Command::new("git").args(["diff", base, "--numstat"]).output()
+                    && output.status.success() {
                         parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
                     }
-                }
             } else {
-                if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
-                    if output.status.success() {
+                if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output()
+                    && output.status.success() {
                         parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
                     }
-                }
-                if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
-                    if output.status.success() {
+                if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output()
+                    && output.status.success() {
                         parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
                     }
-                }
             }
 
             // For untracked files, count lines
@@ -422,15 +417,14 @@ impl Panel for GitPanel {
                 .map(|(path, _)| path.clone())
                 .collect();
             for path in deleted_files {
-                if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
-                    if output.status.success() {
+                if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output()
+                    && output.status.success() {
                         let content = String::from_utf8_lossy(&output.stdout);
                         let lines = content.lines().count() as i32;
                         if let Some(entry) = file_changes.get_mut(&path) {
                             entry.1 = lines;
                         }
                     }
-                }
             }
         }
 
@@ -460,17 +454,16 @@ impl Panel for GitPanel {
             let mut diff_contents: HashMap<String, String> = HashMap::new();
 
             let diff_ref = diff_base.as_deref().unwrap_or("HEAD");
-            if let Ok(output) = Command::new("git").args(["diff", diff_ref]).output() {
-                if output.status.success() {
+            if let Ok(output) = Command::new("git").args(["diff", diff_ref]).output()
+                && output.status.success() {
                     let diff_output = String::from_utf8_lossy(&output.stdout);
                     parse_diff_by_file(&diff_output, &mut diff_contents);
                 }
-            }
 
             // For untracked files, create a pseudo-diff
             for (path, _, _, ct, _) in &changes {
-                if *ct == GitChangeType::Untracked && !diff_contents.contains_key(path) {
-                    if let Ok(content) = std::fs::read_to_string(path) {
+                if *ct == GitChangeType::Untracked && !diff_contents.contains_key(path)
+                    && let Ok(content) = std::fs::read_to_string(path) {
                         let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
                         pseudo_diff.push_str("new file\n");
                         pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
@@ -480,14 +473,13 @@ impl Panel for GitPanel {
                         }
                         diff_contents.insert(path.clone(), pseudo_diff);
                     }
-                }
             }
 
             // For deleted files, create a pseudo-diff
             for (path, _, _, ct, _) in &changes {
-                if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path) {
-                    if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
-                        if output.status.success() {
+                if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path)
+                    && let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output()
+                        && output.status.success() {
                             let content = String::from_utf8_lossy(&output.stdout);
                             let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
                             pseudo_diff.push_str("deleted file\n");
@@ -498,8 +490,6 @@ impl Panel for GitPanel {
                             }
                             diff_contents.insert(path.clone(), pseudo_diff);
                         }
-                    }
-                }
             }
 
             // Attach diff content to changes
@@ -618,8 +608,7 @@ impl Panel for GitPanel {
             .map(|f| f.path.len())
             .max()
             .unwrap_or(4)
-            .max(4)
-            .min(45); // Cap at 45 chars for the panel
+            .clamp(4, 45); // Cap at 45 chars for the panel
 
         // Table header
         text.push(Line::from(vec![
@@ -907,14 +896,12 @@ impl Panel for GitResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.get(state.selected_context) {
-            if ctx.context_type == ContextType::GitResult {
-                if let Some(cmd) = &ctx.result_command {
+        if let Some(ctx) = state.context.get(state.selected_context)
+            && ctx.context_type == ContextType::GitResult
+                && let Some(cmd) = &ctx.result_command {
                     let short = if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
                     return short;
                 }
-            }
-        }
         "Git Result".to_string()
     }
 

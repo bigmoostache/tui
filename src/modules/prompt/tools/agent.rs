@@ -147,15 +147,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Cannot delete built-in agents
-    if let Some(agent) = state.agents.iter().find(|a| a.id == id) {
-        if agent.is_builtin {
+    if let Some(agent) = state.agents.iter().find(|a| a.id == id)
+        && agent.is_builtin {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot delete built-in agent '{}'", id),
                 is_error: true,
             };
         }
-    }
 
     let idx = match state.agents.iter().position(|a| a.id == id) {
         Some(i) => i,

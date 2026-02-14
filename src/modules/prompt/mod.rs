@@ -38,21 +38,18 @@ impl Module for PromptModule {
             state.active_agent_id = v.as_str().map(String::from);
         }
         // Backwards compatibility: try old field name
-        if state.active_agent_id.is_none() {
-            if let Some(v) = data.get("active_system_id") {
+        if state.active_agent_id.is_none()
+            && let Some(v) = data.get("active_system_id") {
                 state.active_agent_id = v.as_str().map(String::from);
             }
-        }
-        if let Some(arr) = data.get("loaded_skill_ids") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("loaded_skill_ids")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.loaded_skill_ids = v;
             }
-        }
-        if let Some(v) = data.get("library_preview") {
-            if let Ok(lp) = serde_json::from_value(v.clone()) {
+        if let Some(v) = data.get("library_preview")
+            && let Ok(lp) = serde_json::from_value(v.clone()) {
                 state.library_preview = lp;
             }
-        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

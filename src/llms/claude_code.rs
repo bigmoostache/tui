@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
+use super::error::LlmError;
 use crate::constants::{library, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
@@ -57,11 +58,10 @@ fn inject_system_reminder(messages: &mut Vec<Value>) {
         }
 
         // Skip tool_result messages (from panel injection / tool loop)
-        if let Some(arr) = msg["content"].as_array() {
-            if arr.iter().any(|block| block["type"] == "tool_result") {
+        if let Some(arr) = msg["content"].as_array()
+            && arr.iter().any(|block| block["type"] == "tool_result") {
                 continue;
             }
-        }
 
         // Convert string content to array format and prepend reminder
         let content = &msg["content"];
@@ -71,11 +71,10 @@ fn inject_system_reminder(messages: &mut Vec<Value>) {
                 reminder,
                 {"type": "text", "text": text}
             ]);
-        } else if content.is_array() {
-            if let Some(arr) = msg["content"].as_array_mut() {
+        } else if content.is_array()
+            && let Some(arr) = msg["content"].as_array_mut() {
                 arr.insert(0, reminder);
             }
-        }
         return; // Only inject into first eligible user message
     }
 
@@ -106,19 +105,19 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
     let mut result: Vec<Value> = Vec::with_capacity(messages.len());
 
     for msg in messages.drain(..) {
-        let same_role = result.last().map_or(false, |last: &Value| last["role"] == msg["role"]);
+        let same_role = result.last().is_some_and(|last: &Value| last["role"] == msg["role"]);
         if !same_role {
             let blocks = content_to_blocks(msg["content"].clone());
             result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
             continue;
         }
 
-        let prev_has_tool_result = result.last().map_or(false, |last| {
-            last["content"].as_array().map_or(false, |arr| {
+        let prev_has_tool_result = result.last().is_some_and(|last| {
+            last["content"].as_array().is_some_and(|arr| {
                 arr.iter().any(|b| b["type"] == "tool_result")
             })
         });
-        let curr_has_tool_result = msg["content"].as_array().map_or(false, |arr| {
+        let curr_has_tool_result = msg["content"].as_array().is_some_and(|arr| {
             arr.iter().any(|b| b["type"] == "tool_result")
         });
 
@@ -141,7 +140,7 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
 
     // API requires first message to be user role. Panel injection starts with
     // assistant messages, so prepend a placeholder user message if needed.
-    if result.first().map_or(false, |m| m["role"] == "assistant") {
+    if result.first().is_some_and(|m| m["role"] == "assistant") {
         result.insert(0, serde_json::json!({
             "role": "user",
             "content": [{"type": "text", "text": "ok"}]
@@ -285,11 +284,11 @@ struct StreamUsage {
 }
 
 impl LlmClient for ClaudeCodeClient {
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let access_token = self
             .access_token
             .as_ref()
-            .ok_or_else(|| "Claude Code OAuth token not found or expired. Run 'claude login'".to_string())?;
+            .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
         let client = Client::new();
 
@@ -315,7 +314,7 @@ impl LlmClient for ClaudeCodeClient {
             let panel_count = fake_panels.len();
             let mut cache_breakpoints = std::collections::BTreeSet::new();
             for quarter in 1..=4usize {
-                let pos = (panel_count * quarter + 3) / 4; // ceiling(panel_count * quarter / 4)
+                let pos = (panel_count * quarter).div_ceil(4);
                 cache_breakpoints.insert(pos.saturating_sub(1));
             }
 
@@ -452,16 +451,13 @@ impl LlmClient for ClaudeCodeClient {
 
                 if !tool_uses.is_empty() {
                     // Append to last assistant message or create new one
-                    if let Some(last) = json_messages.last_mut() {
-                        if last["role"] == "assistant" {
-                            if let Some(content) = last.get_mut("content") {
-                                if let Some(arr) = content.as_array_mut() {
+                    if let Some(last) = json_messages.last_mut()
+                        && last["role"] == "assistant"
+                            && let Some(content) = last.get_mut("content")
+                                && let Some(arr) = content.as_array_mut() {
                                     arr.extend(tool_uses);
                                     continue;
                                 }
-                            }
-                        }
-                    }
 
                     json_messages.push(serde_json::json!({
                         "role": "assistant",
@@ -497,8 +493,8 @@ impl LlmClient for ClaudeCodeClient {
                     })
                 }).collect();
 
-                if let Some(last) = json_messages.last_mut() {
-                    if last["role"] == "assistant" {
+                if let Some(last) = json_messages.last_mut()
+                    && last["role"] == "assistant" {
                         // Convert string content to array and add tool uses
                         let existing_content = last["content"].clone();
                         let mut content_array = if existing_content.is_string() {
@@ -511,7 +507,6 @@ impl LlmClient for ClaudeCodeClient {
                         content_array.extend(tool_uses);
                         last["content"] = Value::Array(content_array);
                     }
-                }
             }
         }
 
@@ -570,13 +565,12 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
             .json(&api_request)
-            .send()
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .send()?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let status = response.status().as_u16();
             let body = response.text().unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
+            return Err(LlmError::Api { status, body });
         }
 
         let reader = BufReader::new(response);
@@ -588,7 +582,7 @@ impl LlmClient for ClaudeCodeClient {
         let mut stop_reason: Option<String> = None;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
             if !line.starts_with("data: ") {
                 continue;
@@ -602,15 +596,14 @@ impl LlmClient for ClaudeCodeClient {
             if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
                 match event.event_type.as_str() {
                     "content_block_start" => {
-                        if let Some(block) = event.content_block {
-                            if block.block_type.as_deref() == Some("tool_use") {
+                        if let Some(block) = event.content_block
+                            && block.block_type.as_deref() == Some("tool_use") {
                                 current_tool = Some((
                                     block.id.unwrap_or_default(),
                                     block.name.unwrap_or_default(),
                                     String::new(),
                                 ));
                             }
-                        }
                     }
                     "content_block_delta" => {
                         if let Some(delta) = event.delta {
@@ -621,11 +614,10 @@ impl LlmClient for ClaudeCodeClient {
                                     }
                                 }
                                 Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json {
-                                        if let Some((_, _, ref mut input)) = current_tool {
+                                    if let Some(json) = delta.partial_json
+                                        && let Some((_, _, ref mut input)) = current_tool {
                                             input.push_str(&json);
                                         }
-                                    }
                                 }
                                 _ => {}
                             }
@@ -639,8 +631,8 @@ impl LlmClient for ClaudeCodeClient {
                         }
                     }
                     "message_start" => {
-                        if let Some(msg_body) = event.message {
-                            if let Some(usage) = msg_body.usage {
+                        if let Some(msg_body) = event.message
+                            && let Some(usage) = msg_body.usage {
                                 if let Some(hit) = usage.cache_read_input_tokens {
                                     cache_hit_tokens = hit;
                                 }
@@ -651,14 +643,12 @@ impl LlmClient for ClaudeCodeClient {
                                     input_tokens = inp;
                                 }
                             }
-                        }
                     }
                     "message_delta" => {
-                        if let Some(ref delta) = event.delta {
-                            if let Some(ref reason) = delta.stop_reason {
+                        if let Some(ref delta) = event.delta
+                            && let Some(ref reason) = delta.stop_reason {
                                 stop_reason = Some(reason.clone());
                             }
-                        }
                         if let Some(usage) = event.usage {
                             if let Some(inp) = usage.input_tokens {
                                 input_tokens = inp;

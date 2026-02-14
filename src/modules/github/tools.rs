@@ -121,13 +121,11 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Invalidate affected panels using heuristics
             let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::GithubResult {
-                    if let Some(ref cmd) = ctx.result_command {
-                        if invalidations.iter().any(|re| re.is_match(cmd)) {
+                if ctx.context_type == ContextType::GithubResult
+                    && let Some(ref cmd) = ctx.result_command
+                        && invalidations.iter().any(|re| re.is_match(cmd)) {
                             ctx.cache_deprecated = true;
                         }
-                    }
-                }
             }
             // Always invalidate Git status (PRs/merges can affect it)
             for ctx in &mut state.context {

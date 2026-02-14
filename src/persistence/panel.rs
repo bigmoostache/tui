@@ -1,7 +1,6 @@
-/// Panel data persistence module
-/// Handles loading and saving panel files (panels/{uid}.json)
-/// Includes conversation panels and dynamic panels (File, Glob, Grep, Tmux)
-
+//! Panel data persistence module
+//! Handles loading and saving panel files (panels/{uid}.json)
+//! Includes conversation panels and dynamic panels (File, Glob, Grep, Tmux)
 use std::fs;
 use std::path::PathBuf;
 

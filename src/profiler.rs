@@ -38,15 +38,14 @@ impl Drop for ProfileGuard {
         crate::perf::PERF.record_op(self.name, us);
 
         // Log to file only for slow operations
-        if ms as u128 >= THRESHOLD_MS {
-            if let Ok(mut file) = OpenOptions::new()
+        if ms as u128 >= THRESHOLD_MS
+            && let Ok(mut file) = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(LOG_FILE)
             {
                 let _ = writeln!(file, "{:>6}ms  {}", ms, self.name);
             }
-        }
     }
 }
 

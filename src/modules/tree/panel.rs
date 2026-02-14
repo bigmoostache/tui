@@ -75,8 +75,8 @@ impl Panel for TreePanel {
         // Find tree context and use cached content
         for ctx in &state.context {
             if ctx.context_type == ContextType::Tree {
-                if let Some(content) = &ctx.cached_content {
-                    if !content.is_empty() {
+                if let Some(content) = &ctx.cached_content
+                    && !content.is_empty() {
                         let output = paginate_content(content, ctx.current_page, ctx.total_pages);
                         return vec![ContextItem::new(
                             &ctx.id,
@@ -85,7 +85,6 @@ impl Panel for TreePanel {
                             ctx.last_refresh_ms,
                         )];
                     }
-                }
                 break;
             }
         }

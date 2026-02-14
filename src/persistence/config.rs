@@ -1,6 +1,5 @@
-/// Shared configuration persistence module
-/// Handles loading and saving config.json (global settings)
-
+//! Shared configuration persistence module
+//! Handles loading and saving config.json (global settings)
 use std::fs;
 use std::path::PathBuf;
 use std::process;

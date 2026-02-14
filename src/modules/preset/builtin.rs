@@ -34,11 +34,10 @@ pub fn ensure_builtin_presets() {
 
     for preset in builtin_preset_definitions() {
         let path = dir.join(format!("{}.json", preset.preset_name));
-        if !path.exists() {
-            if let Ok(json) = serde_json::to_string_pretty(&preset) {
+        if !path.exists()
+            && let Ok(json) = serde_json::to_string_pretty(&preset) {
                 let _ = fs::write(&path, json);
             }
-        }
     }
 }
 

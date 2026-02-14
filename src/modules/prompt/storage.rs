@@ -159,10 +159,8 @@ pub fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>)
                 prompt_type: PromptType::Skill,
                 is_builtin: true,
             });
-        } else {
-            if let Some(s) = skills.iter_mut().find(|s| s.id == builtin.id) {
-                s.is_builtin = true;
-            }
+        } else if let Some(s) = skills.iter_mut().find(|s| s.id == builtin.id) {
+            s.is_builtin = true;
         }
     }
 
@@ -177,10 +175,8 @@ pub fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>)
                 prompt_type: PromptType::Command,
                 is_builtin: true,
             });
-        } else {
-            if let Some(c) = commands.iter_mut().find(|c| c.id == builtin.id) {
-                c.is_builtin = true;
-            }
+        } else if let Some(c) = commands.iter_mut().find(|c| c.id == builtin.id) {
+            c.is_builtin = true;
         }
     }
 

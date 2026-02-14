@@ -62,7 +62,7 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
             .collect();
 
         let new_hash_list: Vec<String> = panel_hashes.iter()
-            .map(|(_, h, _)| h.clone())
+            .map(|(id, h, _)| format!("{}:{}", id, h))
             .collect();
 
         // Find max prefix match index
@@ -155,43 +155,9 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
     false
 }
 
-/// Format a range of messages into a text chunk for the ConversationHistory panel.
-/// Uses the same `[ID]:\ncontent` format the LLM sees in conversation messages.
+/// Format a range of messages into a text chunk (delegates to shared function).
 fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
-    let mut output = String::new();
-    for msg in &messages[start..end] {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-            continue;
-        }
-        match msg.message_type {
-            MessageType::ToolCall => {
-                for tu in &msg.tool_uses {
-                    output += &format!(
-                        "tool_call {}({})\n",
-                        tu.name,
-                        serde_json::to_string(&tu.input).unwrap_or_default()
-                    );
-                }
-            }
-            MessageType::ToolResult => {
-                for tr in &msg.tool_results {
-                    output += &format!("{}\n", tr.content);
-                }
-            }
-            MessageType::TextMessage => {
-                let content = match msg.status {
-                    MessageStatus::Summarized => {
-                        msg.tl_dr.as_deref().unwrap_or(&msg.content)
-                    }
-                    _ => &msg.content,
-                };
-                if !content.is_empty() {
-                    output += &format!("[{}]: {}\n", msg.role, content);
-                }
-            }
-        }
-    }
-    output
+    crate::state::format_messages_to_chunk(&messages[start..end])
 }
 
 /// Detach oldest conversation messages into frozen ConversationHistory panels
@@ -355,5 +321,82 @@ pub fn detach_conversation_chunks(state: &mut State) {
         }
 
         // Loop to check if remaining messages still exceed threshold
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::message::test_helpers::MessageBuilder;
+
+    #[test]
+    fn turn_boundary_assistant_text() {
+        let msgs = vec![
+            MessageBuilder::user("hi").build(),
+            MessageBuilder::assistant("hello").build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0)); // user msg — not a boundary
+        assert!(is_turn_boundary(&msgs, 1)); // assistant text — boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_call_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::tool_call("read_file", serde_json::json!({})).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_then_user() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::user("next question").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0)); // tool result + next user = boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_then_tool_call() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::tool_call("write_file", serde_json::json!({})).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0)); // next is tool call, not user — not a boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_last_message() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0)); // last message — boundary
+    }
+
+    #[test]
+    fn turn_boundary_deleted_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::assistant("deleted").status(MessageStatus::Deleted).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_detached_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::assistant("detached").status(MessageStatus::Detached).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_skips_deleted_next() {
+        // tool_result, then deleted, then user — should still be boundary
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::user("ignored").status(MessageStatus::Deleted).build(),
+            MessageBuilder::user("real next").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0));
     }
 }

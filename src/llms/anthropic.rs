@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
+use super::error::LlmError;
 use crate::constants::{library, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
@@ -81,11 +82,11 @@ struct StreamUsage {
 }
 
 impl LlmClient for AnthropicClient {
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self
             .api_key
             .as_ref()
-            .ok_or_else(|| "ANTHROPIC_API_KEY not set".to_string())?;
+            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
         let client = Client::new();
 
@@ -151,13 +152,12 @@ impl LlmClient for AnthropicClient {
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&api_request)
-            .send()
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .send()?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let status = response.status().as_u16();
             let body = response.text().unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
+            return Err(LlmError::Api { status, body });
         }
 
         let reader = BufReader::new(response);
@@ -167,7 +167,7 @@ impl LlmClient for AnthropicClient {
         let mut stop_reason: Option<String> = None;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
             if !line.starts_with("data: ") {
                 continue;
@@ -181,15 +181,14 @@ impl LlmClient for AnthropicClient {
             if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
                 match event.event_type.as_str() {
                     "content_block_start" => {
-                        if let Some(block) = event.content_block {
-                            if block.block_type.as_deref() == Some("tool_use") {
+                        if let Some(block) = event.content_block
+                            && block.block_type.as_deref() == Some("tool_use") {
                                 current_tool = Some((
                                     block.id.unwrap_or_default(),
                                     block.name.unwrap_or_default(),
                                     String::new(),
                                 ));
                             }
-                        }
                     }
                     "content_block_delta" => {
                         if let Some(delta) = event.delta {
@@ -200,11 +199,10 @@ impl LlmClient for AnthropicClient {
                                     }
                                 }
                                 Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json {
-                                        if let Some((_, _, ref mut input)) = current_tool {
+                                    if let Some(json) = delta.partial_json
+                                        && let Some((_, _, ref mut input)) = current_tool {
                                             input.push_str(&json);
                                         }
-                                    }
                                 }
                                 _ => {}
                             }
@@ -218,11 +216,10 @@ impl LlmClient for AnthropicClient {
                         }
                     }
                     "message_delta" => {
-                        if let Some(ref delta) = event.delta {
-                            if let Some(ref reason) = delta.stop_reason {
+                        if let Some(ref delta) = event.delta
+                            && let Some(ref reason) = delta.stop_reason {
                                 stop_reason = Some(reason.clone());
                             }
-                        }
                         if let Some(usage) = event.usage {
                             if let Some(inp) = usage.input_tokens {
                                 input_tokens = inp;
@@ -481,12 +478,11 @@ fn messages_to_api(
                     });
                 }
 
-                if let Some(last_api_msg) = api_messages.last_mut() {
-                    if last_api_msg.role == "assistant" {
+                if let Some(last_api_msg) = api_messages.last_mut()
+                    && last_api_msg.role == "assistant" {
                         last_api_msg.content.extend(content_blocks);
                         continue;
                     }
-                }
             } else {
                 continue;
             }

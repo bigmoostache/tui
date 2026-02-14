@@ -1,6 +1,5 @@
-/// Worker state persistence module
-/// Handles loading and saving worker state files (states/{worker}.json)
-
+//! Worker state persistence module
+//! Handles loading and saving worker state files (states/{worker}.json)
 use std::fs;
 use std::path::PathBuf;
 

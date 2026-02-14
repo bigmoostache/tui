@@ -27,11 +27,10 @@ impl Module for TodoModule {
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("todos") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("todos")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.todos = v;
             }
-        }
         if let Some(v) = data.get("next_todo_id").and_then(|v| v.as_u64()) {
             state.next_todo_id = v as usize;
         }

@@ -12,8 +12,8 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     // Context switching is always allowed, even during streaming
-    if let Some(id) = parse_context_pattern(&state.input) {
-        if let Some(index) = find_context_by_id(state, &id) {
+    if let Some(id) = parse_context_pattern(&state.input)
+        && let Some(index) = find_context_by_id(state, &id) {
             state.selected_context = index;
             state.scroll_offset = 0.0;
             state.user_scrolled = false;
@@ -21,7 +21,6 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
             state.input_cursor = 0;
             return ActionResult::Nothing;
         }
-    }
 
     let content = replace_commands(&state.input, &state.commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
@@ -29,6 +28,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     state.input.clear();
     state.input_cursor = 0;
     state.paste_buffers.clear();
+    state.paste_buffer_labels.clear();
     let user_token_estimate = estimate_tokens(&content);
 
     // Assign user display ID and UID

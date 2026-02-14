@@ -27,11 +27,10 @@ impl Panel for OverviewPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Use cached content if available (set by refresh)
-        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::Overview) {
-            if let Some(content) = &ctx.cached_content {
+        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::Overview)
+            && let Some(content) = &ctx.cached_content {
                 return vec![ContextItem::new(&ctx.id, "Context Overview", content.clone(), ctx.last_refresh_ms)];
             }
-        }
 
         // Fallback: generate fresh
         let output = self.generate_context_content(state);

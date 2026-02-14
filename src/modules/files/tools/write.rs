@@ -31,17 +31,15 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let is_new = !path.exists();
 
     // Create parent directories if needed
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            if let Err(e) = fs::create_dir_all(parent) {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty() && !parent.exists()
+            && let Err(e) = fs::create_dir_all(parent) {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Failed to create directory '{}': {}", parent.display(), e),
                     is_error: true,
                 };
             }
-        }
-    }
 
     // Write the file
     if let Err(e) = fs::write(path, contents) {

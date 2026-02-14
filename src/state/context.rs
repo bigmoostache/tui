@@ -1,6 +1,34 @@
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 
 use crate::constants::{icons, CHARS_PER_TOKEN};
+
+/// Pre-computed set of fixed context types (avoids heap allocations on every call)
+static FIXED_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
+    let mut set = HashSet::new();
+    for module in crate::modules::all_modules() {
+        for ct in module.fixed_panel_types() {
+            set.insert(ct);
+        }
+    }
+    set
+});
+
+/// Pre-computed set of context types that need cache (avoids heap allocations on every call)
+static CACHE_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
+    let mut set = HashSet::new();
+    for module in crate::modules::all_modules() {
+        for ct in module.fixed_panel_types().into_iter().chain(module.dynamic_panel_types()) {
+            if let Some(panel) = module.create_panel(ct)
+                && panel.needs_cache() {
+                    set.insert(ct);
+                }
+        }
+    }
+    set
+});
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -27,9 +55,9 @@ pub enum ContextType {
 }
 
 impl ContextType {
-    /// Returns true if this is a fixed/system context type (derived from module registry)
+    /// Returns true if this is a fixed/system context type (pre-computed, zero allocation)
     pub fn is_fixed(&self) -> bool {
-        crate::modules::all_modules().iter().any(|m| m.fixed_panel_types().contains(self))
+        FIXED_TYPES.contains(self)
     }
 
     /// Get icon for this context type (normalized to 2 cells)
@@ -58,11 +86,9 @@ impl ContextType {
     }
 
     /// Returns true if this context type uses cached_content from background loading.
-    /// Delegates to the Panel trait's needs_cache() method.
+    /// Pre-computed from Panel trait's needs_cache() method (zero allocation).
     pub fn needs_cache(&self) -> bool {
-        crate::modules::create_panel(*self)
-            .map(|p| p.needs_cache())
-            .unwrap_or(false)
+        CACHE_TYPES.contains(self)
     }
 }
 
@@ -169,5 +195,54 @@ pub fn estimate_tokens(text: &str) -> usize {
 /// Compute total pages for a given token count using PANEL_PAGE_TOKENS
 pub fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::constants::PANEL_PAGE_TOKENS;
-    if token_count <= max { 1 } else { (token_count + max - 1) / max }
+    if token_count <= max { 1 } else { token_count.div_ceil(max) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
+
+    #[test]
+    fn estimate_tokens_empty() {
+        assert_eq!(estimate_tokens(""), 0);
+    }
+
+    #[test]
+    fn estimate_tokens_short_text() {
+        let text = "hello world";
+        let expected = (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize;
+        assert_eq!(estimate_tokens(text), expected);
+    }
+
+    #[test]
+    fn estimate_tokens_single_char() {
+        // 1 char / 3.3 = 0.303... → ceil = 1
+        assert_eq!(estimate_tokens("a"), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_zero() {
+        assert_eq!(compute_total_pages(0), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_at_threshold() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_above_threshold() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS + 1), 2);
+    }
+
+    #[test]
+    fn compute_total_pages_double() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS * 2), 2);
+    }
+
+    #[test]
+    fn compute_total_pages_double_plus_one() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS * 2 + 1), 3);
+    }
 }

@@ -205,20 +205,19 @@ pub fn render_table<'a>(
 
     let render_row = |cells: &[Cell], bold: bool| -> Line<'static> {
         let mut spans: Vec<Span<'static>> = vec![Span::raw(pad.clone())];
-        for col in 0..num_cols {
+        for (col, col_w) in col_widths.iter().enumerate().take(num_cols) {
             if col > 0 {
                 spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
             }
             if let Some(cell) = cells.get(col) {
-                let w = col_widths[col];
                 let padded = match cell.align {
-                    Align::Right => format!("{:>width$}", cell.text, width = w),
-                    Align::Left  => format!("{:<width$}", cell.text, width = w),
+                    Align::Right => format!("{:>width$}", cell.text, width = *col_w),
+                    Align::Left  => format!("{:<width$}", cell.text, width = *col_w),
                 };
                 let style = if bold { cell.style.bold() } else { cell.style };
                 spans.push(Span::styled(padded, style));
             } else {
-                spans.push(Span::styled(" ".repeat(col_widths[col]), Style::default()));
+                spans.push(Span::styled(" ".repeat(*col_w), Style::default()));
             }
         }
         Line::from(spans)

@@ -154,15 +154,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    if let Some(skill) = state.skills.iter().find(|s| s.id == id) {
-        if skill.is_builtin {
+    if let Some(skill) = state.skills.iter().find(|s| s.id == id)
+        && skill.is_builtin {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot delete built-in skill '{}'", id),
                 is_error: true,
             };
         }
-    }
 
     let idx = match state.skills.iter().position(|s| s.id == id) {
         Some(i) => i,

@@ -122,11 +122,10 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
         let relative = path.strip_prefix(search_path).unwrap_or(path);
 
         // Apply file pattern filter if specified
-        if let Some(ref matcher) = file_matcher {
-            if !matcher.is_match(relative) {
+        if let Some(ref matcher) = file_matcher
+            && !matcher.is_match(relative) {
                 continue;
             }
-        }
 
         // Try to read the file
         let file = match fs::File::open(path) {

@@ -1,5 +1,4 @@
-/// Command classification for gh (GitHub CLI) commands.
-
+//! Command classification for gh (GitHub CLI) commands.
 use crate::modules::git::classify::{CommandClass, parse_shell_args, check_shell_operators};
 
 /// Validate a raw command string intended for `gh`.

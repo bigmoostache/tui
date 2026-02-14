@@ -85,11 +85,10 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
         let indent = current_line.len() - trimmed.len();
 
         // Numeric: 1, 2, 3, ...
-        if marker.chars().all(|c| c.is_ascii_digit()) {
-            if let Ok(num) = marker.parse::<usize>() {
+        if marker.chars().all(|c| c.is_ascii_digit())
+            && let Ok(num) = marker.parse::<usize>() {
                 return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
             }
-        }
 
         // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)
         if marker.len() == 1 && marker.chars().all(|c| c.is_ascii_alphabetic()) {

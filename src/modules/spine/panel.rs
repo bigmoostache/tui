@@ -127,7 +127,7 @@ impl Panel for SpinePanel {
                         Style::default().fg(theme::text_muted()),
                     ),
                     Span::styled(
-                        format!("{}", n.notification_type.label()),
+                        n.notification_type.label().to_string(),
                         Style::default().fg(type_color),
                     ),
                     Span::styled(
@@ -168,7 +168,7 @@ impl Panel for SpinePanel {
                         Style::default().fg(theme::text_muted()),
                     ),
                     Span::styled(
-                        format!("{}", n.notification_type.label()),
+                        n.notification_type.label().to_string(),
                         Style::default().fg(theme::text_muted()),
                     ),
                     Span::styled(

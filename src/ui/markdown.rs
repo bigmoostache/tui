@@ -24,6 +24,7 @@ fn markdown_display_width(text: &str) -> usize {
                 if chars.peek() == Some(&c) {
                     chars.next(); // consume second marker
                     // Count until closing **
+                    #[allow(clippy::while_let_on_iterator)]
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
                             chars.next();
@@ -33,7 +34,7 @@ fn markdown_display_width(text: &str) -> usize {
                     }
                 } else {
                     // Single marker (italic) - count until closing
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next == c {
                             break;
                         }
@@ -45,7 +46,7 @@ fn markdown_display_width(text: &str) -> usize {
                 // Link [text](url) - only count the text part
                 let mut link_text_len = 0;
                 let mut found_bracket = false;
-                while let Some(next) = chars.next() {
+                for next in chars.by_ref() {
                     if next == ']' {
                         found_bracket = true;
                         break;
@@ -54,7 +55,7 @@ fn markdown_display_width(text: &str) -> usize {
                 }
                 if found_bracket && chars.peek() == Some(&'(') {
                     chars.next(); // consume (
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next == ')' {
                             break;
                         }
@@ -182,8 +183,8 @@ pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> 
     }
 
     // Bullet points: - or *
-    if trimmed.starts_with("- ") {
-        let content = trimmed[2..].to_string();
+    if let Some(stripped) = trimmed.strip_prefix("- ") {
+        let content = stripped.to_string();
         let indent = line.len() - trimmed.len();
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),
@@ -248,13 +249,13 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     // Bold text
                     let mut bold_text = String::new();
+                    #[allow(clippy::while_let_on_iterator)]
                     while let Some(next) = chars.next() {
-                        if next == c {
-                            if chars.peek() == Some(&c) {
+                        if next == c
+                            && chars.peek() == Some(&c) {
                                 chars.next(); // consume closing **
                                 break;
                             }
-                        }
                         bold_text.push(next);
                     }
 
@@ -269,7 +270,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     let mut italic_text = String::new();
                     let mut found_close = false;
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next == c {
                             found_close = true;
                             break;
@@ -291,7 +292,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 let mut link_text = String::new();
                 let mut found_bracket = false;
 
-                while let Some(next) = chars.next() {
+                for next in chars.by_ref() {
                     if next == ']' {
                         found_bracket = true;
                         break;
@@ -302,7 +303,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 if found_bracket && chars.peek() == Some(&'(') {
                     chars.next(); // consume (
                     let mut url = String::new();
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next == ')' {
                             break;
                         }

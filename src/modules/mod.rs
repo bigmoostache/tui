@@ -230,11 +230,10 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
     }
 
     for module in all_modules() {
-        if active_modules.contains(module.id()) {
-            if let Some(result) = module.execute_tool(tool, state) {
+        if active_modules.contains(module.id())
+            && let Some(result) = module.execute_tool(tool, state) {
                 return result;
             }
-        }
     }
 
     ToolResult {
@@ -283,14 +282,13 @@ pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), St
 
     // Check if any other active module depends on this one
     for module in all_modules() {
-        if module.id() != id && active.contains(module.id()) {
-            if module.dependencies().contains(&id) {
+        if module.id() != id && active.contains(module.id())
+            && module.dependencies().contains(&id) {
                 return Err(format!(
                     "Cannot deactivate '{}': required by '{}'",
                     id, module.id()
                 ));
             }
-        }
     }
 
     Ok(())
@@ -431,6 +429,49 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: tool.id.clone(),
         content: result_parts.join("\n"),
         is_error: !failures.is_empty() && successes.is_empty(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn all_active() -> HashSet<String> {
+        default_active_modules()
+    }
+
+    #[test]
+    fn cannot_deactivate_core_module() {
+        let active = all_active();
+        let result = check_can_deactivate("core", &active);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("core"));
+    }
+
+    #[test]
+    fn cannot_deactivate_with_dependent() {
+        // github depends on git — deactivating git while github is active should fail
+        let active = all_active();
+        let result = check_can_deactivate("git", &active);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("github"));
+    }
+
+    #[test]
+    fn can_deactivate_independent_module() {
+        let active = all_active();
+        // tmux has no dependents
+        let result = check_can_deactivate("tmux", &active);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_deactivate_when_dependent_inactive() {
+        // git can be deactivated if github is not active
+        let mut active = all_active();
+        active.remove("github");
+        let result = check_can_deactivate("git", &active);
+        assert!(result.is_ok());
     }
 }
 

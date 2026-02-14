@@ -43,13 +43,11 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             let has_modifier = key.modifiers.contains(KeyModifiers::CONTROL)
                 || key.modifiers.contains(KeyModifiers::SHIFT)
                 || key.modifiers.contains(KeyModifiers::ALT);
-            if (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ') {
-                if let Some(id) = parse_context_pattern(&state.input) {
-                    if find_context_by_id(state, &id).is_some() {
+            if ((key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' '))
+                && let Some(id) = parse_context_pattern(&state.input)
+                    && find_context_by_id(state, &id).is_some() {
                         return Some(Action::InputSubmit);
                     }
-                }
-            }
 
             // Let the current panel handle the key first
             if let Some(ctx) = state.context.get(state.selected_context) {

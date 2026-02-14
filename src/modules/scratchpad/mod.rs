@@ -27,11 +27,10 @@ impl Module for ScratchpadModule {
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("scratchpad_cells") {
-            if let Ok(v) = serde_json::from_value(arr.clone()) {
+        if let Some(arr) = data.get("scratchpad_cells")
+            && let Ok(v) = serde_json::from_value(arr.clone()) {
                 state.scratchpad_cells = v;
             }
-        }
         if let Some(v) = data.get("next_scratchpad_id").and_then(|v| v.as_u64()) {
             state.next_scratchpad_id = v as usize;
         }

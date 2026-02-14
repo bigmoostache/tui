@@ -14,6 +14,7 @@ use serde::Serialize;
 
 use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
+use super::error::LlmError;
 
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
@@ -87,11 +88,11 @@ struct DsRequest {
 }
 
 impl LlmClient for DeepSeekClient {
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self
             .api_key
             .as_ref()
-            .ok_or_else(|| "DEEPSEEK_API_KEY not set".to_string())?;
+            .ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
 
         let client = Client::new();
         let is_reasoner = request.model == "deepseek-reasoner";
@@ -151,13 +152,12 @@ impl LlmClient for DeepSeekClient {
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&api_request)
-            .send()
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .send()?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let status = response.status().as_u16();
             let body = response.text().unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
+            return Err(LlmError::Api { status, body });
         }
 
         // Stream SSE using shared helpers
@@ -170,7 +170,7 @@ impl LlmClient for DeepSeekClient {
         let mut tool_acc = ToolCallAccumulator::new();
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
             if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
@@ -183,11 +183,10 @@ impl LlmClient for DeepSeekClient {
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
-                        if let Some(content) = delta.content {
-                            if !content.is_empty() {
+                        if let Some(content) = delta.content
+                            && !content.is_empty() {
                                 let _ = tx.send(StreamEvent::Chunk(content));
                             }
-                        }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
                                 tool_acc.feed(call);

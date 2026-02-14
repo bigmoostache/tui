@@ -1,12 +1,11 @@
-/// Message persistence module
-/// Handles loading and saving individual message files
-///
-/// UID format: UID_{number}_{letter}
-/// - U = User message
-/// - A = Assistant message
-/// - T = Tool call
-/// - R = Tool result
-
+//! Message persistence module
+//! Handles loading and saving individual message files
+//!
+//! UID format: UID_{number}_{letter}
+//! - U = User message
+//! - A = Assistant message
+//! - T = Tool call
+//! - R = Tool result
 use std::fs;
 use std::path::PathBuf;
 

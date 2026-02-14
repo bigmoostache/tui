@@ -109,14 +109,12 @@ impl Panel for GithubResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.get(state.selected_context) {
-            if ctx.context_type == ContextType::GithubResult {
-                if let Some(cmd) = &ctx.result_command {
+        if let Some(ctx) = state.context.get(state.selected_context)
+            && ctx.context_type == ContextType::GithubResult
+                && let Some(cmd) = &ctx.result_command {
                     let short = if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
                     return short;
                 }
-            }
-        }
         "GitHub Result".to_string()
     }
 

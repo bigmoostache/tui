@@ -175,12 +175,11 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     changes.push("contents");
                 }
 
-                if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str()) {
-                    if let Some(importance) = MemoryImportance::from_str(importance_str) {
+                if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str())
+                    && let Some(importance) = MemoryImportance::from_str(importance_str) {
                         m.importance = importance;
                         changes.push("importance");
                     }
-                }
 
                 if let Some(labels_arr) = update_value.get("labels").and_then(|v| v.as_array()) {
                     m.labels = labels_arr.iter()
@@ -248,5 +247,40 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: tool.id.clone(),
         content: output,
         is_error: updated.is_empty() && deleted.is_empty(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::MEMORY_TLDR_MAX_TOKENS;
+
+    #[test]
+    fn validate_tldr_short_ok() {
+        assert!(validate_tldr("short note").is_ok());
+    }
+
+    #[test]
+    fn validate_tldr_empty_ok() {
+        assert!(validate_tldr("").is_ok());
+    }
+
+    #[test]
+    fn validate_tldr_at_limit() {
+        // Create text that's around the limit
+        let text = "a".repeat(MEMORY_TLDR_MAX_TOKENS * 3); // ~80 tokens at 3.3 chars/token
+        // This should be right at or just under the limit
+        let result = validate_tldr(&text);
+        // At exactly 240 chars / 3.3 = ~72.7 tokens → Ok (under 80)
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_tldr_way_too_long() {
+        // 1000 chars / 3.3 = ~303 tokens — well over 80
+        let text = "a".repeat(1000);
+        let result = validate_tldr(&text);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too long"));
     }
 }

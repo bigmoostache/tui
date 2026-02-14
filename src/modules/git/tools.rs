@@ -131,13 +131,11 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             } else {
                 for ctx in &mut state.context {
-                    if ctx.context_type == ContextType::GitResult {
-                        if let Some(ref cmd) = ctx.result_command {
-                            if invalidations.iter().any(|re| re.is_match(cmd)) {
+                    if ctx.context_type == ContextType::GitResult
+                        && let Some(ref cmd) = ctx.result_command
+                            && invalidations.iter().any(|re| re.is_match(cmd)) {
                                 ctx.cache_deprecated = true;
                             }
-                        }
-                    }
                 }
             }
             // P6 (Git) always invalidated via .git/ file watcher — no action needed here
