@@ -1,7 +1,5 @@
 use std::process::Command;
 
-use sha2::{Sha256, Digest};
-
 use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::state::{ContextType, State};
@@ -9,13 +7,6 @@ use crate::tools::{ToolUse, ToolResult};
 use crate::modules::git::classify::CommandClass;
 
 use super::classify::{validate_gh_command, classify_gh};
-
-/// Compute SHA-256 hex hash of a string
-fn sha256_hex(input: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    format!("{:064x}", hasher.finalize())
-}
 
 /// Redact a GitHub token from command output if accidentally leaked.
 fn redact_token(output: &str, token: &str) -> String {
@@ -70,12 +61,10 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     match class {
         CommandClass::ReadOnly => {
-            let cmd_hash = sha256_hex(command);
-
-            // Search for existing GithubResult panel with same command hash
+            // Search for existing GithubResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
                 c.context_type == ContextType::GithubResult
-                    && c.result_command_hash.as_deref() == Some(&cmd_hash)
+                    && c.result_command.as_deref() == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -98,7 +87,6 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 );
                 elem.uid = Some(uid);
                 elem.result_command = Some(command.to_string());
-                elem.result_command_hash = Some(cmd_hash);
                 state.context.push(elem);
 
                 ToolResult {

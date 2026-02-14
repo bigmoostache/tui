@@ -3,7 +3,7 @@
 //! Uses HTTP ETags for `gh api` commands and output hashing for other `gh`
 //! commands to efficiently detect changes. Respects the `X-Poll-Interval`
 //! header from GitHub API responses to dynamically adjust per-watch polling
-//! frequency. Sends `CacheUpdate::GithubResultContent` through the shared
+//! frequency. Sends `CacheUpdate::Content` through the shared
 //! `cache_tx` channel when content changes.
 
 use std::collections::HashMap;
@@ -125,7 +125,7 @@ fn is_api_command(args: &[String]) -> bool {
 ///
 /// The normal cache invalidation pattern is two-phase: mark a panel dirty
 /// (`cache_deprecated = true`), then let the cache pipeline re-fetch data.
-/// This watcher shortcuts that by sending `CacheUpdate::GithubResultContent`
+/// This watcher shortcuts that by sending `CacheUpdate::Content`
 /// directly through `cache_tx`.
 ///
 /// This is intentional: both polling methods (ETag-based and hash-based)
@@ -179,11 +179,10 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                     let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&body);
 
-                    let _ = cache_tx.send(CacheUpdate::GithubResultContent {
+                    let _ = cache_tx.send(CacheUpdate::Content {
                         context_id,
                         content: body,
                         token_count,
-                        is_error: false,
                     });
                 }
             } else {
@@ -205,11 +204,10 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                     let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&content);
 
-                    let _ = cache_tx.send(CacheUpdate::GithubResultContent {
+                    let _ = cache_tx.send(CacheUpdate::Content {
                         context_id,
                         content,
                         token_count,
-                        is_error: false,
                     });
                 }
             }

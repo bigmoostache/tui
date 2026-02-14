@@ -47,7 +47,7 @@ impl Panel for GrepPanel {
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::GrepContent { content, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
         ctx.cache_deprecated = false;
@@ -80,7 +80,7 @@ impl Panel for GrepPanel {
         let search_path = path.as_deref().unwrap_or(".");
         let (content, _count) = super::tools::compute_grep_results(&pattern, search_path, file_pattern.as_deref());
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::GrepContent {
+        Some(CacheUpdate::Content {
             context_id,
             content: content.to_string(),
             token_count,

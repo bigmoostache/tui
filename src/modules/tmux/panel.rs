@@ -57,16 +57,16 @@ impl Panel for TmuxPanel {
             context_id: ctx.id.clone(),
             pane_id: pane_id.clone(),
             lines: ctx.tmux_lines,
-            current_content_hash: ctx.tmux_last_lines_hash.clone(),
+            current_source_hash: ctx.source_hash.clone(),
         })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::TmuxContent { content, content_hash, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
+        ctx.source_hash = Some(crate::cache::hash_content(&content));
         ctx.cached_content = Some(content);
-        ctx.tmux_last_lines_hash = Some(content_hash);
         ctx.token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
@@ -85,7 +85,7 @@ impl Panel for TmuxPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshTmux { context_id, pane_id, lines, current_content_hash } = request else {
+        let CacheRequest::RefreshTmux { context_id, pane_id, lines, current_source_hash } = request else {
             return None;
         };
         let start_line = format!("-{}", lines.unwrap_or(50));
@@ -98,14 +98,13 @@ impl Panel for TmuxPanel {
         }
         let content = String::from_utf8_lossy(&output.stdout).to_string();
         let new_hash = hash_content(&content);
-        if current_content_hash.as_ref() == Some(&new_hash) {
+        if current_source_hash.as_ref() == Some(&new_hash) {
             return Some(CacheUpdate::Unchanged { context_id });
         }
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::TmuxContent {
+        Some(CacheUpdate::Content {
             context_id,
             content,
-            content_hash: new_hash,
             token_count,
         })
     }

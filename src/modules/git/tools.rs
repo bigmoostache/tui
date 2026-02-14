@@ -1,20 +1,11 @@
 use std::process::Command;
 
-use sha2::{Sha256, Digest};
-
 use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::state::{ContextType, State};
 use crate::tools::{ToolUse, ToolResult};
 
 use super::classify::{validate_git_command, classify_git, CommandClass};
-
-/// Compute SHA-256 hex hash of a string
-fn sha256_hex(input: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    format!("{:064x}", hasher.finalize())
-}
 
 /// Execute a raw git command.
 /// Read-only commands create/reuse GitResult panels.
@@ -48,12 +39,10 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     match class {
         CommandClass::ReadOnly => {
-            let cmd_hash = sha256_hex(command);
-
-            // Search for existing GitResult panel with same command hash
+            // Search for existing GitResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
                 c.context_type == ContextType::GitResult
-                    && c.result_command_hash.as_deref() == Some(&cmd_hash)
+                    && c.result_command.as_deref() == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -76,7 +65,6 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 );
                 elem.uid = Some(uid);
                 elem.result_command = Some(command.to_string());
-                elem.result_command_hash = Some(cmd_hash);
                 state.context.push(elem);
 
                 ToolResult {

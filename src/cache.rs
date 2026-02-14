@@ -13,39 +13,13 @@ use crate::state::TreeFileDescription;
 /// Result of a background cache operation
 #[derive(Debug, Clone)]
 pub enum CacheUpdate {
-    /// File content was read
-    FileContent {
-        context_id: String,
-        content: String,
-        hash: String,
-        token_count: usize,
-    },
-    /// Tree content was generated
-    TreeContent {
+    /// Generic content update (used by File, Tree, Glob, Grep, Tmux, GitResult, GithubResult)
+    Content {
         context_id: String,
         content: String,
         token_count: usize,
     },
-    /// Glob results were computed
-    GlobContent {
-        context_id: String,
-        content: String,
-        token_count: usize,
-    },
-    /// Grep results were computed
-    GrepContent {
-        context_id: String,
-        content: String,
-        token_count: usize,
-    },
-    /// Tmux pane content was captured
-    TmuxContent {
-        context_id: String,
-        content: String,
-        content_hash: String,
-        token_count: usize,
-    },
-    /// Git status was fetched
+    /// Git status was fetched (special case: writes to State fields, not just ContextElement)
     GitStatus {
         branch: Option<String>,
         is_repo: bool,
@@ -57,25 +31,11 @@ pub enum CacheUpdate {
         formatted_content: String,
         /// Token count for formatted content
         token_count: usize,
-        /// Hash of git status --porcelain output (for change detection)
-        status_hash: String,
+        /// Source data hash for early-exit optimization on next refresh
+        source_hash: String,
     },
     /// Git status unchanged (hash matched, no need to update)
     GitStatusUnchanged,
-    /// Git result command output
-    GitResultContent {
-        context_id: String,
-        content: String,
-        token_count: usize,
-        is_error: bool,
-    },
-    /// GitHub result command output
-    GithubResultContent {
-        context_id: String,
-        content: String,
-        token_count: usize,
-        is_error: bool,
-    },
     /// Content unchanged — clear cache_in_flight without updating content
     Unchanged {
         context_id: String,
@@ -90,7 +50,7 @@ pub enum CacheRequest {
     RefreshFile {
         context_id: String,
         file_path: String,
-        current_hash: Option<String>,
+        current_source_hash: Option<String>,
     },
     /// Refresh tree cache
     RefreshTree {
@@ -117,14 +77,14 @@ pub enum CacheRequest {
         context_id: String,
         pane_id: String,
         lines: Option<usize>,
-        current_content_hash: Option<String>,
+        current_source_hash: Option<String>,
     },
     /// Refresh git status
     RefreshGitStatus {
         /// Whether to include full diff content in formatted output
         show_diffs: bool,
-        /// Current status hash (for change detection - skip if unchanged)
-        current_hash: Option<String>,
+        /// Current source hash (for change detection - skip if unchanged)
+        current_source_hash: Option<String>,
         /// Diff base ref (e.g., "HEAD~3", "main") — None means default (HEAD/working tree)
         diff_base: Option<String>,
     },
@@ -158,39 +118,6 @@ impl CacheRequest {
     }
 }
 
-impl CacheUpdate {
-    /// Get the context type this update is for, to dispatch to the correct panel.
-    pub fn context_type(&self) -> crate::state::ContextType {
-        use crate::state::ContextType;
-        match self {
-            CacheUpdate::FileContent { .. } => ContextType::File,
-            CacheUpdate::TreeContent { .. } => ContextType::Tree,
-            CacheUpdate::GlobContent { .. } => ContextType::Glob,
-            CacheUpdate::GrepContent { .. } => ContextType::Grep,
-            CacheUpdate::TmuxContent { .. } => ContextType::Tmux,
-            CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => ContextType::Git,
-            CacheUpdate::GitResultContent { .. } => ContextType::GitResult,
-            CacheUpdate::GithubResultContent { .. } => ContextType::GithubResult,
-            CacheUpdate::Unchanged { .. } => ContextType::File, // Type doesn't matter — matched by context_id
-        }
-    }
-
-    /// Get the context_id for this update (used to find the matching ContextElement).
-    /// Returns None for Git updates which are matched by context_type instead.
-    pub fn context_id(&self) -> Option<&str> {
-        match self {
-            CacheUpdate::FileContent { context_id, .. } => Some(context_id),
-            CacheUpdate::TreeContent { context_id, .. } => Some(context_id),
-            CacheUpdate::GlobContent { context_id, .. } => Some(context_id),
-            CacheUpdate::GrepContent { context_id, .. } => Some(context_id),
-            CacheUpdate::TmuxContent { context_id, .. } => Some(context_id),
-            CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => None,
-            CacheUpdate::GitResultContent { context_id, .. } => Some(context_id),
-            CacheUpdate::GithubResultContent { context_id, .. } => Some(context_id),
-            CacheUpdate::Unchanged { context_id } => Some(context_id),
-        }
-    }
-}
 
 /// Hash content for change detection (SHA-256, collision-resistant)
 pub fn hash_content(content: &str) -> String {

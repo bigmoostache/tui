@@ -165,8 +165,6 @@ pub struct State {
     pub git_file_changes: Vec<GitFileChange>,
     /// Whether to show full diff content in Git panel (vs summary only)
     pub git_show_diffs: bool,
-    /// Hash of last git status --porcelain output (for change detection)
-    pub git_status_hash: Option<String>,
     /// Whether to show git log in Git panel
     pub git_show_logs: bool,
     /// Custom git log arguments (e.g., "-5 --oneline")
@@ -289,7 +287,6 @@ impl Default for State {
             git_is_repo: false,
             git_file_changes: vec![],
             git_show_diffs: true, // Show diffs by default
-            git_status_hash: None,
             git_show_logs: false,
             git_log_args: None,
             git_log_content: None,

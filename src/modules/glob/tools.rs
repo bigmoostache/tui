@@ -49,7 +49,6 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         name,
         token_count: 0, // Will be updated by cache
         file_path: None,
-        file_hash: None,
         glob_pattern: Some(pattern.to_string()),
         glob_path: path,
         grep_pattern: None,
@@ -60,16 +59,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: None,
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,

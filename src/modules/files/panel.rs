@@ -38,16 +38,16 @@ impl Panel for FilePanel {
         Some(CacheRequest::RefreshFile {
             context_id: ctx.id.clone(),
             file_path: path.clone(),
-            current_hash: ctx.file_hash.clone(),
+            current_source_hash: ctx.source_hash.clone(),
         })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::FileContent { content, hash, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
+        ctx.source_hash = Some(crate::cache::hash_content(&content));
         ctx.cached_content = Some(content);
-        ctx.file_hash = Some(hash);
         ctx.full_token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
@@ -69,7 +69,7 @@ impl Panel for FilePanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshFile { context_id, file_path, current_hash } = request else {
+        let CacheRequest::RefreshFile { context_id, file_path, current_source_hash } = request else {
             return None;
         };
         let path = PathBuf::from(&file_path);
@@ -84,23 +84,21 @@ impl Panel for FilePanel {
                     meta.len(), PANEL_MAX_LOAD_BYTES
                 );
                 let token_count = estimate_tokens(&msg);
-                return Some(CacheUpdate::FileContent {
+                return Some(CacheUpdate::Content {
                     context_id,
                     content: msg,
-                    hash: format!("oversized_{}", meta.len()),
                     token_count,
                 });
             }
         let content = fs::read_to_string(&path).ok()?;
         let new_hash = hash_content(&content);
-        if current_hash.as_ref() == Some(&new_hash) {
+        if current_source_hash.as_ref() == Some(&new_hash) {
             return Some(CacheUpdate::Unchanged { context_id });
         }
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::FileContent {
+        Some(CacheUpdate::Content {
             context_id,
             content,
-            hash: new_hash,
             token_count,
         })
     }

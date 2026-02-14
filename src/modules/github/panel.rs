@@ -31,7 +31,7 @@ impl Panel for GithubResultPanel {
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
         match update {
-            CacheUpdate::GithubResultContent { content, token_count, is_error, .. } => {
+            CacheUpdate::Content { content, token_count, .. } => {
                 ctx.cached_content = Some(content);
                 ctx.full_token_count = token_count;
                 ctx.total_pages = compute_total_pages(token_count);
@@ -45,7 +45,6 @@ impl Panel for GithubResultPanel {
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
                 update_if_changed(ctx, &content_ref);
-                let _ = is_error;
                 true
             }
             _ => false,
@@ -79,7 +78,6 @@ impl Panel for GithubResultPanel {
                 } else {
                     format!("{}\n{}", stdout, stderr)
                 };
-                let is_error = !out.status.success();
                 // Redact token if accidentally in output
                 let content = if github_token.len() >= 8 && content.contains(&github_token) {
                     content.replace(&github_token, "[REDACTED]")
@@ -88,12 +86,12 @@ impl Panel for GithubResultPanel {
                 };
                 let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GithubResultContent { context_id, content, token_count, is_error })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
             Err(e) => {
                 let content = format!("Error executing gh: {}", e);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GithubResultContent { context_id, content, token_count, is_error: true })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
         }
     }

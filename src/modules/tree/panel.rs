@@ -37,7 +37,7 @@ impl Panel for TreePanel {
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::TreeContent { content, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
         ctx.cache_deprecated = false;
@@ -64,7 +64,7 @@ impl Panel for TreePanel {
         };
         let content = super::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::TreeContent {
+        Some(CacheUpdate::Content {
             context_id,
             content,
             token_count,

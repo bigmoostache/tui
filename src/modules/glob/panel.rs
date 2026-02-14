@@ -46,7 +46,7 @@ impl Panel for GlobPanel {
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::GlobContent { content, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
         ctx.cache_deprecated = false;
@@ -79,7 +79,7 @@ impl Panel for GlobPanel {
         let base = base_path.as_deref().unwrap_or(".");
         let (content, _count) = super::tools::compute_glob_results(&pattern, base);
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::GlobContent {
+        Some(CacheUpdate::Content {
             context_id,
             content: content.to_string(),
             token_count,

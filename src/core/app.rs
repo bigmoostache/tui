@@ -756,42 +756,35 @@ impl App {
             if let CacheUpdate::Unchanged { ref context_id } = update {
                 if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *context_id) {
                     ctx.cache_in_flight = false;
-                    ctx.last_polled_ms = now_ms();
+                    ctx.last_refresh_ms = now_ms();
                 }
                 continue;
             }
 
-            let context_type = update.context_type();
-            let panel = crate::core::panels::get_panel(context_type);
-
-            // Find the matching context element index
-            let idx = if let Some(id) = update.context_id() {
-                state.context.iter().position(|c| c.id == id)
-            } else {
-                // Git updates: match by context_type
-                state.context.iter().position(|c| c.context_type == context_type)
-            };
-
-            let Some(idx) = idx else { continue };
-
-            // Remove ctx from vec to get &mut ContextElement and &mut State simultaneously
-            let mut ctx = state.context.remove(idx);
-            let changed = panel.apply_cache_update(update, &mut ctx, state);
-            ctx.cache_in_flight = false;
-            // Always mark poll time so timer-based scheduling knows when we last checked,
-            // even if content was unchanged. Without this, stale last_polled_ms causes
-            // the timer to fire continuously (every 100ms instead of every interval).
-            ctx.last_polled_ms = now_ms();
-            // Only bump last_refresh_ms when content actually changed — this drives
-            // the "refreshed X ago" display and LLM context freshness sorting.
-            if changed {
+            // GitStatus: match by context_type
+            if matches!(update, CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged) {
+                let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
+                let Some(idx) = idx else { continue };
+                let mut ctx = state.context.remove(idx);
+                let panel = crate::core::panels::get_panel(ctx.context_type);
+                let _changed = panel.apply_cache_update(update, &mut ctx, state);
+                ctx.cache_in_flight = false;
                 ctx.last_refresh_ms = now_ms();
+                state.context.insert(idx, ctx);
+                state.dirty = true;
+                continue;
             }
-            state.context.insert(idx, ctx);
 
-            // Always mark dirty — even unchanged updates may have populated
-            // cached_content from None (initial load after reload), which
-            // needs a repaint to clear "Loading..." in the UI.
+            // Content: match by context_id
+            let CacheUpdate::Content { ref context_id, .. } = update else { continue };
+            let idx = state.context.iter().position(|c| c.id == *context_id);
+            let Some(idx) = idx else { continue };
+            let mut ctx = state.context.remove(idx);
+            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let _changed = panel.apply_cache_update(update, &mut ctx, state);
+            ctx.cache_in_flight = false;
+            ctx.last_refresh_ms = now_ms();
+            state.context.insert(idx, ctx);
             state.dirty = true;
         }
     }
@@ -928,7 +921,7 @@ impl App {
                 || ctx.context_type == ContextType::Tmux;
             let interval_elapsed = if interval_eligible {
                 panel.cache_refresh_interval_ms()
-                    .map(|interval| current_ms.saturating_sub(ctx.last_polled_ms) >= interval)
+                    .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
                     .unwrap_or(true) // No interval = always eligible
             } else {
                 false

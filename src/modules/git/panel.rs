@@ -183,14 +183,10 @@ impl Panel for GitPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         // Force full refresh if cache is explicitly deprecated (e.g., toggle_diffs)
-        let current_hash = if ctx.cache_deprecated {
-            None
-        } else {
-            state.git_status_hash.clone()
-        };
+        let current_source_hash = if ctx.cache_deprecated { None } else { ctx.source_hash.clone() };
         Some(CacheRequest::RefreshGitStatus {
             show_diffs: state.git_show_diffs,
-            current_hash,
+            current_source_hash,
             diff_base: state.git_diff_base.clone(),
         })
     }
@@ -204,7 +200,7 @@ impl Panel for GitPanel {
                 branches,
                 formatted_content,
                 token_count,
-                status_hash,
+                source_hash,
             } => {
                 state.git_branch = branch;
                 state.git_branches = branches;
@@ -218,7 +214,7 @@ impl Panel for GitPanel {
                         diff_content,
                     })
                     .collect();
-                state.git_status_hash = Some(status_hash);
+                ctx.source_hash = Some(source_hash);
                 ctx.cached_content = Some(formatted_content);
                 ctx.full_token_count = token_count;
                 ctx.total_pages = compute_total_pages(token_count);
@@ -290,7 +286,7 @@ impl Panel for GitPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshGitStatus { show_diffs, current_hash, diff_base } = request else {
+        let CacheRequest::RefreshGitStatus { show_diffs, current_source_hash, diff_base } = request else {
             return None;
         };
         let _guard = crate::profile!("cache::git_status");
@@ -310,7 +306,7 @@ impl Panel for GitPanel {
                 branches: vec![],
                 formatted_content: "Not a git repository".to_string(),
                 token_count: estimate_tokens("Not a git repository"),
-                status_hash: String::new(),
+                source_hash: hash_content("not_a_repo"),
             });
         }
 
@@ -334,7 +330,7 @@ impl Panel for GitPanel {
         let new_hash = hash_content(&format!("{}\n{}", branch_output, status_output));
 
         // If hash unchanged, skip expensive operations
-        if current_hash.as_ref() == Some(&new_hash) {
+        if current_source_hash.as_ref() == Some(&new_hash) {
             return Some(CacheUpdate::GitStatusUnchanged);
         }
 
@@ -511,7 +507,7 @@ impl Panel for GitPanel {
             branches,
             formatted_content,
             token_count,
-            status_hash: new_hash,
+            source_hash: new_hash,
         })
     }
 
@@ -827,7 +823,7 @@ impl Panel for GitResultPanel {
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
         match update {
-            CacheUpdate::GitResultContent { content, token_count, is_error, .. } => {
+            CacheUpdate::Content { content, token_count, .. } => {
                 ctx.cached_content = Some(content);
                 ctx.full_token_count = token_count;
                 ctx.total_pages = compute_total_pages(token_count);
@@ -841,7 +837,6 @@ impl Panel for GitResultPanel {
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
                 update_if_changed(ctx, &content_ref);
-                let _ = is_error; // could style differently in future
                 true
             }
             _ => false,
@@ -872,15 +867,14 @@ impl Panel for GitResultPanel {
                 } else {
                     format!("{}\n{}", stdout, stderr)
                 };
-                let is_error = !out.status.success();
                 let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GitResultContent { context_id, content, token_count, is_error })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
             Err(e) => {
                 let content = format!("Error executing git: {}", e);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GitResultContent { context_id, content, token_count, is_error: true })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
         }
     }
