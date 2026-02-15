@@ -1,4 +1,4 @@
-pub mod panel;
+mod panel;
 
 use std::collections::HashMap;
 use std::fs;

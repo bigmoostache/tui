@@ -1,5 +1,5 @@
-pub mod panel;
-pub mod tools;
+mod panel;
+mod tools;
 
 use serde_json::json;
 

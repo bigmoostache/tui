@@ -1,9 +1,9 @@
 mod library_panel;
 pub mod seed;
 mod skill_panel;
-pub mod storage;
+pub(crate) mod storage;
 mod tools;
-pub mod types;
+pub(crate) mod types;
 
 use serde_json::json;
 

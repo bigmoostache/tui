@@ -1,6 +1,6 @@
-pub mod continuation;
+pub(crate) mod continuation;
 pub mod engine;
-pub mod guard_rail;
+pub(crate) mod guard_rail;
 mod panel;
 pub(crate) mod tools;
 

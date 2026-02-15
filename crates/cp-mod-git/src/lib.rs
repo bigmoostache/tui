@@ -1,10 +1,10 @@
-pub mod cache_invalidation;
-pub mod classify;
+pub(crate) mod cache_invalidation;
+mod classify;
 mod panel;
-pub mod tools;
+mod tools;
 
 /// Refresh interval for git status (milliseconds)
-pub const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
+pub(crate) const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
 
 use serde_json::json;
 

@@ -1,5 +1,5 @@
-pub mod panel;
-pub mod tools;
+mod panel;
+mod tools;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
