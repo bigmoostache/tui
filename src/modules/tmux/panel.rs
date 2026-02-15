@@ -3,22 +3,23 @@ use std::process::Command;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
-use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
-use crate::actions::Action;
 use super::TMUX_DEPRECATION_MS;
-use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
-use crate::ui::{theme, chars};
+use crate::actions::Action;
+use crate::cache::{CacheRequest, CacheUpdate, hash_content};
+use crate::core::panels::{ContextItem, Panel, paginate_content, update_if_changed};
+use crate::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use crate::ui::{chars, theme};
 
 pub struct TmuxPanel;
 
 impl Panel for TmuxPanel {
-    fn needs_cache(&self) -> bool { true }
+    fn needs_cache(&self) -> bool {
+        true
+    }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         // Get current tmux pane ID
-        let pane_id = state.context.get(state.selected_context)
-            .and_then(|c| c.tmux_pane_id.clone())?;
+        let pane_id = state.context.get(state.selected_context).and_then(|c| c.tmux_pane_id.clone())?;
 
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 
@@ -89,10 +90,8 @@ impl Panel for TmuxPanel {
             return None;
         };
         let start_line = format!("-{}", lines.unwrap_or(50));
-        let output = Command::new("tmux")
-            .args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id])
-            .output()
-            .ok()?;
+        let output =
+            Command::new("tmux").args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id]).output().ok()?;
         if !output.status.success() {
             return None;
         }
@@ -102,15 +101,13 @@ impl Panel for TmuxPanel {
             return Some(CacheUpdate::Unchanged { context_id });
         }
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::Content {
-            context_id,
-            content,
-            token_count,
-        })
+        Some(CacheUpdate::Content { context_id, content, token_count })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        state.context.iter()
+        state
+            .context
+            .iter()
             .filter(|c| c.context_type == ContextType::Tmux)
             .filter_map(|c| {
                 let pane_id = c.tmux_pane_id.as_ref()?;
@@ -131,15 +128,9 @@ impl Panel for TmuxPanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let (content, description, last_keys) = if let Some(ctx) = state.context.get(state.selected_context) {
             // Use cached content only - no blocking operations
-            let content = ctx.cached_content.as_ref()
-                .cloned()
-                .unwrap_or_else(|| {
-                    if ctx.cache_deprecated {
-                        "Loading...".to_string()
-                    } else {
-                        "No content".to_string()
-                    }
-                });
+            let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
+                if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }
+            });
             let desc = ctx.tmux_description.clone().unwrap_or_default();
             let last = ctx.tmux_last_keys.clone();
             (content, desc, last)
@@ -162,9 +153,10 @@ impl Panel for TmuxPanel {
             ]));
         }
         if !text.is_empty() {
-            text.push(Line::from(vec![
-                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(40)), Style::default().fg(theme::border())),
-            ]));
+            text.push(Line::from(vec![Span::styled(
+                format!(" {}", chars::HORIZONTAL.repeat(40)),
+                Style::default().fg(theme::border()),
+            )]));
         }
 
         for line in content.lines() {

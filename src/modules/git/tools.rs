@@ -3,9 +3,9 @@ use std::process::Command;
 use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::state::{ContextType, State};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tools::{ToolResult, ToolUse};
 
-use super::classify::{validate_git_command, classify_git, CommandClass};
+use super::classify::{CommandClass, classify_git, validate_git_command};
 
 /// Execute a raw git command.
 /// Read-only commands create/reuse GitResult panels.
@@ -40,10 +40,10 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     match class {
         CommandClass::ReadOnly => {
             // Search for existing GitResult panel with same command
-            let existing_idx = state.context.iter().position(|c| {
-                c.context_type == ContextType::GitResult
-                    && c.result_command.as_deref() == Some(command)
-            });
+            let existing_idx = state
+                .context
+                .iter()
+                .position(|c| c.context_type == ContextType::GitResult && c.result_command.as_deref() == Some(command));
 
             if let Some(idx) = existing_idx {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
@@ -60,9 +60,8 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid += 1;
 
-                let mut elem = crate::modules::make_default_context_element(
-                    &panel_id, ContextType::GitResult, command, true,
-                );
+                let mut elem =
+                    crate::modules::make_default_context_element(&panel_id, ContextType::GitResult, command, true);
                 elem.uid = Some(uid);
                 elem.result_command = Some(command.to_string());
                 state.context.push(elem);
@@ -77,8 +76,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
         CommandClass::Mutating => {
             // Execute directly with timeout
             let mut cmd = Command::new("git");
-            cmd.args(&args)
-                .env("GIT_TERMINAL_PROMPT", "0");
+            cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
 
             // If GITHUB_TOKEN is available, create a temporary askpass script
             // so git push/pull/fetch can authenticate via HTTPS automatically.
@@ -117,9 +115,10 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 for ctx in &mut state.context {
                     if ctx.context_type == ContextType::GitResult
                         && let Some(ref cmd) = ctx.result_command
-                            && invalidations.iter().any(|re| re.is_match(cmd)) {
-                                ctx.cache_deprecated = true;
-                            }
+                        && invalidations.iter().any(|re| re.is_match(cmd))
+                    {
+                        ctx.cache_deprecated = true;
+                    }
                 }
             }
             // P6 (Git) always invalidated via .git/ file watcher — no action needed here
@@ -140,8 +139,11 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     ToolResult {
                         tool_use_id: tool.id.clone(),
                         content: if combined.is_empty() {
-                            if is_error { "Command failed with no output".to_string() }
-                            else { "Command completed successfully".to_string() }
+                            if is_error {
+                                "Command failed with no output".to_string()
+                            } else {
+                                "Command completed successfully".to_string()
+                            }
                         } else {
                             combined
                         },
@@ -154,11 +156,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     } else {
                         format!("Error running git: {}", e)
                     };
-                    ToolResult {
-                        tool_use_id: tool.id.clone(),
-                        content,
-                        is_error: true,
-                    }
+                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true }
                 }
             }
         }
@@ -239,9 +237,7 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
             changes.push("diff_base=<cleared>".to_string());
         } else {
             // Validate the ref
-            let check = Command::new("git")
-                .args(["rev-parse", "--verify", base])
-                .output();
+            let check = Command::new("git").args(["rev-parse", "--verify", base]).output();
             match check {
                 Ok(output) if output.status.success() => {
                     state.git_diff_base = Some(base.to_string());

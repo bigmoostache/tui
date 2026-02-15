@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ContextElement, ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path = match tool.input.get("path").and_then(|v| v.as_str()) {
@@ -11,7 +11,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'path' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -42,10 +42,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let file_name = path_obj
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.to_string());
+    let file_name = path_obj.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
 
     // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();

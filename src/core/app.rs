@@ -5,21 +5,21 @@ use std::time::Duration;
 use crossterm::event;
 use ratatui::prelude::*;
 
-use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
-use crate::api::{start_streaming, StreamEvent};
-use crate::background::{generate_tldr, TlDrResult};
-use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
+use crate::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
+use crate::api::{StreamEvent, start_streaming};
+use crate::background::{TlDrResult, generate_tldr};
+use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
+use crate::core::panels::{mark_panels_dirty, now_ms};
 use crate::events::handle_event;
+use crate::gh_watcher::GhWatcher;
 use crate::help::CommandPalette;
-use crate::core::panels::{now_ms, mark_panels_dirty};
-use crate::persistence::{check_ownership, save_state, build_save_batch, build_message_op, PersistenceWriter};
+use crate::persistence::{PersistenceWriter, build_message_op, build_save_batch, check_ownership, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
-use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
+use crate::tools::{ToolResult, ToolUse, execute_tool, perform_reload};
 use crate::typewriter::TypewriterBuffer;
 use crate::ui;
 use crate::watcher::{FileWatcher, WatchEvent};
-use crate::gh_watcher::GhWatcher;
 
 use super::context::prepare_stream_context;
 use super::init::get_active_agent_content;
@@ -260,7 +260,8 @@ impl App {
                 }
                 StreamEvent::Done { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason } => {
                     self.typewriter.mark_done();
-                    self.pending_done = Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
+                    self.pending_done =
+                        Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
@@ -284,9 +285,10 @@ impl App {
             if self.state.is_streaming {
                 // Clear any partial assistant message content before retrying
                 if let Some(msg) = self.state.messages.last_mut()
-                    && msg.role == "assistant" {
-                        msg.content.clear();
-                    }
+                    && msg.role == "assistant"
+                {
+                    msg.content.clear();
+                }
                 let ctx = prepare_stream_context(&mut self.state, true);
                 let system_prompt = get_active_agent_content(&self.state);
                 self.typewriter.reset();
@@ -294,7 +296,14 @@ impl App {
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
+                    ctx.messages,
+                    ctx.context_items,
+                    ctx.tools,
+                    None,
+                    system_prompt.clone(),
+                    Some(system_prompt),
+                    DEFAULT_WORKER_ID.to_string(),
+                    tx.clone(),
                 );
                 self.state.dirty = true;
             }
@@ -304,10 +313,11 @@ impl App {
     fn process_typewriter(&mut self) {
         let _guard = crate::profile!("app::typewriter");
         if self.state.is_streaming
-            && let Some(chars) = self.typewriter.take_chars() {
-                apply_action(&mut self.state, Action::AppendChars(chars));
-                self.state.dirty = true;
-            }
+            && let Some(chars) = self.typewriter.take_chars()
+        {
+            apply_action(&mut self.state, Action::AppendChars(chars));
+            self.state.dirty = true;
+        }
     }
 
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
@@ -325,17 +335,22 @@ impl App {
 
     fn process_api_check_results(&mut self) {
         if let Some(rx) = &self.api_check_rx
-            && let Ok(result) = rx.try_recv() {
-                self.state.api_check_in_progress = false;
-                self.state.api_check_result = Some(result);
-                self.state.dirty = true;
-                self.api_check_rx = None;
-                self.save_state_async();
-            }
+            && let Ok(result) = rx.try_recv()
+        {
+            self.state.api_check_in_progress = false;
+            self.state.api_check_result = Some(result);
+            self.state.dirty = true;
+            self.api_check_rx = None;
+            self.save_state_async();
+        }
     }
 
     fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
-        if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
+        if !self.state.is_streaming
+            || self.pending_done.is_none()
+            || !self.typewriter.pending_chars.is_empty()
+            || self.pending_tools.is_empty()
+        {
             return;
         }
         // Don't process new tools while waiting for panels or deferred sleep
@@ -350,16 +365,17 @@ impl App {
 
         // Finalize current assistant message
         if let Some(msg) = self.state.messages.last_mut()
-            && msg.role == "assistant" {
-                // Clean any LLM ID prefixes before saving
-                msg.content = clean_llm_id_prefix(&msg.content);
-                let op = build_message_op(msg);
-                self.writer.send_message(op);
-                if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
-                    self.state.pending_tldrs += 1;
-                    generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
-                }
+            && msg.role == "assistant"
+        {
+            // Clean any LLM ID prefixes before saving
+            msg.content = clean_llm_id_prefix(&msg.content);
+            let op = build_message_op(msg);
+            self.writer.send_message(op);
+            if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
+                self.state.pending_tldrs += 1;
+                generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
             }
+        }
 
         // Create tool call messages
         for tool in &tools {
@@ -399,7 +415,8 @@ impl App {
         let result_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
         self.state.global_next_uid += 1;
-        let tool_result_records: Vec<ToolResultRecord> = tool_results.iter()
+        let tool_result_records: Vec<ToolResultRecord> = tool_results
+            .iter()
             .map(|r| ToolResultRecord {
                 tool_use_id: r.tool_use_id.clone(),
                 content: r.content.clone(),
@@ -503,7 +520,14 @@ impl App {
         start_streaming(
             self.state.llm_provider,
             self.state.current_model(),
-            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
+            ctx.messages,
+            ctx.context_items,
+            ctx.tools,
+            None,
+            system_prompt.clone(),
+            Some(system_prompt),
+            DEFAULT_WORKER_ID.to_string(),
+            tx.clone(),
         );
     }
 
@@ -585,42 +609,49 @@ impl App {
             return;
         }
 
-        if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) = self.pending_done
-            && self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
-                self.state.dirty = true;
-                let stop_reason = stop_reason.clone();
-                match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason }) {
-                    ActionResult::SaveMessage(id) => {
-                        let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
-                            self.save_message_async(msg);
-                            if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
-                                Some((msg.id.clone(), msg.content.clone()))
-                            } else {
-                                None
-                            }
-                        });
-                        if let Some((msg_id, content)) = tldr_info {
-                            self.state.pending_tldrs += 1;
-                            generate_tldr(msg_id, content, tldr_tx.clone());
+        if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) =
+            self.pending_done
+            && self.typewriter.pending_chars.is_empty()
+            && self.pending_tools.is_empty()
+        {
+            self.state.dirty = true;
+            let stop_reason = stop_reason.clone();
+            match apply_action(
+                &mut self.state,
+                Action::StreamDone {
+                    _input_tokens: input_tokens,
+                    output_tokens,
+                    cache_hit_tokens,
+                    cache_miss_tokens,
+                    stop_reason,
+                },
+            ) {
+                ActionResult::SaveMessage(id) => {
+                    let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
+                        self.save_message_async(msg);
+                        if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
+                            Some((msg.id.clone(), msg.content.clone()))
+                        } else {
+                            None
                         }
-                        self.save_state_async();
+                    });
+                    if let Some((msg_id, content)) = tldr_info {
+                        self.state.pending_tldrs += 1;
+                        generate_tldr(msg_id, content, tldr_tx.clone());
                     }
-                    ActionResult::Save => self.save_state_async(),
-                    _ => {}
+                    self.save_state_async();
                 }
-                // Reset retry count on successful completion
-                self.state.api_retry_count = 0;
-                self.typewriter.reset();
-                self.pending_done = None;
+                ActionResult::Save => self.save_state_async(),
+                _ => {}
             }
+            // Reset retry count on successful completion
+            self.state.api_retry_count = 0;
+            self.typewriter.reset();
+            self.pending_done = None;
+        }
     }
 
-    fn handle_action(
-        &mut self,
-        action: Action,
-        tx: &Sender<StreamEvent>,
-        tldr_tx: &Sender<TlDrResult>,
-    ) {
+    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
         // Any action triggers a re-render
         self.state.dirty = true;
         match apply_action(&mut self.state, action) {
@@ -637,9 +668,10 @@ impl App {
                 self.state.spine_config.user_stopped = true;
                 self.state.touch_panel(ContextType::Spine);
                 if let Some(msg) = self.state.messages.last()
-                    && msg.role == "assistant" {
-                        self.save_message_async(msg);
-                    }
+                    && msg.role == "assistant"
+                {
+                    self.save_message_async(msg);
+                }
                 self.save_state_async();
             }
             ActionResult::Save => {
@@ -665,11 +697,7 @@ impl App {
             ActionResult::StartApiCheck => {
                 let (api_tx, api_rx) = std::sync::mpsc::channel();
                 self.api_check_rx = Some(api_rx);
-                crate::llms::start_api_check(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    api_tx,
-                );
+                crate::llms::start_api_check(self.state.llm_provider, self.state.current_model(), api_tx);
                 self.save_state_async();
             }
             ActionResult::Nothing => {}
@@ -684,18 +712,18 @@ impl App {
         for ctx in &self.state.context {
             if ctx.context_type == ContextType::File
                 && let Some(path) = &ctx.file_path
-                    && !self.watched_file_paths.contains(path)
-                        && watcher.watch_file(path).is_ok() {
-                            self.watched_file_paths.insert(path.clone());
-                        }
+                && !self.watched_file_paths.contains(path)
+                && watcher.watch_file(path).is_ok()
+            {
+                self.watched_file_paths.insert(path.clone());
+            }
         }
 
         // Watch directories for Tree panel (only open folders)
         for folder in &self.state.tree_open_folders {
-            if !self.watched_dir_paths.contains(folder)
-                && watcher.watch_dir(folder).is_ok() {
-                    self.watched_dir_paths.insert(folder.clone());
-                }
+            if !self.watched_dir_paths.contains(folder) && watcher.watch_dir(folder).is_ok() {
+                self.watched_dir_paths.insert(folder.clone());
+            }
         }
 
         // Watch .git/ paths for GitResult panel deprecation
@@ -719,7 +747,10 @@ impl App {
             Some(t) => t.clone(),
             None => return,
         };
-        let panels: Vec<(String, String, String)> = self.state.context.iter()
+        let panels: Vec<(String, String, String)> = self
+            .state
+            .context
+            .iter()
             .filter(|c| c.context_type == ContextType::GithubResult)
             .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
             .collect();
@@ -734,7 +765,9 @@ impl App {
     fn schedule_initial_cache_refreshes(&mut self) {
         for i in 0..self.state.context.len() {
             let ctx = &self.state.context[i];
-            if !ctx.context_type.is_fixed() { continue; }
+            if !ctx.context_type.is_fixed() {
+                continue;
+            }
             let panel = crate::core::panels::get_panel(ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
@@ -798,7 +831,9 @@ impl App {
             let Some(watcher) = &self.file_watcher else { return };
             watcher.poll_events()
         };
-        if events.is_empty() { return; }
+        if events.is_empty() {
+            return;
+        }
 
         // First pass: mark deprecated, collect indices and paths needing re-watch
         let mut refresh_indices = Vec::new();
@@ -872,7 +907,9 @@ impl App {
         refresh_indices.sort_unstable();
         refresh_indices.dedup();
         for i in refresh_indices {
-            if self.state.context[i].cache_in_flight { continue; }
+            if self.state.context[i].cache_in_flight {
+                continue;
+            }
             let ctx = &self.state.context[i];
             let panel = crate::core::panels::get_panel(ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
@@ -917,7 +954,9 @@ impl App {
         let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
 
         for (i, ctx) in self.state.context.iter().enumerate() {
-            if ctx.cache_in_flight { continue; }
+            if ctx.cache_in_flight {
+                continue;
+            }
 
             let panel = crate::core::panels::get_panel(ctx.context_type);
 
@@ -942,9 +981,10 @@ impl App {
             if let Some(interval) = panel.cache_refresh_interval_ms() {
                 let last = self.last_poll_ms.get(&ctx.id).copied().unwrap_or(0);
                 if current_ms.saturating_sub(last) >= interval
-                    && let Some(req) = panel.build_cache_request(ctx, &self.state) {
-                        requests.push((i, req));
-                    }
+                    && let Some(req) = panel.build_cache_request(ctx, &self.state)
+                {
+                    requests.push((i, req));
+                }
             }
         }
 
@@ -965,27 +1005,26 @@ impl App {
             // File panels: watch individual files
             if ctx.context_type == ContextType::File
                 && let Some(path) = &ctx.file_path
-                    && !self.watched_file_paths.contains(path)
-                        && watcher.watch_file(path).is_ok() {
-                            self.watched_file_paths.insert(path.clone());
-                        }
+                && !self.watched_file_paths.contains(path)
+                && watcher.watch_file(path).is_ok()
+            {
+                self.watched_file_paths.insert(path.clone());
+            }
 
             // Glob panels: watch base directory
             if ctx.context_type == ContextType::Glob {
                 let dir = ctx.glob_path.as_deref().unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir)
-                    && watcher.watch_dir(dir).is_ok() {
-                        self.watched_dir_paths.insert(dir.to_string());
-                    }
+                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
+                    self.watched_dir_paths.insert(dir.to_string());
+                }
             }
 
             // Grep panels: watch search directory
             if ctx.context_type == ContextType::Grep {
                 let dir = ctx.grep_path.as_deref().unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir)
-                    && watcher.watch_dir(dir).is_ok() {
-                        self.watched_dir_paths.insert(dir.to_string());
-                    }
+                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
+                    self.watched_dir_paths.insert(dir.to_string());
+                }
             }
         }
     }
@@ -994,7 +1033,7 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
-        use crate::modules::spine::engine::{check_spine, apply_continuation, SpineDecision};
+        use crate::modules::spine::engine::{SpineDecision, apply_continuation, check_spine};
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
@@ -1022,7 +1061,14 @@ impl App {
                     start_streaming(
                         self.state.llm_provider,
                         self.state.current_model(),
-                        ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
+                        ctx.messages,
+                        ctx.context_items,
+                        ctx.tools,
+                        None,
+                        system_prompt.clone(),
+                        Some(system_prompt),
+                        DEFAULT_WORKER_ID.to_string(),
+                        tx.clone(),
                     );
                     self.save_state_async();
                     self.state.dirty = true;
@@ -1043,9 +1089,7 @@ impl App {
         let has_active_spinner = self.state.is_streaming
             || self.state.pending_tldrs > 0
             || self.state.api_check_in_progress
-            || self.state.context.iter().any(|c| {
-                c.cached_content.is_none() && c.context_type.needs_cache()
-            });
+            || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 
         if has_active_spinner {
             self.last_spinner_ms = now;

@@ -6,7 +6,7 @@
 use std::sync::mpsc::{self, Sender};
 use std::thread;
 
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 use crate::state::TreeFileDescription;
 
@@ -14,11 +14,7 @@ use crate::state::TreeFileDescription;
 #[derive(Debug, Clone)]
 pub enum CacheUpdate {
     /// Generic content update (used by File, Tree, Glob, Grep, Tmux, GitResult, GithubResult)
-    Content {
-        context_id: String,
-        content: String,
-        token_count: usize,
-    },
+    Content { context_id: String, content: String, token_count: usize },
     /// Git status was fetched (special case: writes to State fields, not just ContextElement)
     GitStatus {
         branch: Option<String>,
@@ -37,9 +33,7 @@ pub enum CacheUpdate {
     /// Git status unchanged (hash matched, no need to update)
     GitStatusUnchanged,
     /// Content unchanged — clear cache_in_flight without updating content
-    Unchanged {
-        context_id: String,
-    },
+    Unchanged { context_id: String },
 }
 
 /// Request for background cache operations
@@ -47,11 +41,7 @@ pub enum CacheUpdate {
 #[allow(clippy::enum_variant_names)]
 pub enum CacheRequest {
     /// Refresh a file's cache
-    RefreshFile {
-        context_id: String,
-        file_path: String,
-        current_source_hash: Option<String>,
-    },
+    RefreshFile { context_id: String, file_path: String, current_source_hash: Option<String> },
     /// Refresh tree cache
     RefreshTree {
         context_id: String,
@@ -60,25 +50,11 @@ pub enum CacheRequest {
         tree_descriptions: Vec<TreeFileDescription>,
     },
     /// Refresh glob cache
-    RefreshGlob {
-        context_id: String,
-        pattern: String,
-        base_path: Option<String>,
-    },
+    RefreshGlob { context_id: String, pattern: String, base_path: Option<String> },
     /// Refresh grep cache
-    RefreshGrep {
-        context_id: String,
-        pattern: String,
-        path: Option<String>,
-        file_pattern: Option<String>,
-    },
+    RefreshGrep { context_id: String, pattern: String, path: Option<String>, file_pattern: Option<String> },
     /// Refresh tmux pane cache
-    RefreshTmux {
-        context_id: String,
-        pane_id: String,
-        lines: Option<usize>,
-        current_source_hash: Option<String>,
-    },
+    RefreshTmux { context_id: String, pane_id: String, lines: Option<usize>, current_source_hash: Option<String> },
     /// Refresh git status
     RefreshGitStatus {
         /// Whether to include full diff content in formatted output
@@ -89,16 +65,9 @@ pub enum CacheRequest {
         diff_base: Option<String>,
     },
     /// Refresh a git result panel (re-execute read-only git command)
-    RefreshGitResult {
-        context_id: String,
-        command: String,
-    },
+    RefreshGitResult { context_id: String, command: String },
     /// Refresh a GitHub result panel (re-execute read-only gh command)
-    RefreshGithubResult {
-        context_id: String,
-        command: String,
-        github_token: String,
-    },
+    RefreshGithubResult { context_id: String, command: String, github_token: String },
 }
 
 impl CacheRequest {
@@ -117,7 +86,6 @@ impl CacheRequest {
         }
     }
 }
-
 
 /// Hash content for change detection (SHA-256, collision-resistant)
 pub fn hash_content(content: &str) -> String {
@@ -155,9 +123,10 @@ impl CachePool {
                             Ok((request, tx)) => {
                                 let context_type = request.context_type();
                                 if let Some(panel) = crate::modules::create_panel(context_type)
-                                    && let Some(update) = panel.refresh_cache(request) {
-                                        let _ = tx.send(update);
-                                    }
+                                    && let Some(update) = panel.refresh_cache(request)
+                                {
+                                    let _ = tx.send(update);
+                                }
                             }
                             Err(_) => break, // Channel closed, pool shutting down
                         }
@@ -186,19 +155,13 @@ mod tests {
     fn hash_content_empty_deterministic() {
         let h = hash_content("");
         // SHA-256 of empty string is well-known
-        assert_eq!(
-            h,
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
+        assert_eq!(h, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     }
 
     #[test]
     fn hash_content_abc() {
         let h = hash_content("abc");
-        assert_eq!(
-            h,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+        assert_eq!(h, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     #[test]

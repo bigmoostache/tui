@@ -4,15 +4,17 @@ use std::process::Command;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::cache::{hash_content, CacheRequest, CacheUpdate};
-use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
-use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
-use crate::modules::{run_with_timeout, truncate_output};
-use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use super::GIT_STATUS_REFRESH_MS;
-use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
-use crate::ui::{theme, chars};
+use crate::actions::Action;
+use crate::cache::{CacheRequest, CacheUpdate, hash_content};
+use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::core::panels::{ContextItem, Panel, paginate_content, update_if_changed};
+use crate::modules::{run_with_timeout, truncate_output};
+use crate::state::{
+    ContextElement, ContextType, GitChangeType, GitFileChange, State, compute_total_pages, estimate_tokens,
+};
+use crate::ui::{chars, theme};
 
 pub(crate) struct GitResultPanel;
 pub struct GitPanel;
@@ -52,14 +54,18 @@ impl GitPanel {
                     GitChangeType::Modified => "M",
                     GitChangeType::Renamed => "R",
                 };
-                output.push_str(&format!("| {} | {} | +{} | -{} | {} |\n",
-                    file.path, type_str, file.additions, file.deletions, net_str));
+                output.push_str(&format!(
+                    "| {} | {} | +{} | -{} | {} |\n",
+                    file.path, type_str, file.additions, file.deletions, net_str
+                ));
             }
 
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
-            output.push_str(&format!("| **Total** | | **+{}** | **-{}** | **{}** |\n",
-                total_add, total_del, total_net_str));
+            output.push_str(&format!(
+                "| **Total** | | **+{}** | **-{}** | **{}** |\n",
+                total_add, total_del, total_net_str
+            ));
 
             // Add diff content only if git_show_diffs is enabled
             if state.git_show_diffs {
@@ -107,13 +113,12 @@ fn format_git_content_for_cache(
                 GitChangeType::Modified => "M",
                 GitChangeType::Renamed => "R",
             };
-            output.push_str(&format!("| {} | {} | +{} | -{} | {} |\n",
-                path, type_str, additions, deletions, net_str));
+            output.push_str(&format!("| {} | {} | +{} | -{} | {} |\n", path, type_str, additions, deletions, net_str));
         }
         let total_net = total_add - total_del;
         let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
-        output.push_str(&format!("| **Total** | | **+{}** | **-{}** | **{}** |\n",
-            total_add, total_del, total_net_str));
+        output
+            .push_str(&format!("| **Total** | | **+{}** | **-{}** | **{}** |\n", total_add, total_del, total_net_str));
         if show_diffs {
             output.push_str("\n## Diffs\n\n");
             for (_, _, _, _, diff_content) in changes {
@@ -135,9 +140,10 @@ fn parse_diff_by_file(diff_output: &str, diff_contents: &mut HashMap<String, Str
     for line in diff_output.lines() {
         if line.starts_with("diff --git") {
             if let Some(file) = current_file.take()
-                && !current_diff.is_empty() {
-                    diff_contents.insert(file, current_diff.clone());
-                }
+                && !current_diff.is_empty()
+            {
+                diff_contents.insert(file, current_diff.clone());
+            }
             current_diff.clear();
             if let Some(b_part) = line.split(" b/").nth(1) {
                 current_file = Some(b_part.to_string());
@@ -150,16 +156,14 @@ fn parse_diff_by_file(diff_output: &str, diff_contents: &mut HashMap<String, Str
         }
     }
     if let Some(file) = current_file
-        && !current_diff.is_empty() {
-            diff_contents.insert(file, current_diff);
-        }
+        && !current_diff.is_empty()
+    {
+        diff_contents.insert(file, current_diff);
+    }
 }
 
 /// Parse git diff --numstat output and add to file_changes map
-fn parse_numstat_to_map(
-    output: &str,
-    file_changes: &mut HashMap<String, (i32, i32, GitChangeType)>,
-) {
+fn parse_numstat_to_map(output: &str, file_changes: &mut HashMap<String, (i32, i32, GitChangeType)>) {
     for line in output.lines() {
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 3 {
@@ -179,7 +183,9 @@ fn parse_numstat_to_map(
 }
 
 impl Panel for GitPanel {
-    fn needs_cache(&self) -> bool { true }
+    fn needs_cache(&self) -> bool {
+        true
+    }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         // Force full refresh if cache is explicitly deprecated (e.g., toggle_diffs)
@@ -205,7 +211,8 @@ impl Panel for GitPanel {
                 state.git_branch = branch;
                 state.git_branches = branches;
                 state.git_is_repo = is_repo;
-                state.git_file_changes = file_changes.into_iter()
+                state.git_file_changes = file_changes
+                    .into_iter()
                     .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
                         path,
                         additions,
@@ -221,7 +228,11 @@ impl Panel for GitPanel {
                 ctx.current_page = 0;
                 // token_count reflects current page, not full content
                 if ctx.total_pages > 1 {
-                    let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+                    let page_content = paginate_content(
+                        ctx.cached_content.as_deref().unwrap_or(""),
+                        ctx.current_page,
+                        ctx.total_pages,
+                    );
                     ctx.token_count = estimate_tokens(&page_content);
                 } else {
                     ctx.token_count = token_count;
@@ -254,11 +265,8 @@ impl Panel for GitPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        let base_title = if let Some(branch) = &state.git_branch {
-            format!("Git ({})", branch)
-        } else {
-            "Git".to_string()
-        };
+        let base_title =
+            if let Some(branch) = &state.git_branch { format!("Git ({})", branch) } else { "Git".to_string() };
         if let Some(ref diff_base) = state.git_diff_base {
             format!("{} [vs {}]", base_title, diff_base)
         } else {
@@ -269,7 +277,9 @@ impl Panel for GitPanel {
     fn refresh(&self, state: &mut State) {
         // Token count is already set by cache system when GitStatus arrives
         // Only recalculate if no cached content exists (shouldn't happen normally)
-        let needs_calc = state.context.iter()
+        let needs_calc = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Git)
             .map(|ctx| ctx.cached_content.is_none())
             .unwrap_or(false);
@@ -293,11 +303,8 @@ impl Panel for GitPanel {
         let _guard = crate::profile!("cache::git_status");
 
         // Check if we're in a git repo (fast check)
-        let is_repo = Command::new("git")
-            .args(["rev-parse", "--git-dir"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
+        let is_repo =
+            Command::new("git").args(["rev-parse", "--git-dir"]).output().map(|o| o.status.success()).unwrap_or(false);
 
         if !is_repo {
             return Some(CacheUpdate::GitStatus {
@@ -358,11 +365,8 @@ impl Panel for GitPanel {
             let x = line.chars().next().unwrap_or(' ');
             let y = line.chars().nth(1).unwrap_or(' ');
             let path = line[3..].trim().to_string();
-            let path = if path.contains(" -> ") {
-                path.split(" -> ").last().unwrap_or(&path).to_string()
-            } else {
-                path
-            };
+            let path =
+                if path.contains(" -> ") { path.split(" -> ").last().unwrap_or(&path).to_string() } else { path };
 
             let change_type = match (x, y) {
                 ('?', '?') => GitChangeType::Untracked,
@@ -380,22 +384,26 @@ impl Panel for GitPanel {
             if let Some(ref base) = diff_base {
                 // When diff_base is set, compare against that ref
                 if let Ok(output) = Command::new("git").args(["diff", base, "--numstat"]).output()
-                    && output.status.success() {
-                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
-                    }
+                    && output.status.success()
+                {
+                    parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                }
             } else {
                 if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output()
-                    && output.status.success() {
-                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
-                    }
+                    && output.status.success()
+                {
+                    parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                }
                 if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output()
-                    && output.status.success() {
-                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
-                    }
+                    && output.status.success()
+                {
+                    parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                }
             }
 
             // For untracked files, count lines
-            let untracked_files: Vec<String> = file_changes.iter()
+            let untracked_files: Vec<String> = file_changes
+                .iter()
                 .filter(|(_, (add, del, ct))| *ct == GitChangeType::Untracked && *add == 0 && *del == 0)
                 .map(|(path, _)| path.clone())
                 .collect();
@@ -409,26 +417,27 @@ impl Panel for GitPanel {
             }
 
             // For deleted files, get line count from HEAD
-            let deleted_files: Vec<String> = file_changes.iter()
+            let deleted_files: Vec<String> = file_changes
+                .iter()
                 .filter(|(_, (add, del, ct))| *ct == GitChangeType::Deleted && *add == 0 && *del == 0)
                 .map(|(path, _)| path.clone())
                 .collect();
             for path in deleted_files {
                 if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output()
-                    && output.status.success() {
-                        let content = String::from_utf8_lossy(&output.stdout);
-                        let lines = content.lines().count() as i32;
-                        if let Some(entry) = file_changes.get_mut(&path) {
-                            entry.1 = lines;
-                        }
+                    && output.status.success()
+                {
+                    let content = String::from_utf8_lossy(&output.stdout);
+                    let lines = content.lines().count() as i32;
+                    if let Some(entry) = file_changes.get_mut(&path) {
+                        entry.1 = lines;
                     }
+                }
             }
         }
 
         // Convert to vec and sort by path
-        let mut changes: Vec<_> = file_changes.into_iter()
-            .map(|(path, (add, del, ct))| (path, add, del, ct, String::new()))
-            .collect();
+        let mut changes: Vec<_> =
+            file_changes.into_iter().map(|(path, (add, del, ct))| (path, add, del, ct, String::new())).collect();
         changes.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Get all local branches
@@ -439,10 +448,7 @@ impl Panel for GitPanel {
             .filter(|o| o.status.success())
             .map(|o| {
                 let current = branch.as_deref().unwrap_or("");
-                String::from_utf8_lossy(&o.stdout)
-                    .lines()
-                    .map(|b| (b.to_string(), b == current))
-                    .collect()
+                String::from_utf8_lossy(&o.stdout).lines().map(|b| (b.to_string(), b == current)).collect()
             })
             .unwrap_or_default();
 
@@ -452,41 +458,46 @@ impl Panel for GitPanel {
 
             let diff_ref = diff_base.as_deref().unwrap_or("HEAD");
             if let Ok(output) = Command::new("git").args(["diff", diff_ref]).output()
-                && output.status.success() {
-                    let diff_output = String::from_utf8_lossy(&output.stdout);
-                    parse_diff_by_file(&diff_output, &mut diff_contents);
-                }
+                && output.status.success()
+            {
+                let diff_output = String::from_utf8_lossy(&output.stdout);
+                parse_diff_by_file(&diff_output, &mut diff_contents);
+            }
 
             // For untracked files, create a pseudo-diff
             for (path, _, _, ct, _) in &changes {
-                if *ct == GitChangeType::Untracked && !diff_contents.contains_key(path)
-                    && let Ok(content) = std::fs::read_to_string(path) {
-                        let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
-                        pseudo_diff.push_str("new file\n");
-                        pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
-                        pseudo_diff.push_str("@@ -0,0 +1 @@\n");
-                        for line in content.lines() {
-                            pseudo_diff.push_str(&format!("+{}\n", line));
-                        }
-                        diff_contents.insert(path.clone(), pseudo_diff);
+                if *ct == GitChangeType::Untracked
+                    && !diff_contents.contains_key(path)
+                    && let Ok(content) = std::fs::read_to_string(path)
+                {
+                    let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                    pseudo_diff.push_str("new file\n");
+                    pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
+                    pseudo_diff.push_str("@@ -0,0 +1 @@\n");
+                    for line in content.lines() {
+                        pseudo_diff.push_str(&format!("+{}\n", line));
                     }
+                    diff_contents.insert(path.clone(), pseudo_diff);
+                }
             }
 
             // For deleted files, create a pseudo-diff
             for (path, _, _, ct, _) in &changes {
-                if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path)
+                if *ct == GitChangeType::Deleted
+                    && !diff_contents.contains_key(path)
                     && let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output()
-                        && output.status.success() {
-                            let content = String::from_utf8_lossy(&output.stdout);
-                            let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
-                            pseudo_diff.push_str("deleted file\n");
-                            pseudo_diff.push_str(&format!("--- a/{}\n+++ /dev/null\n", path));
-                            pseudo_diff.push_str("@@ -1 +0,0 @@\n");
-                            for line in content.lines() {
-                                pseudo_diff.push_str(&format!("-{}\n", line));
-                            }
-                            diff_contents.insert(path.clone(), pseudo_diff);
-                        }
+                    && output.status.success()
+                {
+                    let content = String::from_utf8_lossy(&output.stdout);
+                    let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                    pseudo_diff.push_str("deleted file\n");
+                    pseudo_diff.push_str(&format!("--- a/{}\n+++ /dev/null\n", path));
+                    pseudo_diff.push_str("@@ -1 +0,0 @@\n");
+                    for line in content.lines() {
+                        pseudo_diff.push_str(&format!("-{}\n", line));
+                    }
+                    diff_contents.insert(path.clone(), pseudo_diff);
+                }
             }
 
             // Attach diff content to changes
@@ -524,14 +535,8 @@ impl Panel for GitPanel {
         let content = git_ctx
             .and_then(|ctx| ctx.cached_content.as_ref())
             .map(|c| {
-                let is_deprecated = git_ctx
-                    .map(|ctx| ctx.cache_deprecated)
-                    .unwrap_or(false);
-                if is_deprecated {
-                    format!("[refreshing...]\n{}", c)
-                } else {
-                    c.clone()
-                }
+                let is_deprecated = git_ctx.map(|ctx| ctx.cache_deprecated).unwrap_or(false);
+                if is_deprecated { format!("[refreshing...]\n{}", c) } else { c.clone() }
             })
             .unwrap_or_else(|| Self::format_git_for_context(state));
 
@@ -557,11 +562,7 @@ impl Panel for GitPanel {
 
         // Branch name
         if let Some(branch) = &state.git_branch {
-            let branch_color = if branch.starts_with("detached:") {
-                theme::warning()
-            } else {
-                theme::accent()
-            };
+            let branch_color = if branch.starts_with("detached:") { theme::warning() } else { theme::accent() };
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("Branch: ".to_string(), Style::default().fg(theme::text_secondary())),
@@ -601,17 +602,16 @@ impl Panel for GitPanel {
         }
 
         // Calculate column widths
-        let path_width = state.git_file_changes.iter()
-            .map(|f| f.path.len())
-            .max()
-            .unwrap_or(4)
-            .clamp(4, 45); // Cap at 45 chars for the panel
+        let path_width = state.git_file_changes.iter().map(|f| f.path.len()).max().unwrap_or(4).clamp(4, 45); // Cap at 45 chars for the panel
 
         // Table header
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("T ".to_string(), Style::default().fg(theme::text_secondary()).bold()),
-            Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::text_secondary()).bold()),
+            Span::styled(
+                format!("{:<width$}", "File", width = path_width),
+                Style::default().fg(theme::text_secondary()).bold(),
+            ),
             Span::styled("  ", base_style),
             Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::success()).bold()),
             Span::styled("  ", base_style),
@@ -659,16 +659,15 @@ impl Panel for GitPanel {
                 theme::text_muted()
             };
 
-            let net_str = if net > 0 {
-                format!("+{}", net)
-            } else {
-                format!("{}", net)
-            };
+            let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled(format!("{} ", type_char), Style::default().fg(type_color)),
-                Span::styled(format!("{:<width$}", display_path, width = path_width), Style::default().fg(theme::text())),
+                Span::styled(
+                    format!("{:<width$}", display_path, width = path_width),
+                    Style::default().fg(theme::text()),
+                ),
                 Span::styled("  ", base_style),
                 Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::success())),
                 Span::styled("  ", base_style),
@@ -693,11 +692,7 @@ impl Panel for GitPanel {
         } else {
             theme::text_muted()
         };
-        let total_net_str = if total_net > 0 {
-            format!("+{}", total_net)
-        } else {
-            format!("{}", total_net)
-        };
+        let total_net_str = if total_net > 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
@@ -720,11 +715,21 @@ impl Panel for GitPanel {
         let renamed = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Renamed).count();
 
         let mut summary_parts = Vec::new();
-        if added > 0 { summary_parts.push(format!("{} added", added)); }
-        if untracked > 0 { summary_parts.push(format!("{} untracked", untracked)); }
-        if modified > 0 { summary_parts.push(format!("{} modified", modified)); }
-        if deleted > 0 { summary_parts.push(format!("{} deleted", deleted)); }
-        if renamed > 0 { summary_parts.push(format!("{} renamed", renamed)); }
+        if added > 0 {
+            summary_parts.push(format!("{} added", added));
+        }
+        if untracked > 0 {
+            summary_parts.push(format!("{} untracked", untracked));
+        }
+        if modified > 0 {
+            summary_parts.push(format!("{} modified", modified));
+        }
+        if deleted > 0 {
+            summary_parts.push(format!("{} deleted", deleted));
+        }
+        if renamed > 0 {
+            summary_parts.push(format!("{} renamed", renamed));
+        }
 
         if !summary_parts.is_empty() {
             text.push(Line::from(vec![
@@ -744,7 +749,7 @@ impl Panel for GitPanel {
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("Recent Commits:".to_string(), Style::default().fg(theme::text_secondary()).bold()),
             ]));
-            
+
             if let Some(log_content) = &state.git_log_content {
                 for line in log_content.lines() {
                     text.push(Line::from(vec![
@@ -784,7 +789,8 @@ impl Panel for GitPanel {
                 } else if line.starts_with("diff --git") {
                     // Diff header
                     (Style::default().fg(theme::accent()).bold(), line.to_string())
-                } else if line.starts_with("new file") || line.starts_with("deleted file") || line.starts_with("index ") {
+                } else if line.starts_with("new file") || line.starts_with("deleted file") || line.starts_with("index ")
+                {
                     // Meta info
                     (Style::default().fg(theme::text_muted()), line.to_string())
                 } else {
@@ -808,7 +814,9 @@ impl Panel for GitPanel {
 // =============================================================================
 
 impl Panel for GitResultPanel {
-    fn needs_cache(&self) -> bool { true }
+    fn needs_cache(&self) -> bool {
+        true
+    }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         Some(GIT_STATUS_REFRESH_MS)
@@ -816,10 +824,7 @@ impl Panel for GitResultPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let command = ctx.result_command.as_ref()?;
-        Some(CacheRequest::RefreshGitResult {
-            context_id: ctx.id.clone(),
-            command: command.clone(),
-        })
+        Some(CacheRequest::RefreshGitResult { context_id: ctx.id.clone(), command: command.clone() })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
@@ -830,7 +835,11 @@ impl Panel for GitResultPanel {
                 ctx.total_pages = compute_total_pages(token_count);
                 ctx.current_page = 0;
                 if ctx.total_pages > 1 {
-                    let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+                    let page_content = paginate_content(
+                        ctx.cached_content.as_deref().unwrap_or(""),
+                        ctx.current_page,
+                        ctx.total_pages,
+                    );
                     ctx.token_count = estimate_tokens(&page_content);
                 } else {
                     ctx.token_count = token_count;
@@ -853,8 +862,7 @@ impl Panel for GitResultPanel {
         let args = crate::modules::git::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        cmd.args(&args)
-            .env("GIT_TERMINAL_PROMPT", "0");
+        cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {
@@ -893,10 +901,12 @@ impl Panel for GitResultPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type == ContextType::GitResult
-                && let Some(cmd) = &ctx.result_command {
-                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
-                    return short;
-                }
+            && let Some(cmd) = &ctx.result_command
+        {
+            let short =
+                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
+            return short;
+        }
         "Git Result".to_string()
     }
 
@@ -918,13 +928,10 @@ impl Panel for GitResultPanel {
         let mut text: Vec<Line> = Vec::new();
 
         // Find the selected GitResult panel
-        let ctx = state.context.get(state.selected_context)
-            .filter(|c| c.context_type == ContextType::GitResult);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GitResult);
 
         let Some(ctx) = ctx else {
-            text.push(Line::from(vec![
-                Span::styled(" No git result panel", Style::default().fg(theme::text_muted())),
-            ]));
+            text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));
             return text;
         };
 
@@ -950,9 +957,7 @@ impl Panel for GitResultPanel {
                 ]));
             }
         } else {
-            text.push(Line::from(vec![
-                Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic()),
-            ]));
+            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
         }
 
         text

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::constants::{icons, CHARS_PER_TOKEN};
+use crate::constants::{CHARS_PER_TOKEN, icons};
 
 /// Pre-computed set of fixed context types (avoids heap allocations on every call)
 static FIXED_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
@@ -22,9 +22,10 @@ static CACHE_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
     for module in crate::modules::all_modules() {
         for ct in module.fixed_panel_types().into_iter().chain(module.dynamic_panel_types()) {
             if let Some(panel) = module.create_panel(ct)
-                && panel.needs_cache() {
-                    set.insert(ct);
-                }
+                && panel.needs_cache()
+            {
+                set.insert(ct);
+            }
         }
     }
     set

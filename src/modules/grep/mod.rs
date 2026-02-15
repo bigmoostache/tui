@@ -1,11 +1,10 @@
 mod panel;
 pub mod tools;
 
-
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::GrepPanel;
 use super::Module;
@@ -13,9 +12,15 @@ use super::Module;
 pub struct GrepModule;
 
 impl Module for GrepModule {
-    fn id(&self) -> &'static str { "grep" }
-    fn name(&self) -> &'static str { "Grep" }
-    fn description(&self) -> &'static str { "Content search across files" }
+    fn id(&self) -> &'static str {
+        "grep"
+    }
+    fn name(&self) -> &'static str {
+        "Grep"
+    }
+    fn description(&self) -> &'static str {
+        "Content search across files"
+    }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Grep]

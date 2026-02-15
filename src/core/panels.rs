@@ -28,14 +28,11 @@ use crossterm::event::KeyEvent;
 use crate::actions::Action;
 use crate::cache::{CacheRequest, CacheUpdate};
 use crate::state::{ContextElement, ContextType, State};
-use crate::ui::{theme, helpers::count_wrapped_lines};
+use crate::ui::{helpers::count_wrapped_lines, theme};
 
 /// Get current time in milliseconds since UNIX epoch
 pub fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
 /// Update last_refresh_ms only if content actually changed (hash differs).
@@ -66,7 +63,7 @@ pub fn mark_panels_dirty(state: &mut crate::state::State, context_type: crate::s
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
-    use crate::constants::{PANEL_PAGE_TOKENS, CHARS_PER_TOKEN};
+    use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     if total_pages <= 1 {
         return full_content.to_string();
@@ -82,9 +79,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after start_char
-        full_content[start_char..].find('\n')
-            .map(|pos| start_char + pos + 1)
-            .unwrap_or(full_content.len())
+        full_content[start_char..].find('\n').map(|pos| start_char + pos + 1).unwrap_or(full_content.len())
     };
 
     let end_char = start + chars_per_page as usize;
@@ -92,18 +87,11 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after end_char to snap to line boundary
-        full_content[end_char..].find('\n')
-            .map(|pos| end_char + pos + 1)
-            .unwrap_or(full_content.len())
+        full_content[end_char..].find('\n').map(|pos| end_char + pos + 1).unwrap_or(full_content.len())
     };
 
     let page_content = &full_content[start..end];
-    format!(
-        "[Page {}/{} — use panel_goto_page to navigate]\n{}",
-        current_page + 1,
-        total_pages,
-        page_content
-    )
+    format!("[Page {}/{} — use panel_goto_page to navigate]\n{}", current_page + 1, total_pages, page_content)
 }
 
 /// A single context item to be sent to the LLM
@@ -126,12 +114,7 @@ impl ContextItem {
         content: impl Into<String>,
         last_refresh_ms: u64,
     ) -> Self {
-        Self {
-            id: id.into(),
-            header: header.into(),
-            content: content.into(),
-            last_refresh_ms,
-        }
+        Self { id: id.into(), header: header.into(), content: content.into(), last_refresh_ms }
     }
 }
 
@@ -150,7 +133,9 @@ pub trait Panel {
     }
 
     /// Whether this panel uses background caching (cached_content from background loading)
-    fn needs_cache(&self) -> bool { false }
+    fn needs_cache(&self) -> bool {
+        false
+    }
 
     /// Refresh token counts and any cached data (called before generating context)
     fn refresh(&self, _state: &mut State) {
@@ -192,21 +177,19 @@ pub trait Panel {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
-        let inner_area = Rect::new(
-            area.x + 1,
-            area.y,
-            area.width.saturating_sub(2),
-            area.height
-        );
+        let inner_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), area.height);
 
         // Build bottom title for dynamic panels: "refreshed Xs ago"
-        let bottom_title = state.context.get(state.selected_context)
-            .filter(|ctx| !ctx.context_type.is_fixed())
-            .and_then(|ctx| {
+        let bottom_title =
+            state.context.get(state.selected_context).filter(|ctx| !ctx.context_type.is_fixed()).and_then(|ctx| {
                 let ts = ctx.last_refresh_ms;
-                if ts < 1577836800000 { return None; } // invalid timestamp
+                if ts < 1577836800000 {
+                    return None;
+                } // invalid timestamp
                 let now = now_ms();
-                if now <= ts { return None; }
+                if now <= ts {
+                    return None;
+                }
                 Some(format!(" {} ", crate::ui::helpers::format_time_ago(now - ts)))
             });
 
@@ -218,9 +201,7 @@ pub trait Panel {
             .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
 
         if let Some(ref bottom) = bottom_title {
-            block = block.title_bottom(
-                Span::styled(bottom, Style::default().fg(theme::text_muted()))
-            );
+            block = block.title_bottom(Span::styled(bottom, Style::default().fg(theme::text_muted())));
         }
 
         let content_area = block.inner(inner_area);
@@ -233,9 +214,7 @@ pub trait Panel {
         let viewport_height = content_area.height as usize;
         let content_height: usize = {
             let _guard = crate::profile!("panel::scroll_calc");
-            text.iter()
-                .map(|line| count_wrapped_lines(line, viewport_width))
-                .sum()
+            text.iter().map(|line| count_wrapped_lines(line, viewport_width)).sum()
         };
         let max_scroll = content_height.saturating_sub(viewport_height) as f32;
         state.max_scroll = max_scroll;
@@ -265,9 +244,7 @@ pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
 /// Refresh all panels (update token counts, etc.)
 pub fn refresh_all_panels(state: &mut State) {
     // Get unique context types from state
-    let context_types: Vec<ContextType> = state.context.iter()
-        .map(|c| c.context_type)
-        .collect();
+    let context_types: Vec<ContextType> = state.context.iter().map(|c| c.context_type).collect();
 
     for context_type in context_types {
         let panel = get_panel(context_type);
@@ -281,10 +258,8 @@ pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
 
     // Get UNIQUE context types from state (dedup to avoid multiplying items!)
     let mut seen = std::collections::HashSet::new();
-    let context_types: Vec<ContextType> = state.context.iter()
-        .map(|c| c.context_type)
-        .filter(|ct| seen.insert(*ct))
-        .collect();
+    let context_types: Vec<ContextType> =
+        state.context.iter().map(|c| c.context_type).filter(|ct| seen.insert(*ct)).collect();
 
     for context_type in context_types {
         let panel = get_panel(context_type);
@@ -397,11 +372,8 @@ mod tests {
         ctx.cache_deprecated = true;
 
         let panel = get_panel(ContextType::Tree);
-        let update = CacheUpdate::Content {
-            context_id: "P2".to_string(),
-            content: "tree output".to_string(),
-            token_count: 3,
-        };
+        let update =
+            CacheUpdate::Content { context_id: "P2".to_string(), content: "tree output".to_string(), token_count: 3 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
 
         assert!(changed);
@@ -417,11 +389,8 @@ mod tests {
         ctx.cache_deprecated = true;
 
         let panel = get_panel(ContextType::Glob);
-        let update = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "glob results".to_string(),
-            token_count: 2,
-        };
+        let update =
+            CacheUpdate::Content { context_id: "P99".to_string(), content: "glob results".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
 
         assert!(changed);
@@ -437,11 +406,8 @@ mod tests {
         ctx.cache_deprecated = true;
 
         let panel = get_panel(ContextType::Grep);
-        let update = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "grep results".to_string(),
-            token_count: 2,
-        };
+        let update =
+            CacheUpdate::Content { context_id: "P99".to_string(), content: "grep results".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
 
         assert!(changed);
@@ -474,7 +440,9 @@ mod tests {
     fn git_status_apply_cache_update() {
         let mut state = State::default();
         let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
-        if idx.is_none() { return; } // Git module not active
+        if idx.is_none() {
+            return;
+        } // Git module not active
         let idx = idx.unwrap();
         state.context[idx].cache_deprecated = true;
 
@@ -505,7 +473,9 @@ mod tests {
     fn git_status_unchanged_clears_deprecated() {
         let mut state = State::default();
         let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
-        if idx.is_none() { return; }
+        if idx.is_none() {
+            return;
+        }
         let idx = idx.unwrap();
         state.context[idx].cache_deprecated = true;
 
@@ -546,11 +516,8 @@ mod tests {
         ctx.cache_deprecated = true;
 
         let panel = get_panel(ContextType::GithubResult);
-        let update = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "#1 Fix bug".to_string(),
-            token_count: 2,
-        };
+        let update =
+            CacheUpdate::Content { context_id: "P99".to_string(), content: "#1 Fix bug".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
 
         assert!(changed);
@@ -569,21 +536,15 @@ mod tests {
         let panel = get_panel(ContextType::File);
 
         // First update
-        let update1 = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "same content".to_string(),
-            token_count: 2,
-        };
+        let update1 =
+            CacheUpdate::Content { context_id: "P99".to_string(), content: "same content".to_string(), token_count: 2 };
         let changed1 = panel.apply_cache_update(update1, &mut ctx, &mut state);
         assert!(changed1);
         let ts1 = ctx.last_refresh_ms;
 
         // Second update with same content — should NOT bump last_refresh_ms
-        let update2 = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "same content".to_string(),
-            token_count: 2,
-        };
+        let update2 =
+            CacheUpdate::Content { context_id: "P99".to_string(), content: "same content".to_string(), token_count: 2 };
         // apply_cache_update returns true (it replaced content) but update_if_changed
         // doesn't bump timestamp since hash matches
         let _changed2 = panel.apply_cache_update(update2, &mut ctx, &mut state);
