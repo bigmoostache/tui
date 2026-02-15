@@ -59,7 +59,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_open = state
         .context
         .iter_mut()
-        .find(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str));
+        .find(|c| c.context_type == ContextType::FILE && c.file_path.as_deref() == Some(path_str));
 
     if let Some(ctx) = already_open {
         // Update existing context element
@@ -77,7 +77,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.context.push(ContextElement {
             id: context_id,
             uid: Some(uid),
-            context_type: ContextType::File,
+            context_type: ContextType::new(ContextType::FILE),
             name: file_name,
             token_count,
             file_path: Some(path_str.to_string()),
@@ -107,7 +107,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         });
 
         // Invalidate tree cache
-        cp_base::panels::mark_panels_dirty(state, ContextType::Tree);
+        cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::TREE));
     }
 
     let action = if is_new { "Created" } else { "Wrote" };

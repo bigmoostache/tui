@@ -72,7 +72,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                     timestamp_ms: now_ms(),
                     content: format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
                 });
-                state.touch_panel(ContextType::Spine);
+                state.touch_panel(ContextType::new(ContextType::SPINE));
             }
             return SpineDecision::Blocked(reason);
         }
@@ -89,7 +89,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 
     // No notification created — auto-continuation is under-the-hood TUI behavior,
     // not something the model needs to see in the spine panel.
-    state.touch_panel(ContextType::Spine);
+    state.touch_panel(ContextType::new(ContextType::SPINE));
 
     SpineDecision::Continue(action)
 }

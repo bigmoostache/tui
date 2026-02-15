@@ -9,7 +9,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::library_panel::LibraryPanel;
@@ -66,21 +66,21 @@ impl Module for PromptModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Library]
+        vec![ContextType::new(ContextType::LIBRARY)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Library, "Library", false)]
+        vec![(ContextType::new(ContextType::LIBRARY), "Library", false)]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Skill]
+        vec![ContextType::new(ContextType::SKILL)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Library => Some(Box::new(LibraryPanel)),
-            ContextType::Skill => Some(Box::new(SkillPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::LIBRARY => Some(Box::new(LibraryPanel)),
+            ContextType::SKILL => Some(Box::new(SkillPanel)),
             _ => None,
         }
     }
@@ -99,7 +99,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("System prompt content").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Agent,
+                category: "Agent".to_string(),
             },
             ToolDefinition {
                 id: "agent_edit".to_string(),
@@ -113,7 +113,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Agent,
+                category: "Agent".to_string(),
             },
             ToolDefinition {
                 id: "agent_delete".to_string(),
@@ -124,7 +124,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Agent,
+                category: "Agent".to_string(),
             },
             ToolDefinition {
                 id: "agent_load".to_string(),
@@ -135,7 +135,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to activate. Empty to use default."),
                 ],
                 enabled: true,
-                category: ToolCategory::Agent,
+                category: "Agent".to_string(),
             },
             // === Skill tools ===
             ToolDefinition {
@@ -149,7 +149,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Skill content (instructions/knowledge)").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Skill,
+                category: "Skill".to_string(),
             },
             ToolDefinition {
                 id: "skill_edit".to_string(),
@@ -163,7 +163,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Skill,
+                category: "Skill".to_string(),
             },
             ToolDefinition {
                 id: "skill_delete".to_string(),
@@ -174,7 +174,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Skill,
+                category: "Skill".to_string(),
             },
             ToolDefinition {
                 id: "skill_load".to_string(),
@@ -185,7 +185,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to load").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Skill,
+                category: "Skill".to_string(),
             },
             ToolDefinition {
                 id: "skill_unload".to_string(),
@@ -196,7 +196,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to unload").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Skill,
+                category: "Skill".to_string(),
             },
             // === Command tools ===
             ToolDefinition {
@@ -210,7 +210,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Content to replace the /command with").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Command,
+                category: "Command".to_string(),
             },
             ToolDefinition {
                 id: "command_edit".to_string(),
@@ -224,7 +224,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
-                category: ToolCategory::Command,
+                category: "Command".to_string(),
             },
             ToolDefinition {
                 id: "command_delete".to_string(),
@@ -235,7 +235,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Command ID to delete").required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Command,
+                category: "Command".to_string(),
             },
         ]
     }

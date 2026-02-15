@@ -6,7 +6,7 @@ pub(crate) const TMUX_DEPRECATION_MS: u64 = 100; // 100ms — capture-pane is a 
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TmuxPanel;
@@ -26,12 +26,12 @@ impl Module for TmuxModule {
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Tmux]
+        vec![ContextType::new(ContextType::TMUX)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Tmux => Some(Box::new(TmuxPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::TMUX => Some(Box::new(TmuxPanel)),
             _ => None,
         }
     }
@@ -53,7 +53,7 @@ impl Module for TmuxModule {
                         .desc("Description of what this console is for"),
                 ],
                 enabled: true,
-                category: ToolCategory::Console,
+                category: "Console".to_string(),
             },
             ToolDefinition {
                 id: "console_edit".to_string(),
@@ -70,7 +70,7 @@ impl Module for TmuxModule {
                         .desc("New description"),
                 ],
                 enabled: true,
-                category: ToolCategory::Console,
+                category: "Console".to_string(),
             },
             ToolDefinition {
                 id: "console_send_keys".to_string(),
@@ -86,7 +86,7 @@ impl Module for TmuxModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Console,
+                category: "Console".to_string(),
             },
             ToolDefinition {
                 id: "console_sleep".to_string(),
@@ -95,7 +95,7 @@ impl Module for TmuxModule {
                 description: "Pauses execution. Useful for waiting for terminal output or processes to complete.".to_string(),
                 params: vec![],
                 enabled: true,
-                category: ToolCategory::Console,
+                category: "Console".to_string(),
             },
         ]
     }

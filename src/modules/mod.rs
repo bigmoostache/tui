@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
 
 pub use cp_mod_files::FilesModule;
@@ -29,16 +29,16 @@ pub use cp_base::modules::{Module, run_with_timeout, truncate_output};
 /// This defines the sidebar position and ID assignment for each fixed panel.
 /// Conversation is NOT included — it's the live chat feed, not a numbered panel.
 /// System (Seed) is NOT included — agent prompt is injected as system message.
-const FIXED_PANEL_ORDER: &[ContextType] = &[
-    ContextType::Todo,       // P1
-    ContextType::Library,    // P2
-    ContextType::Overview,   // P3
-    ContextType::Tree,       // P4
-    ContextType::Memory,     // P5
-    ContextType::Spine,      // P6
-    ContextType::Logs,       // P7
-    ContextType::Git,        // P8
-    ContextType::Scratchpad, // P9
+const FIXED_PANEL_ORDER: &[&str] = &[
+    ContextType::TODO,       // P1
+    ContextType::LIBRARY,    // P2
+    ContextType::OVERVIEW,   // P3
+    ContextType::TREE,       // P4
+    ContextType::MEMORY,     // P5
+    ContextType::SPINE,      // P6
+    ContextType::LOGS,       // P7
+    ContextType::GIT,        // P8
+    ContextType::SCRATCHPAD, // P9
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -56,7 +56,10 @@ pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'sta
     // Return in canonical order
     FIXED_PANEL_ORDER
         .iter()
-        .filter_map(|ct| lookup.get(ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, *ct, *name, *cache_dep)))
+        .filter_map(|ct_str| {
+            let ct = ContextType::new(ct_str);
+            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, ct, *name, *cache_dep))
+        })
         .collect()
 }
 
@@ -120,7 +123,7 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
 }
 
 /// Create a panel for the given context type by asking all modules.
-pub fn create_panel(context_type: ContextType) -> Option<Box<dyn Panel>> {
+pub fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
     for module in all_modules() {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);
@@ -190,7 +193,7 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
             .required(),
         ],
         enabled: true,
-        category: ToolCategory::System,
+        category: "System".to_string(),
     }
 }
 

@@ -1,3 +1,4 @@
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::context::{ContextElement, ContextType};
@@ -201,6 +202,11 @@ pub struct State {
     /// Syntax highlighting function (provided by binary's highlight module)
     /// Takes (file_path, content) and returns highlighted spans per line
     pub highlight_fn: Option<fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>>,
+
+    // === Module extension data (TypeMap pattern) ===
+    /// Module-owned state stored by TypeId. Each module registers its own state struct
+    /// at startup via `Module::init_state()`. Accessed via `get_ext<T>()`/`get_ext_mut<T>()`.
+    module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Default for State {
@@ -299,11 +305,29 @@ impl Default for State {
             input_cache: None,
             full_content_cache: None,
             highlight_fn: None,
+            module_data: HashMap::new(),
         }
     }
 }
 
 impl State {
+    // === Module extension data (TypeMap) ===
+
+    /// Get a reference to module-owned state by type.
+    pub fn get_ext<T: 'static + Send + Sync>(&self) -> Option<&T> {
+        self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
+    }
+
+    /// Get a mutable reference to module-owned state by type.
+    pub fn get_ext_mut<T: 'static + Send + Sync>(&mut self) -> Option<&mut T> {
+        self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
+    }
+
+    /// Set module-owned state by type. Replaces any existing value of this type.
+    pub fn set_ext<T: 'static + Send + Sync>(&mut self, val: T) {
+        self.module_data.insert(TypeId::of::<T>(), Box::new(val));
+    }
+
     /// Update the last_refresh_ms timestamp for a panel by its context type
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
@@ -429,7 +453,7 @@ impl State {
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
             ctx.token_count += token_count;
             ctx.last_refresh_ms = crate::panels::now_ms();
         }
@@ -471,7 +495,7 @@ impl State {
         let notification = Notification::new(id.clone(), notification_type, source, content);
         self.notifications.push(notification);
         self.gc_notifications(100);
-        self.touch_panel(ContextType::Spine);
+        self.touch_panel(ContextType::new(ContextType::SPINE));
         id
     }
 
@@ -479,7 +503,7 @@ impl State {
     pub fn mark_notification_processed(&mut self, id: &str) -> bool {
         if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
             n.processed = true;
-            self.touch_panel(ContextType::Spine);
+            self.touch_panel(ContextType::new(ContextType::SPINE));
             true
         } else {
             false
@@ -514,7 +538,7 @@ impl State {
             true
         });
         if removed > 0 {
-            self.touch_panel(ContextType::Spine);
+            self.touch_panel(ContextType::new(ContextType::SPINE));
         }
     }
 
@@ -530,7 +554,7 @@ impl State {
             }
         }
         if changed {
-            self.touch_panel(ContextType::Spine);
+            self.touch_panel(ContextType::new(ContextType::SPINE));
         }
     }
 

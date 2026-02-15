@@ -135,7 +135,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if file is open in context
     let is_open =
-        state.context.iter().any(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str));
+        state.context.iter().any(|c| c.context_type == ContextType::FILE && c.file_path.as_deref() == Some(path_str));
 
     if !is_open {
         return ToolResult {
@@ -207,7 +207,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(ctx) = state
         .context
         .iter_mut()
-        .find(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str))
+        .find(|c| c.context_type == ContextType::FILE && c.file_path.as_deref() == Some(path_str))
     {
         ctx.token_count = estimate_tokens(&content);
     }

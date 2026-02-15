@@ -1,4 +1,4 @@
-use cp_base::state::{ScratchpadCell, State};
+use cp_base::state::{ContextType, ScratchpadCell, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Create a new scratchpad cell
@@ -31,7 +31,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
 
     // Update Scratchpad panel timestamp
-    state.touch_panel(cp_base::state::ContextType::Scratchpad);
+    state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
 
     let preview =
         if contents.len() > 50 { format!("{}...", &contents[..contents.floor_char_boundary(47)]) } else { contents };
@@ -80,7 +80,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             } else {
                 // Update Scratchpad panel timestamp
-                state.touch_panel(cp_base::state::ContextType::Scratchpad);
+                state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Updated cell {}: {}", cell_id, changes.join(", ")),
@@ -112,7 +112,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         let count = state.scratchpad_cells.len();
         state.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
-        state.touch_panel(cp_base::state::ContextType::Scratchpad);
+        state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Wiped all {} scratchpad cell(s)", count),
@@ -136,7 +136,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Scratchpad panel timestamp if any cells were deleted
     if deleted_count > 0 {
-        state.touch_panel(cp_base::state::ContextType::Scratchpad);
+        state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
     }
 
     ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: deleted_count == 0 }

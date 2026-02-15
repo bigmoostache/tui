@@ -10,7 +10,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
-    cp_base::panels::mark_panels_dirty(state, ContextType::Tree);
+    cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::TREE));
 }
 
 /// Generate tree string without mutating state (for read-only rendering)

@@ -4,7 +4,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
@@ -42,16 +42,16 @@ impl Module for ScratchpadModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Scratchpad]
+        vec![ContextType::new(ContextType::SCRATCHPAD)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Scratchpad, "Scratch", false)]
+        vec![(ContextType::new(ContextType::SCRATCHPAD), "Scratch", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Scratchpad => Some(Box::new(ScratchpadPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::SCRATCHPAD => Some(Box::new(ScratchpadPanel)),
             _ => None,
         }
     }
@@ -72,7 +72,7 @@ impl Module for ScratchpadModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Scratchpad,
+                category: "Scratchpad".to_string(),
             },
             ToolDefinition {
                 id: "scratchpad_edit_cell".to_string(),
@@ -89,7 +89,7 @@ impl Module for ScratchpadModule {
                         .desc("New contents (omit to keep current)"),
                 ],
                 enabled: true,
-                category: ToolCategory::Scratchpad,
+                category: "Scratchpad".to_string(),
             },
             ToolDefinition {
                 id: "scratchpad_wipe".to_string(),
@@ -102,7 +102,7 @@ impl Module for ScratchpadModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Scratchpad,
+                category: "Scratchpad".to_string(),
             },
         ]
     }

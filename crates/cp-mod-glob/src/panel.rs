@@ -81,7 +81,7 @@ impl Panel for GlobPanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::Glob)
+            .filter(|c| c.context_type == ContextType::GLOB)
             .filter_map(|c| {
                 let pattern = c.glob_pattern.as_ref()?;
                 // Use cached content only - no blocking operations

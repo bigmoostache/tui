@@ -60,7 +60,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
         CommandClass::ReadOnly => {
             // Search for existing GithubResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type == ContextType::GithubResult && c.result_command.as_deref() == Some(command)
+                c.context_type == ContextType::GITHUB_RESULT && c.result_command.as_deref() == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -78,7 +78,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid += 1;
 
-                let mut elem = make_default_context_element(&panel_id, ContextType::GithubResult, command, true);
+                let mut elem = make_default_context_element(&panel_id, ContextType::new(ContextType::GITHUB_RESULT), command, true);
                 elem.uid = Some(uid);
                 elem.result_command = Some(command.to_string());
                 state.context.push(elem);
@@ -103,7 +103,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Invalidate affected panels using heuristics
             let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::GithubResult
+                if ctx.context_type == ContextType::GITHUB_RESULT
                     && let Some(ref cmd) = ctx.result_command
                     && invalidations.iter().any(|re| re.is_match(cmd))
                 {
@@ -111,7 +111,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             // Always invalidate Git status (PRs/merges can affect it)
-            mark_panels_dirty(state, ContextType::Git);
+            mark_panels_dirty(state, ContextType::new(ContextType::GIT));
 
             match result {
                 Ok(output) => {

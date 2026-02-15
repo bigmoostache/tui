@@ -43,7 +43,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             let existing_idx = state
                 .context
                 .iter()
-                .position(|c| c.context_type == ContextType::GitResult && c.result_command.as_deref() == Some(command));
+                .position(|c| c.context_type == ContextType::GIT_RESULT && c.result_command.as_deref() == Some(command));
 
             if let Some(idx) = existing_idx {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
@@ -61,7 +61,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 state.global_next_uid += 1;
 
                 let mut elem =
-                    cp_base::state::make_default_context_element(&panel_id, ContextType::GitResult, command, true);
+                    cp_base::state::make_default_context_element(&panel_id, ContextType::new(ContextType::GIT_RESULT), command, true);
                 elem.uid = Some(uid);
                 elem.result_command = Some(command.to_string());
                 state.context.push(elem);
@@ -110,10 +110,10 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             let invalidations = super::cache_invalidation::find_invalidations(command);
             if invalidations.is_empty() {
                 // Unknown mutating command -> blanket invalidation (safe default)
-                cp_base::panels::mark_panels_dirty(state, ContextType::GitResult);
+                cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::GIT_RESULT));
             } else {
                 for ctx in &mut state.context {
-                    if ctx.context_type == ContextType::GitResult
+                    if ctx.context_type == ContextType::GIT_RESULT
                         && let Some(ref cmd) = ctx.result_command
                         && invalidations.iter().any(|re| re.is_match(cmd))
                     {
@@ -263,7 +263,7 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Mark P6 as deprecated to refresh
-    cp_base::panels::mark_panels_dirty(state, ContextType::Git);
+    cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::GIT));
 
     ToolResult {
         tool_use_id: tool.id.clone(),

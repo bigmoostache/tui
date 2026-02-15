@@ -3,7 +3,7 @@ mod tools;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::GlobPanel;
@@ -23,12 +23,12 @@ impl Module for GlobModule {
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Glob]
+        vec![ContextType::new(ContextType::GLOB)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Glob => Some(Box::new(GlobPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::GLOB => Some(Box::new(GlobPanel)),
             _ => None,
         }
     }
@@ -46,7 +46,7 @@ impl Module for GlobModule {
                 ToolParam::new("path", ParamType::String).desc("Base path to search from").default_val("."),
             ],
             enabled: true,
-            category: ToolCategory::File,
+            category: "File".to_string(),
         }]
     }
 

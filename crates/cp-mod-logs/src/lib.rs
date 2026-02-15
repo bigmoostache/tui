@@ -8,7 +8,7 @@ use cp_base::constants::{LOGS_CHUNK_SIZE, LOGS_DIR, MEMORY_TLDR_MAX_TOKENS, STOR
 use cp_base::modules::Module;
 use cp_base::panels::{Panel, mark_panels_dirty, now_ms};
 use cp_base::state::{ContextType, LogEntry, MemoryImportance, MemoryItem, State, estimate_tokens};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Directory for chunked log files
@@ -163,7 +163,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
 
             ToolDefinition {
@@ -180,7 +180,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
 
             ToolDefinition {
@@ -198,7 +198,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
 
             ToolDefinition {
@@ -227,7 +227,7 @@ impl Module for LogsModule {
                         .desc("Memory items to create (persistent across conversations)"),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
         ]
     }
@@ -242,19 +242,19 @@ impl Module for LogsModule {
         }
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Logs => Some(Box::new(panel::LogsPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::LOGS => Some(Box::new(panel::LogsPanel)),
             _ => None,
         }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Logs]
+        vec![ContextType::new(ContextType::LOGS)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Logs, "Logs", true)]
+        vec![(ContextType::new(ContextType::LOGS), "Logs", true)]
     }
 }
 
@@ -281,7 +281,7 @@ fn touch_logs_panel(state: &mut State) {
     let token_count = estimate_tokens(&content);
     let now = now_ms();
     for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Logs {
+        if ctx.context_type == ContextType::LOGS {
             ctx.token_count = token_count;
             ctx.last_refresh_ms = now;
         }
@@ -501,7 +501,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
             };
         }
         Some(idx) => {
-            if state.context[idx].context_type != ContextType::ConversationHistory {
+            if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!(
@@ -604,7 +604,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         if mem_count > 0 {
             output_parts.push(format!("Created {} memory(ies)", mem_count));
             // Deprecate the memory panel cache
-            mark_panels_dirty(state, ContextType::Memory);
+            mark_panels_dirty(state, ContextType::new(ContextType::MEMORY));
         }
     }
 

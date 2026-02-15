@@ -108,7 +108,7 @@ impl Panel for TmuxPanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::Tmux)
+            .filter(|c| c.context_type == ContextType::TMUX)
             .filter_map(|c| {
                 let pane_id = c.tmux_pane_id.as_ref()?;
                 // Use cached content only - no blocking operations

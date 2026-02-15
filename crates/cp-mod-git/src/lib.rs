@@ -10,7 +10,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::{GitPanel, GitResultPanel};
@@ -46,21 +46,21 @@ impl Module for GitModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Git]
+        vec![ContextType::new(ContextType::GIT)]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::GitResult]
+        vec![ContextType::new(ContextType::GIT_RESULT)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Git, "Changes", false)]
+        vec![(ContextType::new(ContextType::GIT), "Changes", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Git => Some(Box::new(GitPanel)),
-            ContextType::GitResult => Some(Box::new(GitResultPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::GIT => Some(Box::new(GitPanel)),
+            ContextType::GIT_RESULT => Some(Box::new(GitResultPanel)),
             _ => None,
         }
     }
@@ -82,7 +82,7 @@ impl Module for GitModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Git,
+                category: "Git".to_string(),
             },
             ToolDefinition {
                 id: "git_configure_p6".to_string(),
@@ -100,7 +100,7 @@ impl Module for GitModule {
                         .desc("Git ref to diff against (e.g., 'HEAD~3', 'main'). Set to empty string to clear."),
                 ],
                 enabled: true,
-                category: ToolCategory::Git,
+                category: "Git".to_string(),
             },
         ]
     }

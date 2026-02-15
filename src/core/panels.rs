@@ -79,7 +79,7 @@ pub fn render_panel_default(panel: &dyn Panel, frame: &mut Frame, state: &mut St
 }
 
 /// Get the appropriate panel for a context type (delegates to module system)
-pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
+pub fn get_panel(context_type: &ContextType) -> Box<dyn Panel> {
     crate::modules::create_panel(context_type)
         .unwrap_or_else(|| panic!("No module provides a panel for {:?}", context_type))
 }
@@ -87,9 +87,9 @@ pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
 /// Refresh all panels (update token counts, etc.)
 pub fn refresh_all_panels(state: &mut State) {
     // Get unique context types from state
-    let context_types: Vec<ContextType> = state.context.iter().map(|c| c.context_type).collect();
+    let context_types: Vec<ContextType> = state.context.iter().map(|c| c.context_type.clone()).collect();
 
-    for context_type in context_types {
+    for context_type in &context_types {
         let panel = get_panel(context_type);
         panel.refresh(state);
     }
@@ -102,9 +102,9 @@ pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
     // Get UNIQUE context types from state (dedup to avoid multiplying items!)
     let mut seen = std::collections::HashSet::new();
     let context_types: Vec<ContextType> =
-        state.context.iter().map(|c| c.context_type).filter(|ct| seen.insert(*ct)).collect();
+        state.context.iter().map(|c| c.context_type.clone()).filter(|ct| seen.insert(ct.clone())).collect();
 
-    for context_type in context_types {
+    for context_type in &context_types {
         let panel = get_panel(context_type);
         items.extend(panel.context(state));
     }
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_first_call_returns_true() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         ctx.content_hash = None;
         assert!(update_if_changed(&mut ctx, "hello"));
         assert!(ctx.content_hash.is_some());
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_same_content_returns_false() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         update_if_changed(&mut ctx, "hello");
         let ts = ctx.last_refresh_ms;
         assert!(!update_if_changed(&mut ctx, "hello"));
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_different_content_returns_true() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         update_if_changed(&mut ctx, "hello");
         assert!(update_if_changed(&mut ctx, "world"));
     }
@@ -161,11 +161,11 @@ mod tests {
         }
         state.dirty = false;
 
-        mark_panels_dirty(&mut state, ContextType::Git);
+        mark_panels_dirty(&mut state, ContextType::new(ContextType::GIT));
 
         // Only Git panels should be dirty
         for ctx in &state.context {
-            if ctx.context_type == ContextType::Git {
+            if ctx.context_type == ContextType::GIT {
                 assert!(ctx.cache_deprecated, "Git panel should be dirty");
             } else {
                 assert!(!ctx.cache_deprecated, "{:?} should not be dirty", ctx.context_type);
@@ -178,7 +178,7 @@ mod tests {
     fn mark_panels_dirty_sets_state_dirty() {
         let mut state = State::default();
         state.dirty = false;
-        mark_panels_dirty(&mut state, ContextType::File);
+        mark_panels_dirty(&mut state, ContextType::new(ContextType::FILE));
         assert!(state.dirty);
     }
 
@@ -187,12 +187,12 @@ mod tests {
     #[test]
     fn file_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::File);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::FILE));
         ctx.file_path = Some("/tmp/test.txt".to_string());
         ctx.cache_deprecated = true;
         ctx.cache_in_flight = true;
 
-        let panel = get_panel(ContextType::File);
+        let panel = get_panel(&ContextType::new(ContextType::FILE));
         let update = CacheUpdate::Content {
             context_id: "P99".to_string(),
             content: "file content here".to_string(),
@@ -211,10 +211,10 @@ mod tests {
     #[test]
     fn tree_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P2", ContextType::Tree);
+        let mut ctx = test_ctx("P2", ContextType::new(ContextType::TREE));
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Tree);
+        let panel = get_panel(&ContextType::new(ContextType::TREE));
         let update =
             CacheUpdate::Content { context_id: "P2".to_string(), content: "tree output".to_string(), token_count: 3 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
@@ -227,11 +227,11 @@ mod tests {
     #[test]
     fn glob_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::Glob);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GLOB));
         ctx.glob_pattern = Some("*.rs".to_string());
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Glob);
+        let panel = get_panel(&ContextType::new(ContextType::GLOB));
         let update =
             CacheUpdate::Content { context_id: "P99".to_string(), content: "glob results".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
@@ -244,11 +244,11 @@ mod tests {
     #[test]
     fn grep_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::Grep);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GREP));
         ctx.grep_pattern = Some("fn main".to_string());
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Grep);
+        let panel = get_panel(&ContextType::new(ContextType::GREP));
         let update =
             CacheUpdate::Content { context_id: "P99".to_string(), content: "grep results".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
@@ -261,11 +261,11 @@ mod tests {
     #[test]
     fn tmux_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::Tmux);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::TMUX));
         ctx.tmux_pane_id = Some("%0".to_string());
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Tmux);
+        let panel = get_panel(&ContextType::new(ContextType::TMUX));
         let update = CacheUpdate::Content {
             context_id: "P99".to_string(),
             content: "$ ls\nfile1.txt\nfile2.txt".to_string(),
@@ -282,14 +282,14 @@ mod tests {
     #[test]
     fn git_status_apply_cache_update() {
         let mut state = State::default();
-        let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
+        let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
         if idx.is_none() {
             return;
         } // Git module not active
         let idx = idx.unwrap();
         state.context[idx].cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Git);
+        let panel = get_panel(&ContextType::new(ContextType::GIT));
         let update = CacheUpdate::GitStatus {
             branch: Some("main".to_string()),
             is_repo: true,
@@ -315,14 +315,14 @@ mod tests {
     #[test]
     fn git_status_unchanged_clears_deprecated() {
         let mut state = State::default();
-        let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
+        let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
         if idx.is_none() {
             return;
         }
         let idx = idx.unwrap();
         state.context[idx].cache_deprecated = true;
 
-        let panel = get_panel(ContextType::Git);
+        let panel = get_panel(&ContextType::new(ContextType::GIT));
         let mut ctx = state.context.remove(idx);
         let changed = panel.apply_cache_update(CacheUpdate::GitStatusUnchanged, &mut ctx, &mut state);
         state.context.insert(idx, ctx);
@@ -334,11 +334,11 @@ mod tests {
     #[test]
     fn git_result_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::GitResult);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GIT_RESULT));
         ctx.result_command = Some("git log --oneline -5".to_string());
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::GitResult);
+        let panel = get_panel(&ContextType::new(ContextType::GIT_RESULT));
         let update = CacheUpdate::Content {
             context_id: "P99".to_string(),
             content: "abc1234 Initial commit".to_string(),
@@ -354,11 +354,11 @@ mod tests {
     #[test]
     fn github_result_panel_apply_cache_update() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::GithubResult);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GITHUB_RESULT));
         ctx.result_command = Some("gh pr list".to_string());
         ctx.cache_deprecated = true;
 
-        let panel = get_panel(ContextType::GithubResult);
+        let panel = get_panel(&ContextType::new(ContextType::GITHUB_RESULT));
         let update =
             CacheUpdate::Content { context_id: "P99".to_string(), content: "#1 Fix bug".to_string(), token_count: 2 };
         let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
@@ -373,10 +373,10 @@ mod tests {
     #[test]
     fn apply_cache_update_same_content_twice() {
         let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::File);
+        let mut ctx = test_ctx("P99", ContextType::new(ContextType::FILE));
         ctx.file_path = Some("/tmp/test.txt".to_string());
 
-        let panel = get_panel(ContextType::File);
+        let panel = get_panel(&ContextType::new(ContextType::FILE));
 
         // First update
         let update1 =
@@ -396,37 +396,37 @@ mod tests {
 
     #[test]
     fn tmux_has_timer_interval() {
-        let panel = get_panel(ContextType::Tmux);
+        let panel = get_panel(&ContextType::new(ContextType::TMUX));
         assert!(panel.cache_refresh_interval_ms().is_some(), "Tmux should have timer interval");
     }
 
     #[test]
     fn git_has_timer_interval() {
-        let panel = get_panel(ContextType::Git);
+        let panel = get_panel(&ContextType::new(ContextType::GIT));
         assert!(panel.cache_refresh_interval_ms().is_some(), "Git should have timer interval");
     }
 
     #[test]
     fn file_has_no_timer_interval() {
-        let panel = get_panel(ContextType::File);
+        let panel = get_panel(&ContextType::new(ContextType::FILE));
         assert!(panel.cache_refresh_interval_ms().is_none(), "File should use watcher, not timer");
     }
 
     #[test]
     fn tree_has_no_timer_interval() {
-        let panel = get_panel(ContextType::Tree);
+        let panel = get_panel(&ContextType::new(ContextType::TREE));
         assert!(panel.cache_refresh_interval_ms().is_none(), "Tree should use watcher, not timer");
     }
 
     #[test]
     fn glob_has_no_timer_interval() {
-        let panel = get_panel(ContextType::Glob);
+        let panel = get_panel(&ContextType::new(ContextType::GLOB));
         assert!(panel.cache_refresh_interval_ms().is_none(), "Glob should use watcher, not timer");
     }
 
     #[test]
     fn grep_has_no_timer_interval() {
-        let panel = get_panel(ContextType::Grep);
+        let panel = get_panel(&ContextType::new(ContextType::GREP));
         assert!(panel.cache_refresh_interval_ms().is_none(), "Grep should use watcher, not timer");
     }
 
@@ -435,21 +435,21 @@ mod tests {
     #[test]
     fn cache_types_are_correct() {
         // Panels that need background caching
-        assert!(ContextType::File.needs_cache());
-        assert!(ContextType::Tree.needs_cache());
-        assert!(ContextType::Glob.needs_cache());
-        assert!(ContextType::Grep.needs_cache());
-        assert!(ContextType::Tmux.needs_cache());
-        assert!(ContextType::Git.needs_cache());
-        assert!(ContextType::GitResult.needs_cache());
-        assert!(ContextType::GithubResult.needs_cache());
+        assert!(ContextType::new(ContextType::FILE).needs_cache());
+        assert!(ContextType::new(ContextType::TREE).needs_cache());
+        assert!(ContextType::new(ContextType::GLOB).needs_cache());
+        assert!(ContextType::new(ContextType::GREP).needs_cache());
+        assert!(ContextType::new(ContextType::TMUX).needs_cache());
+        assert!(ContextType::new(ContextType::GIT).needs_cache());
+        assert!(ContextType::new(ContextType::GIT_RESULT).needs_cache());
+        assert!(ContextType::new(ContextType::GITHUB_RESULT).needs_cache());
 
         // Panels that derive content from state (no background caching)
-        assert!(!ContextType::System.needs_cache());
-        assert!(!ContextType::Conversation.needs_cache());
-        assert!(!ContextType::Todo.needs_cache());
-        assert!(!ContextType::Memory.needs_cache());
-        assert!(!ContextType::Scratchpad.needs_cache());
-        assert!(!ContextType::Library.needs_cache());
+        assert!(!ContextType::new(ContextType::SYSTEM).needs_cache());
+        assert!(!ContextType::new(ContextType::CONVERSATION).needs_cache());
+        assert!(!ContextType::new(ContextType::TODO).needs_cache());
+        assert!(!ContextType::new(ContextType::MEMORY).needs_cache());
+        assert!(!ContextType::new(ContextType::SCRATCHPAD).needs_cache());
+        assert!(!ContextType::new(ContextType::LIBRARY).needs_cache());
     }
 }

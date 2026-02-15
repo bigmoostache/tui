@@ -5,7 +5,7 @@ mod tools;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::GithubResultPanel;
@@ -29,12 +29,12 @@ impl Module for GithubModule {
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::GithubResult]
+        vec![ContextType::new(ContextType::GITHUB_RESULT)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::GithubResult => Some(Box::new(GithubResultPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::GITHUB_RESULT => Some(Box::new(GithubResultPanel)),
             _ => None,
         }
     }
@@ -55,7 +55,7 @@ impl Module for GithubModule {
                     .required(),
             ],
             enabled: true,
-            category: ToolCategory::Github,
+            category: "GitHub".to_string(),
         }]
     }
 

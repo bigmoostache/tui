@@ -58,6 +58,14 @@ pub trait Module: Send + Sync {
         false
     }
 
+    /// Initialize module-owned state in the State extension map.
+    /// Called once at startup for each module. Use `state.set_ext(MyState { ... })`.
+    fn init_state(&self, _state: &mut State) {}
+
+    /// Reset module-owned state to defaults (e.g., when loading a preset).
+    /// Called by preset system to clear module data without full restart.
+    fn reset_state(&self, _state: &mut State) {}
+
     /// Serialize this module's data from State into a JSON value for persistence.
     /// Returns Value::Null if this module has no data to persist.
     /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
@@ -84,7 +92,7 @@ pub trait Module: Send + Sync {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult>;
 
     /// Create a panel for the given context type. Returns None if not owned by this module.
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>>;
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>>;
 
     /// Fixed panel types owned by this module (P0-P7)
     fn fixed_panel_types(&self) -> Vec<ContextType> {

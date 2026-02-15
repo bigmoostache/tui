@@ -280,7 +280,7 @@ impl Panel for GitPanel {
         let needs_calc = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::Git)
+            .find(|c| c.context_type == ContextType::GIT)
             .map(|ctx| ctx.cached_content.is_none())
             .unwrap_or(false);
 
@@ -288,7 +288,7 @@ impl Panel for GitPanel {
             let git_content = Self::format_git_for_context(state);
             let token_count = estimate_tokens(&git_content);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::Git {
+                if ctx.context_type == ContextType::GIT {
                     ctx.token_count = token_count;
                     break;
                 }
@@ -528,7 +528,7 @@ impl Panel for GitPanel {
         }
 
         // Find the Git context element
-        let git_ctx = state.context.iter().find(|c| c.context_type == ContextType::Git);
+        let git_ctx = state.context.iter().find(|c| c.context_type == ContextType::GIT);
 
         // Use cached content if available
         let content = git_ctx
@@ -898,7 +898,7 @@ impl Panel for GitResultPanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
-            && ctx.context_type == ContextType::GitResult
+            && ctx.context_type == ContextType::GIT_RESULT
             && let Some(cmd) = &ctx.result_command
         {
             let short =
@@ -911,7 +911,7 @@ impl Panel for GitResultPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type != ContextType::GitResult {
+            if ctx.context_type != ContextType::GIT_RESULT {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
@@ -926,7 +926,7 @@ impl Panel for GitResultPanel {
         let mut text: Vec<Line> = Vec::new();
 
         // Find the selected GitResult panel
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GitResult);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GIT_RESULT);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));

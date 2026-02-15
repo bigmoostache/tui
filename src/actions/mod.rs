@@ -232,7 +232,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.context.push(ContextElement {
                 id: context_id,
                 uid: None,
-                context_type: ContextType::Conversation,
+                context_type: ContextType::new(ContextType::CONVERSATION),
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
                 file_path: None,
@@ -341,7 +341,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StopStreaming => {
             if state.is_streaming {
                 state.is_streaming = false;
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;

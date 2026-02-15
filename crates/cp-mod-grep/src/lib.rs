@@ -3,7 +3,7 @@ mod tools;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::GrepPanel;
@@ -23,12 +23,12 @@ impl Module for GrepModule {
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Grep]
+        vec![ContextType::new(ContextType::GREP)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Grep => Some(Box::new(GrepPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::GREP => Some(Box::new(GrepPanel)),
             _ => None,
         }
     }
@@ -48,7 +48,7 @@ impl Module for GrepModule {
                     .desc("Glob pattern to filter files (e.g., '*.rs', '*.ts')"),
             ],
             enabled: true,
-            category: ToolCategory::File,
+            category: "File".to_string(),
         }]
     }
 

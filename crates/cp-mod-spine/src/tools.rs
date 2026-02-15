@@ -112,7 +112,7 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         changes.push("reset runtime counters".to_string());
     }
 
-    state.touch_panel(ContextType::Spine);
+    state.touch_panel(ContextType::new(ContextType::SPINE));
 
     if changes.is_empty() {
         ToolResult {

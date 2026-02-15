@@ -3,7 +3,7 @@ use ratatui::prelude::*;
 use crate::types::PromptType;
 use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::State;
+use cp_base::state::{ContextType, State};
 use cp_base::ui::{Cell, render_table};
 
 pub struct LibraryPanel;
@@ -204,14 +204,14 @@ impl Panel for LibraryPanel {
     fn refresh(&self, state: &mut State) {
         // Compute token count from context content
         let items = self.context(state);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == cp_base::state::ContextType::Library) {
+        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) {
             let total: usize = items.iter().map(|i| cp_base::state::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
         }
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let Some(ctx) = state.context.iter().find(|c| c.context_type == cp_base::state::ContextType::Library) else {
+        let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) else {
             return Vec::new();
         };
 

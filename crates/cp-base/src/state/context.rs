@@ -1,99 +1,120 @@
-use std::collections::HashSet;
-use std::sync::LazyLock;
-
 use serde::{Deserialize, Serialize};
 
 use crate::constants::{CHARS_PER_TOKEN, icons};
 
-/// Pre-computed set of fixed context types (hardcoded — these are the panel types
-/// that are always present in the sidebar regardless of dynamic panel creation)
-static FIXED_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
-    HashSet::from([
-        ContextType::Todo,
-        ContextType::Library,
-        ContextType::Overview,
-        ContextType::Tree,
-        ContextType::Memory,
-        ContextType::Spine,
-        ContextType::Logs,
-        ContextType::Git,
-        ContextType::Scratchpad,
-    ])
-});
-
-/// Pre-computed set of context types that use background cache loading
-static CACHE_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
-    HashSet::from([
-        ContextType::File,
-        ContextType::Tree,
-        ContextType::Glob,
-        ContextType::Grep,
-        ContextType::Tmux,
-        ContextType::Git,
-        ContextType::GitResult,
-        ContextType::GithubResult,
-    ])
-});
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ContextType {
-    System,
-    Conversation,
-    File,
-    Tree,
-    Glob,
-    Grep,
-    Tmux,
-    Todo,
-    Memory,
-    Overview,
-    Git,
-    GitResult,
-    GithubResult,
-    Scratchpad,
-    Library,
-    Skill,
-    ConversationHistory,
-    Spine,
-    Logs,
-}
+/// A string-backed context type identifier.
+///
+/// Replaces the former hardcoded enum. Modules define their own context type
+/// constants (e.g., `pub const CONTEXT_TYPE: &str = "todo"`) and cp-base
+/// provides associated `&str` constants for backwards compatibility.
+///
+/// Serialized transparently as a plain string (e.g., `"todo"`, `"git_result"`),
+/// which is backwards-compatible with the old `#[serde(rename_all = "snake_case")]`
+/// enum serialization.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ContextType(String);
 
 impl ContextType {
-    /// Returns true if this is a fixed/system context type (pre-computed, zero allocation)
+    pub fn new(id: &str) -> Self {
+        Self(id.to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    // === Well-known context type constants ===
+    // These match the old enum variant names in snake_case (serde format).
+    // Modules also export their own constants; these exist for convenience
+    // and will be gradually removed as module-specific code moves out.
+
+    pub const SYSTEM: &str = "system";
+    pub const CONVERSATION: &str = "conversation";
+    pub const FILE: &str = "file";
+    pub const TREE: &str = "tree";
+    pub const GLOB: &str = "glob";
+    pub const GREP: &str = "grep";
+    pub const TMUX: &str = "tmux";
+    pub const TODO: &str = "todo";
+    pub const MEMORY: &str = "memory";
+    pub const OVERVIEW: &str = "overview";
+    pub const GIT: &str = "git";
+    pub const GIT_RESULT: &str = "git_result";
+    pub const GITHUB_RESULT: &str = "github_result";
+    pub const SCRATCHPAD: &str = "scratchpad";
+    pub const LIBRARY: &str = "library";
+    pub const SKILL: &str = "skill";
+    pub const CONVERSATION_HISTORY: &str = "conversation_history";
+    pub const SPINE: &str = "spine";
+    pub const LOGS: &str = "logs";
+
+    /// Returns true if this is a fixed/system context type
     pub fn is_fixed(&self) -> bool {
-        FIXED_TYPES.contains(self)
+        matches!(
+            self.0.as_str(),
+            Self::TODO
+                | Self::LIBRARY
+                | Self::OVERVIEW
+                | Self::TREE
+                | Self::MEMORY
+                | Self::SPINE
+                | Self::LOGS
+                | Self::GIT
+                | Self::SCRATCHPAD
+        )
     }
 
     /// Get icon for this context type (normalized to 2 cells)
     pub fn icon(&self) -> String {
-        match self {
-            ContextType::System => icons::ctx_system(),
-            ContextType::Conversation => icons::ctx_conversation(),
-            ContextType::File => icons::ctx_file(),
-            ContextType::Tree => icons::ctx_tree(),
-            ContextType::Glob => icons::ctx_glob(),
-            ContextType::Grep => icons::ctx_grep(),
-            ContextType::Tmux => icons::ctx_tmux(),
-            ContextType::Todo => icons::ctx_todo(),
-            ContextType::Memory => icons::ctx_memory(),
-            ContextType::Overview => icons::ctx_overview(),
-            ContextType::Git => icons::ctx_git(),
-            ContextType::GitResult => icons::ctx_git(),
-            ContextType::GithubResult => icons::ctx_git(),
-            ContextType::Scratchpad => icons::ctx_scratchpad(),
-            ContextType::Library => icons::ctx_library(),
-            ContextType::Skill => icons::ctx_skill(),
-            ContextType::ConversationHistory => icons::ctx_conversation(),
-            ContextType::Spine => icons::ctx_spine(),
-            ContextType::Logs => icons::ctx_memory(), // Reuse memory icon for logs
+        match self.0.as_str() {
+            Self::SYSTEM => icons::ctx_system(),
+            Self::CONVERSATION => icons::ctx_conversation(),
+            Self::FILE => icons::ctx_file(),
+            Self::TREE => icons::ctx_tree(),
+            Self::GLOB => icons::ctx_glob(),
+            Self::GREP => icons::ctx_grep(),
+            Self::TMUX => icons::ctx_tmux(),
+            Self::TODO => icons::ctx_todo(),
+            Self::MEMORY => icons::ctx_memory(),
+            Self::OVERVIEW => icons::ctx_overview(),
+            Self::GIT | Self::GIT_RESULT | Self::GITHUB_RESULT => icons::ctx_git(),
+            Self::SCRATCHPAD => icons::ctx_scratchpad(),
+            Self::LIBRARY => icons::ctx_library(),
+            Self::SKILL => icons::ctx_skill(),
+            Self::CONVERSATION_HISTORY => icons::ctx_conversation(),
+            Self::SPINE => icons::ctx_spine(),
+            Self::LOGS => icons::ctx_memory(),
+            _ => icons::ctx_file(), // fallback for unknown types
         }
     }
 
     /// Returns true if this context type uses cached_content from background loading.
-    /// Pre-computed from Panel trait's needs_cache() method (zero allocation).
     pub fn needs_cache(&self) -> bool {
-        CACHE_TYPES.contains(self)
+        matches!(
+            self.0.as_str(),
+            Self::FILE | Self::TREE | Self::GLOB | Self::GREP | Self::TMUX | Self::GIT | Self::GIT_RESULT | Self::GITHUB_RESULT
+        )
+    }
+}
+
+impl std::fmt::Display for ContextType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Allow `ctx.context_type == "todo"` comparisons
+impl PartialEq<&str> for ContextType {
+    fn eq(&self, other: &&str) -> bool {
+        self.0.as_str() == *other
+    }
+}
+
+/// Allow `"todo" == ctx.context_type` comparisons
+impl PartialEq<ContextType> for &str {
+    fn eq(&self, other: &ContextType) -> bool {
+        *self == other.0.as_str()
     }
 }
 
@@ -240,6 +261,39 @@ mod tests {
     use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     #[test]
+    fn context_type_serde_roundtrip() {
+        let ct = ContextType::new("todo");
+        let json = serde_json::to_string(&ct).unwrap();
+        assert_eq!(json, "\"todo\"");
+        let ct2: ContextType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ct, ct2);
+    }
+
+    #[test]
+    fn context_type_eq_str() {
+        let ct = ContextType::new("todo");
+        assert!(ct == "todo");
+        assert!("todo" == ct);
+        assert!(ct != "file");
+    }
+
+    #[test]
+    fn context_type_is_fixed() {
+        assert!(ContextType::new(ContextType::TODO).is_fixed());
+        assert!(ContextType::new(ContextType::GIT).is_fixed());
+        assert!(!ContextType::new(ContextType::FILE).is_fixed());
+        assert!(!ContextType::new(ContextType::CONVERSATION).is_fixed());
+    }
+
+    #[test]
+    fn context_type_needs_cache() {
+        assert!(ContextType::new(ContextType::FILE).needs_cache());
+        assert!(ContextType::new(ContextType::GIT).needs_cache());
+        assert!(!ContextType::new(ContextType::TODO).needs_cache());
+        assert!(!ContextType::new(ContextType::CONVERSATION).needs_cache());
+    }
+
+    #[test]
     fn estimate_tokens_empty() {
         assert_eq!(estimate_tokens(""), 0);
     }
@@ -253,7 +307,6 @@ mod tests {
 
     #[test]
     fn estimate_tokens_single_char() {
-        // 1 char / 3.3 = 0.303... → ceil = 1
         assert_eq!(estimate_tokens("a"), 1);
     }
 

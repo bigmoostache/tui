@@ -91,7 +91,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Add to context (cache will be populated by background system)
     let name = format!("tmux:{}", pane_id);
-    let mut elem = make_default_context_element(&context_id, ContextType::Tmux, &name, true);
+    let mut elem = make_default_context_element(&context_id, ContextType::new(ContextType::TMUX), &name, true);
     elem.uid = Some(uid);
     elem.tmux_pane_id = Some(pane_id.clone());
     elem.tmux_lines = Some(lines);

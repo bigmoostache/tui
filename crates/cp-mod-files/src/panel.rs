@@ -101,7 +101,7 @@ impl Panel for FilePanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::File)
+            .filter(|c| c.context_type == ContextType::FILE)
             .filter_map(|c| {
                 let path = c.file_path.as_ref()?;
                 // Use cached content only - no blocking file reads

@@ -46,7 +46,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.push(ContextElement {
         id: context_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::Grep,
+        context_type: ContextType::new(ContextType::GREP),
         name,
         token_count: 0, // Will be updated by cache
         file_path: None,

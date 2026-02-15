@@ -66,7 +66,7 @@ impl Panel for LogsPanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::Logs {
+            if ctx.context_type == ContextType::LOGS {
                 ctx.token_count = token_count;
                 break;
             }
@@ -78,7 +78,7 @@ impl Panel for LogsPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::Logs)
+            .find(|c| c.context_type == ContextType::LOGS)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P10", 0));
         vec![ContextItem::new(id, "Logs", content, last_refresh_ms)]

@@ -114,7 +114,7 @@ impl Panel for GithubResultPanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
-            && ctx.context_type == ContextType::GithubResult
+            && ctx.context_type == ContextType::GITHUB_RESULT
             && let Some(cmd) = &ctx.result_command
         {
             let short =
@@ -127,7 +127,7 @@ impl Panel for GithubResultPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type != ContextType::GithubResult {
+            if ctx.context_type != ContextType::GITHUB_RESULT {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
@@ -141,7 +141,7 @@ impl Panel for GithubResultPanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line> = Vec::new();
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GithubResult);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GITHUB_RESULT);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![Span::styled(

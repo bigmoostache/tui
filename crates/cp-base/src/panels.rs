@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_first_call_returns_true() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         ctx.content_hash = None;
         assert!(update_if_changed(&mut ctx, "hello"));
         assert!(ctx.content_hash.is_some());
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_same_content_returns_false() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         update_if_changed(&mut ctx, "hello");
         let ts = ctx.last_refresh_ms;
         assert!(!update_if_changed(&mut ctx, "hello"));
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn update_if_changed_different_content_returns_true() {
-        let mut ctx = test_ctx("P0", ContextType::File);
+        let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
         update_if_changed(&mut ctx, "hello");
         assert!(update_if_changed(&mut ctx, "world"));
     }

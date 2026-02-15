@@ -2,7 +2,7 @@ use ratatui::prelude::*;
 
 use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{State, estimate_tokens};
+use cp_base::state::{ContextType, State, estimate_tokens};
 
 pub struct SkillPanel;
 
@@ -11,7 +11,7 @@ impl Panel for SkillPanel {
         // Find the skill name from the selected context element
         let selected = state.context.get(state.selected_context);
         if let Some(ctx) = selected
-            && ctx.context_type == cp_base::state::ContextType::Skill
+            && ctx.context_type == ContextType::new(ContextType::SKILL)
             && let Some(skill_id) = &ctx.skill_prompt_id
             && let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id)
         {
@@ -55,7 +55,7 @@ impl Panel for SkillPanel {
             .context
             .iter()
             .enumerate()
-            .filter(|(_, c)| c.context_type == cp_base::state::ContextType::Skill)
+            .filter(|(_, c)| c.context_type == ContextType::new(ContextType::SKILL))
             .filter_map(|(idx, c)| c.skill_prompt_id.as_ref().map(|sid| (sid.clone(), c.id.clone(), idx)))
             .collect();
 
@@ -74,7 +74,7 @@ impl Panel for SkillPanel {
         // Skill panels are sent to LLM as context
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type == cp_base::state::ContextType::Skill
+            if ctx.context_type == ContextType::new(ContextType::SKILL)
                 && let Some(content) = &ctx.cached_content
             {
                 items.push(ContextItem::new(&ctx.id, &ctx.name, content.clone(), ctx.last_refresh_ms));

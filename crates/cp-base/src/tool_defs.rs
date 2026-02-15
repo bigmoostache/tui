@@ -109,8 +109,8 @@ pub struct ToolDefinition {
     pub params: Vec<ToolParam>,
     /// Whether this tool is currently enabled
     pub enabled: bool,
-    /// Category for grouping
-    pub category: ToolCategory,
+    /// Category for grouping (e.g., "File", "Git", "System")
+    pub category: String,
 }
 
 impl ToolDefinition {
@@ -138,67 +138,6 @@ impl ToolDefinition {
             "properties": properties,
             "required": required
         })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ToolCategory {
-    File,
-    Tree,
-    Console,
-    Context,
-    Skill,
-    Agent,
-    Command,
-    System,
-    Todo,
-    Memory,
-    Git,
-    Github,
-    Scratchpad,
-    Spine,
-}
-
-impl ToolCategory {
-    /// Short display name for the category
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            ToolCategory::File => "File",
-            ToolCategory::Tree => "Tree",
-            ToolCategory::Console => "Console",
-            ToolCategory::Context => "Context",
-            ToolCategory::Skill => "Skill",
-            ToolCategory::Agent => "Agent",
-            ToolCategory::Command => "Command",
-            ToolCategory::System => "System",
-            ToolCategory::Todo => "Todo",
-            ToolCategory::Memory => "Memory",
-            ToolCategory::Git => "Git",
-            ToolCategory::Github => "GitHub",
-            ToolCategory::Scratchpad => "Scratch",
-            ToolCategory::Spine => "Spine",
-        }
-    }
-
-    /// Get all categories in display order
-    pub fn all() -> &'static [ToolCategory] {
-        &[
-            ToolCategory::File,
-            ToolCategory::Tree,
-            ToolCategory::Console,
-            ToolCategory::Context,
-            ToolCategory::Skill,
-            ToolCategory::Agent,
-            ToolCategory::Command,
-            ToolCategory::System,
-            ToolCategory::Todo,
-            ToolCategory::Memory,
-            ToolCategory::Git,
-            ToolCategory::Github,
-            ToolCategory::Scratchpad,
-            ToolCategory::Spine,
-        ]
     }
 }
 

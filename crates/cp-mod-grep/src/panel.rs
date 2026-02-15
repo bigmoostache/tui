@@ -82,7 +82,7 @@ impl Panel for GrepPanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::Grep)
+            .filter(|c| c.context_type == ContextType::GREP)
             .filter_map(|c| {
                 let pattern = c.grep_pattern.as_ref()?;
                 // Use cached content only - no blocking operations

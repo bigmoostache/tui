@@ -4,7 +4,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::MemoryPanel;
@@ -51,16 +51,16 @@ impl Module for MemoryModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Memory]
+        vec![ContextType::new(ContextType::MEMORY)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Memory, "Memories", false)]
+        vec![(ContextType::new(ContextType::MEMORY), "Memories", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Memory => Some(Box::new(MemoryPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::MEMORY => Some(Box::new(MemoryPanel)),
             _ => None,
         }
     }
@@ -91,7 +91,7 @@ impl Module for MemoryModule {
                     .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Memory,
+                category: "Memory".to_string(),
             },
             ToolDefinition {
                 id: "memory_update".to_string(),
@@ -120,7 +120,7 @@ impl Module for MemoryModule {
                     .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Memory,
+                category: "Memory".to_string(),
             },
         ]
     }

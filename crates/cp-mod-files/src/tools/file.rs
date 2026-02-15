@@ -54,7 +54,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.push(ContextElement {
         id: context_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::File,
+        context_type: ContextType::new(ContextType::FILE),
         name: file_name,
         token_count: 0, // Will be updated by cache
         file_path: Some(path.to_string()),

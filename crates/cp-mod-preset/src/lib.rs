@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Function pointers for module-registry operations that live in the binary.
@@ -68,7 +68,7 @@ impl Module for PresetModule {
                     ),
                 ],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
             ToolDefinition {
                 id: "preset_load".to_string(),
@@ -81,7 +81,7 @@ impl Module for PresetModule {
                     .to_string(),
                 params: vec![ToolParam::new("name", ParamType::String).desc("Name of the preset to load").required()],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
         ]
     }
@@ -100,7 +100,7 @@ impl Module for PresetModule {
         }
     }
 
-    fn create_panel(&self, _context_type: ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
         None
     }
 }

@@ -115,7 +115,7 @@ pub(crate) fn execute_snapshot(
         .iter()
         .filter(|ctx| !ctx.context_type.is_fixed())
         .map(|ctx| PresetPanelConfig {
-            panel_type: ctx.context_type,
+            panel_type: ctx.context_type.clone(),
             name: ctx.name.clone(),
             file_path: ctx.file_path.clone(),
             glob_pattern: ctx.glob_pattern.clone(),
@@ -291,7 +291,7 @@ pub(crate) fn execute_load(
 
     // 5. Remove existing dynamic panels (kill tmux panes first)
     for ctx in &state.context {
-        if ctx.context_type == ContextType::Tmux
+        if ctx.context_type == ContextType::TMUX
             && let Some(pane_id) = &ctx.tmux_pane_id
         {
             let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane_id]).output();
@@ -308,7 +308,7 @@ pub(crate) fn execute_load(
         state.context.push(ContextElement {
             id: context_id,
             uid: Some(uid),
-            context_type: panel_cfg.panel_type,
+            context_type: panel_cfg.panel_type.clone(),
             name: panel_cfg.name.clone(),
             token_count: 0,
             file_path: panel_cfg.file_path.clone(),
@@ -344,7 +344,7 @@ pub(crate) fn execute_load(
 
     // 6c. Populate cached_content for restored skill panels
     for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Skill
+        if ctx.context_type == ContextType::SKILL
             && let Some(ref skill_id) = ctx.skill_prompt_id
             && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id)
         {

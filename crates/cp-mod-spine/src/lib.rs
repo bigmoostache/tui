@@ -8,7 +8,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
@@ -67,16 +67,16 @@ impl Module for SpineModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Spine]
+        vec![ContextType::new(ContextType::SPINE)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Spine, "Spine", false)]
+        vec![(ContextType::new(ContextType::SPINE), "Spine", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Spine => Some(Box::new(SpinePanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::SPINE => Some(Box::new(SpinePanel)),
             _ => None,
         }
     }
@@ -94,7 +94,7 @@ impl Module for SpineModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Spine,
+                category: "Spine".to_string(),
             },
             ToolDefinition {
                 id: "spine_configure".to_string(),
@@ -120,7 +120,7 @@ impl Module for SpineModule {
                         .desc("Reset runtime counters (auto_continuation_count, autonomous_start_ms)"),
                 ],
                 enabled: true,
-                category: ToolCategory::Spine,
+                category: "Spine".to_string(),
             },
         ]
     }

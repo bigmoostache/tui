@@ -1,5 +1,5 @@
 use cp_base::constants::MEMORY_TLDR_MAX_TOKENS;
-use cp_base::state::{MemoryImportance, MemoryItem, State, estimate_tokens};
+use cp_base::state::{ContextType, MemoryImportance, MemoryItem, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
 fn validate_tldr(text: &str) -> Result<(), String> {
@@ -79,7 +79,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !created.is_empty() {
         output.push_str(&format!("Created {} memory(s):\n{}", created.len(), created.join("\n")));
-        state.touch_panel(cp_base::state::ContextType::Memory);
+        state.touch_panel(ContextType::new(ContextType::MEMORY));
     }
 
     if !errors.is_empty() {
@@ -198,7 +198,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Memory panel timestamp if anything changed
     if !updated.is_empty() || !deleted.is_empty() {
-        state.touch_panel(cp_base::state::ContextType::Memory);
+        state.touch_panel(ContextType::new(ContextType::MEMORY));
     }
 
     let mut output = String::new();

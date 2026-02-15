@@ -1,4 +1,4 @@
-use cp_base::state::{State, TodoItem, TodoStatus};
+use cp_base::state::{ContextType, State, TodoItem, TodoStatus};
 use cp_base::tools::{ToolResult, ToolUse};
 
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -79,7 +79,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !created.is_empty() {
         output.push_str(&format!("Created {} todo(s):\n{}", created.len(), created.join("\n")));
         // Update Todo panel timestamp
-        state.touch_panel(cp_base::state::ContextType::Todo);
+        state.touch_panel(ContextType::new(ContextType::TODO));
     }
 
     if !errors.is_empty() {
@@ -293,7 +293,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Todo panel timestamp if anything changed
     if !updated.is_empty() || !deleted.is_empty() || !propagated.is_empty() {
-        state.touch_panel(cp_base::state::ContextType::Todo);
+        state.touch_panel(ContextType::new(ContextType::TODO));
     }
 
     let mut output = String::new();
@@ -410,7 +410,7 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     state.todos.insert(insert_idx, item);
-    state.touch_panel(cp_base::state::ContextType::Todo);
+    state.touch_panel(ContextType::new(ContextType::TODO));
 
     let position_desc = match after_id {
         None => "top".to_string(),

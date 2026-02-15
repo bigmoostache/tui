@@ -5,7 +5,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TreePanel;
@@ -73,16 +73,16 @@ impl Module for TreeModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Tree]
+        vec![ContextType::new(ContextType::TREE)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Tree, "Tree", true)]
+        vec![(ContextType::new(ContextType::TREE), "Tree", true)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Tree => Some(Box::new(TreePanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::TREE => Some(Box::new(TreePanel)),
             _ => None,
         }
     }
@@ -100,7 +100,7 @@ impl Module for TreeModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Tree,
+                category: "Tree".to_string(),
             },
             ToolDefinition {
                 id: "tree_toggle".to_string(),
@@ -117,7 +117,7 @@ impl Module for TreeModule {
                         .default_val("toggle"),
                 ],
                 enabled: true,
-                category: ToolCategory::Tree,
+                category: "Tree".to_string(),
             },
             ToolDefinition {
                 id: "tree_describe".to_string(),
@@ -138,7 +138,7 @@ impl Module for TreeModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Tree,
+                category: "Tree".to_string(),
             },
         ]
     }

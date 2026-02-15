@@ -53,7 +53,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &item);
     state.skills.push(item);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -133,7 +133,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -184,7 +184,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let skill = state.skills.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Skill), id);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -236,7 +236,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let elem = cp_base::state::ContextElement {
         id: panel_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::Skill,
+        context_type: ContextType::new(ContextType::SKILL),
         name: skill.name.clone(),
         token_count: tokens,
         file_path: None,
@@ -268,7 +268,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.push(elem);
     state.loaded_skill_ids.push(id.to_string());
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -303,7 +303,7 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
     state.loaded_skill_ids.retain(|s| s != id);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     let name = state.skills.iter().find(|s| s.id == id).map(|s| s.name.as_str()).unwrap_or(id);
 

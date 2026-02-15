@@ -54,8 +54,8 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), &item);
     state.agents.push(item);
 
-    state.touch_panel(ContextType::System);
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::SYSTEM));
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -124,8 +124,8 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let agent_clone = agent.clone();
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), &agent_clone);
 
-    state.touch_panel(ContextType::System);
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::SYSTEM));
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -176,8 +176,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.active_agent_id = Some(library::default_agent_id().to_string());
     }
 
-    state.touch_panel(ContextType::System);
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::SYSTEM));
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -192,8 +192,8 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     // If id is None or empty, switch to default agent
     if id.is_none() || id.map(|s| s.is_empty()).unwrap_or(true) {
         state.active_agent_id = Some(library::default_agent_id().to_string());
-        state.touch_panel(ContextType::System);
-        state.touch_panel(ContextType::Library);
+        state.touch_panel(ContextType::new(ContextType::SYSTEM));
+        state.touch_panel(ContextType::new(ContextType::LIBRARY));
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Switched to default agent ({})", library::default_agent_id()),
@@ -212,8 +212,8 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     state.active_agent_id = Some(id.to_string());
-    state.touch_panel(ContextType::System);
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::SYSTEM));
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     let name = state.agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
 

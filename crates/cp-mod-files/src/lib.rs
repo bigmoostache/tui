@@ -3,7 +3,7 @@ mod tools;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::FilePanel;
@@ -29,12 +29,12 @@ impl Module for FilesModule {
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::File]
+        vec![ContextType::new(ContextType::FILE)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::File => Some(Box::new(FilePanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::FILE => Some(Box::new(FilePanel)),
             _ => None,
         }
     }
@@ -52,7 +52,7 @@ impl Module for FilesModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::File,
+                category: "File".to_string(),
             },
             ToolDefinition {
                 id: "file_edit".to_string(),
@@ -73,7 +73,7 @@ impl Module for FilesModule {
                         .desc("Replace all occurrences (default: false)"),
                 ],
                 enabled: true,
-                category: ToolCategory::File,
+                category: "File".to_string(),
             },
             ToolDefinition {
                 id: "file_write".to_string(),
@@ -89,7 +89,7 @@ impl Module for FilesModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::File,
+                category: "File".to_string(),
             },
 
 

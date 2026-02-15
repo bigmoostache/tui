@@ -5,7 +5,7 @@ use serde_json::json;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
@@ -43,16 +43,16 @@ impl Module for TodoModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Todo]
+        vec![ContextType::new(ContextType::TODO)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Todo, "WIP", false)]
+        vec![(ContextType::new(ContextType::TODO), "WIP", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Todo => Some(Box::new(TodoPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::TODO => Some(Box::new(TodoPanel)),
             _ => None,
         }
     }
@@ -78,7 +78,7 @@ impl Module for TodoModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Todo,
+                category: "Todo".to_string(),
             },
             ToolDefinition {
                 id: "todo_update".to_string(),
@@ -106,7 +106,7 @@ impl Module for TodoModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Todo,
+                category: "Todo".to_string(),
             },
             ToolDefinition {
                 id: "todo_move".to_string(),
@@ -121,7 +121,7 @@ impl Module for TodoModule {
                         .desc("Place after this todo ID. Null or omit to move to top."),
                 ],
                 enabled: true,
-                category: ToolCategory::Todo,
+                category: "Todo".to_string(),
             },
         ]
     }

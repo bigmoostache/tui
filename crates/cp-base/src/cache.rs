@@ -1,5 +1,6 @@
 use sha2::{Digest, Sha256};
 
+use crate::state::ContextType;
 use crate::types::git::GitChangeType;
 use crate::types::tree::TreeFileDescription;
 
@@ -64,17 +65,16 @@ pub enum CacheRequest {
 
 impl CacheRequest {
     /// Get the context type this request is for, to dispatch to the correct panel.
-    pub fn context_type(&self) -> crate::state::ContextType {
-        use crate::state::ContextType;
+    pub fn context_type(&self) -> ContextType {
         match self {
-            CacheRequest::File { .. } => ContextType::File,
-            CacheRequest::Tree { .. } => ContextType::Tree,
-            CacheRequest::Glob { .. } => ContextType::Glob,
-            CacheRequest::Grep { .. } => ContextType::Grep,
-            CacheRequest::Tmux { .. } => ContextType::Tmux,
-            CacheRequest::GitStatus { .. } => ContextType::Git,
-            CacheRequest::GitResult { .. } => ContextType::GitResult,
-            CacheRequest::GithubResult { .. } => ContextType::GithubResult,
+            CacheRequest::File { .. } => ContextType::new(ContextType::FILE),
+            CacheRequest::Tree { .. } => ContextType::new(ContextType::TREE),
+            CacheRequest::Glob { .. } => ContextType::new(ContextType::GLOB),
+            CacheRequest::Grep { .. } => ContextType::new(ContextType::GREP),
+            CacheRequest::Tmux { .. } => ContextType::new(ContextType::TMUX),
+            CacheRequest::GitStatus { .. } => ContextType::new(ContextType::GIT),
+            CacheRequest::GitResult { .. } => ContextType::new(ContextType::GIT_RESULT),
+            CacheRequest::GithubResult { .. } => ContextType::new(ContextType::GITHUB_RESULT),
         }
     }
 }

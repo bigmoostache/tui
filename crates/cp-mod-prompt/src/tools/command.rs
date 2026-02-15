@@ -53,7 +53,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &item);
     state.commands.push(item);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -121,7 +121,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cmd_clone = cmd.clone();
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &cmd_clone);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -166,7 +166,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cmd = state.commands.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Command), id);
 
-    state.touch_panel(ContextType::Library);
+    state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
