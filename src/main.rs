@@ -60,7 +60,7 @@ fn main() -> io::Result<()> {
     ensure_default_agent(&mut state);
 
     // Ensure built-in presets exist on disk
-    modules::preset::builtin::ensure_builtin_presets();
+    cp_mod_preset::builtin::ensure_builtin_presets();
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();

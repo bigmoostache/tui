@@ -1,5 +1,4 @@
 pub mod core;
-pub mod preset;
 
 use std::collections::HashSet;
 
@@ -15,6 +14,7 @@ pub use cp_mod_glob::GlobModule;
 pub use cp_mod_grep::GrepModule;
 pub use cp_mod_logs::LogsModule;
 pub use cp_mod_memory::MemoryModule;
+pub use cp_mod_preset::PresetModule;
 pub use cp_mod_prompt::PromptModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
@@ -85,7 +85,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(TodoModule),
         Box::new(MemoryModule),
         Box::new(ScratchpadModule),
-        Box::new(preset::PresetModule),
+        Box::new(PresetModule::new(all_modules, active_tool_definitions, crate::core::ensure_default_contexts)),
         Box::new(SpineModule),
         Box::new(LogsModule),
     ]

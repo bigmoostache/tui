@@ -116,9 +116,6 @@ pub const PANELS_DIR: &str = "panels";
 /// Default worker ID
 pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
-/// Presets subdirectory
-pub const PRESETS_DIR: &str = "presets";
-
 /// Logs subdirectory (chunked JSON files, global across workers)
 pub const LOGS_DIR: &str = "logs";
 

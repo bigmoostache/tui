@@ -489,7 +489,7 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
 pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
 
-    let presets = crate::modules::preset::tools::list_presets_with_info();
+    let presets = cp_mod_preset::tools::list_presets_with_info();
     if presets.is_empty() {
         return text;
     }

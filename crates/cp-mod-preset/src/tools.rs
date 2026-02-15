@@ -2,12 +2,13 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use crate::constants::{PRESETS_DIR, STORE_DIR};
-use crate::core::ensure_default_contexts;
-use crate::state::{ContextElement, State};
-use crate::tools::{ToolResult, ToolUse};
-
-use super::types::{Preset, PresetPanelConfig, PresetWorkerState};
+use cp_base::constants::{PRESETS_DIR, STORE_DIR};
+use cp_base::modules::Module;
+use cp_base::panels::now_ms;
+use cp_base::state::{ContextElement, ContextType, State};
+use cp_base::tool_defs::ToolDefinition;
+use cp_base::tools::{ToolResult, ToolUse};
+use cp_base::types::preset::{Preset, PresetPanelConfig, PresetWorkerState};
 
 fn presets_path() -> std::path::PathBuf {
     Path::new(STORE_DIR).join(PRESETS_DIR)
@@ -28,7 +29,11 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_snapshot(
+    tool: &ToolUse,
+    state: &mut State,
+    all_modules_fn: fn() -> Vec<Box<dyn Module>>,
+) -> ToolResult {
     let name = match tool.input.get("name").and_then(|v| v.as_str()) {
         Some(n) => n,
         None => {
@@ -85,7 +90,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Capture worker state
-    let modules = crate::modules::all_modules();
+    let modules = all_modules_fn();
 
     // Capture active_modules
     let active_modules: Vec<String> = state.active_modules.iter().cloned().collect();
@@ -178,7 +183,13 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_load(
+    tool: &ToolUse,
+    state: &mut State,
+    all_modules_fn: fn() -> Vec<Box<dyn Module>>,
+    active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
+    ensure_defaults_fn: fn(&mut State),
+) -> ToolResult {
     let name = match tool.input.get("name").and_then(|v| v.as_str()) {
         Some(n) => n,
         None => {
@@ -234,7 +245,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     // If system doesn't exist, keep current active_agent_id
 
     // 2. Set active_modules — ensure core modules are always included
-    let modules = crate::modules::all_modules();
+    let modules = all_modules_fn();
     let core_ids: HashSet<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
@@ -248,7 +259,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // 3. Rebuild tools from active modules, then apply disabled_tools
     let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(|s| s.as_str()).collect();
-    let mut new_tools = crate::modules::active_tool_definitions(&state.active_modules);
+    let mut new_tools = active_tool_defs_fn(&state.active_modules);
     for t in &mut new_tools {
         if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str()) {
             t.enabled = false;
@@ -280,7 +291,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // 5. Remove existing dynamic panels (kill tmux panes first)
     for ctx in &state.context {
-        if ctx.context_type == crate::state::ContextType::Tmux
+        if ctx.context_type == ContextType::Tmux
             && let Some(pane_id) = &ctx.tmux_pane_id
         {
             let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane_id]).output();
@@ -316,7 +327,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             history_messages: None,
             cache_deprecated: true,
             cache_in_flight: false,
-            last_refresh_ms: crate::core::panels::now_ms(),
+            last_refresh_ms: now_ms(),
             content_hash: None,
             source_hash: None,
             current_page: 0,
@@ -333,7 +344,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // 6c. Populate cached_content for restored skill panels
     for ctx in &mut state.context {
-        if ctx.context_type == crate::state::ContextType::Skill
+        if ctx.context_type == ContextType::Skill
             && let Some(ref skill_id) = ctx.skill_prompt_id
             && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id)
         {
@@ -342,7 +353,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules
-    ensure_default_contexts(state);
+    ensure_defaults_fn(state);
 
     // 8. Mark all panels as cache_deprecated
     for ctx in &mut state.context {

@@ -77,7 +77,7 @@ impl Panel for OverviewPanel {
         text.extend(overview_render::separator());
 
         text.extend(overview_render::render_presets(base_style));
-        if !crate::modules::preset::tools::list_presets_with_info().is_empty() {
+        if !cp_mod_preset::tools::list_presets_with_info().is_empty() {
             text.extend(overview_render::separator());
         }
 

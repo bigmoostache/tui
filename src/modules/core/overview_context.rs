@@ -86,7 +86,7 @@ pub fn generate_context_content(state: &State) -> String {
     }
 
     // Presets table for LLM
-    let presets = crate::modules::preset::tools::list_presets_with_info();
+    let presets = cp_mod_preset::tools::list_presets_with_info();
     if !presets.is_empty() {
         output.push_str("\nPresets:\n\n");
         output.push_str("| Name | Type | Description |\n");

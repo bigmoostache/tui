@@ -46,7 +46,7 @@ impl Panel for TreePanel {
         ctx.cache_deprecated = false;
         // Check if content actually changed before updating
         let new_hash = cp_base::cache::hash_content(&content);
-        if ctx.content_hash.as_deref() == Some(&new_hash) {
+        if ctx.content_hash.as_deref() == Some(&new_hash) && ctx.cached_content.is_some() {
             return false;
         }
         ctx.cached_content = Some(content);
