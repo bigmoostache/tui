@@ -218,6 +218,10 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
     // Format result as a diff for UI display
+    // Note: This is a simple diff format showing all old lines followed by all new lines.
+    // This is intentionally simple for a minimal UI-only change. A more sophisticated 
+    // diff algorithm (like Myers diff) with context lines could be added in the future
+    // if needed, but that would be a larger change beyond the scope of this UI enhancement.
     let mut result_msg = String::new();
     
     // Header line

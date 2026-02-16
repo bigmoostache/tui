@@ -85,12 +85,12 @@ pub(crate) fn render_message(
 
                 // Determine line style based on diff markers
                 let (line_content, line_style) = if in_diff_block {
-                    if let Some(content) = line.strip_prefix("- ") {
+                    if line.starts_with("- ") {
                         // Deleted line: red color
-                        (format!("- {}", content), Style::default().fg(theme::error()))
-                    } else if let Some(content) = line.strip_prefix("+ ") {
+                        (line.to_string(), Style::default().fg(theme::error()))
+                    } else if line.starts_with("+ ") {
                         // Added line: green color
-                        (format!("+ {}", content), Style::default().fg(theme::success()))
+                        (line.to_string(), Style::default().fg(theme::success()))
                     } else {
                         // Regular line in diff block
                         (line.to_string(), Style::default().fg(theme::text_secondary()))
