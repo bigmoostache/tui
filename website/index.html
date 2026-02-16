@@ -57,6 +57,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2" crossorigin>
+    <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOVgaY.woff2" crossorigin>
 </head>
 <body>
     <!-- Skip to main content for accessibility -->
@@ -126,6 +128,15 @@
                     <span class="terminal-dot yellow"></span>
                     <span class="terminal-dot green"></span>
                     <span class="terminal-title">context-pilot</span>
+                    <button class="terminal-pause" id="terminal-pause" aria-label="Pause animation" title="Pause/Resume animation">
+                        <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                        <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </button>
                 </div>
                 <div class="terminal-body">
                     <pre class="terminal-content" id="terminal-anim"></pre>
@@ -535,6 +546,14 @@ tmux new-session context-pilot</code></pre>
             </div>
         </div>
     </footer>
+
+    <!-- Back to Top Button -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
+
     <!-- Copy Buttons -->
     <script>
     (function() {
@@ -578,7 +597,11 @@ tmux new-session context-pilot</code></pre>
     <script>
     (function() {
         const el = document.getElementById('terminal-anim');
-        if (!el) return;
+        const pauseBtn = document.getElementById('terminal-pause');
+        if (!el || !pauseBtn) return;
+
+        let isPaused = false;
+        let animationTimeout = null;
 
         const C = (cls, text) => `<span class="${cls}">${text}</span>`;
         const dim = t => C('t-dim', t);
@@ -629,19 +652,21 @@ tmux new-session context-pilot</code></pre>
         }
 
         function tick() {
+            if (isPaused) return;
+
             if (phase === 0) {
                 // Phase 0: panels appear one by one
                 if (idx < panels.length) {
                     lines.push(panels[idx]);
                     idx++;
                     render();
-                    setTimeout(tick, 80);
+                    animationTimeout = setTimeout(tick, 80);
                 } else {
                     phase = 1;
                     idx = 0;
                     charIdx = 0;
                     render();
-                    setTimeout(tick, 600);
+                    animationTimeout = setTimeout(tick, 600);
                 }
             } else if (phase === 1) {
                 // Phase 1: user types message
@@ -650,14 +675,14 @@ tmux new-session context-pilot</code></pre>
                     // Replace cursor line with typing
                     const typed = userMsg.slice(0, charIdx);
                     el.innerHTML = lines.join('\n') + '\n' + `${yellow('❯')} ${typed}${C('t-blink', '█')}`;
-                    setTimeout(tick, 35 + Math.random() * 40);
+                    animationTimeout = setTimeout(tick, 35 + Math.random() * 40);
                 } else {
                     // "Submit" — add the user line to lines
                     lines.push(`${yellow('❯')} ${userMsg}`);
                     phase = 2;
                     idx = 0;
                     render();
-                    setTimeout(tick, 400);
+                    animationTimeout = setTimeout(tick, 400);
                 }
             } else if (phase === 2) {
                 // Phase 2: AI response streams in
@@ -665,24 +690,43 @@ tmux new-session context-pilot</code></pre>
                     lines.push(aiLines[idx]);
                     idx++;
                     render();
-                    setTimeout(tick, 300 + Math.random() * 200);
+                    animationTimeout = setTimeout(tick, 300 + Math.random() * 200);
                 } else {
                     // Done — pause then restart
-                    setTimeout(() => {
+                    animationTimeout = setTimeout(() => {
                         lines = [];
                         phase = 0;
                         idx = 0;
                         charIdx = 0;
                         typingLine = '';
                         render();
-                        setTimeout(tick, 500);
+                        animationTimeout = setTimeout(tick, 500);
                     }, 4000);
                 }
             }
         }
 
+        // Pause/Resume button
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            const pauseIcon = pauseBtn.querySelector('.pause-icon');
+            const playIcon = pauseBtn.querySelector('.play-icon');
+            
+            if (isPaused) {
+                if (animationTimeout) clearTimeout(animationTimeout);
+                pauseIcon.style.display = 'none';
+                playIcon.style.display = 'block';
+                pauseBtn.setAttribute('aria-label', 'Resume animation');
+            } else {
+                pauseIcon.style.display = 'block';
+                playIcon.style.display = 'none';
+                pauseBtn.setAttribute('aria-label', 'Pause animation');
+                tick();
+            }
+        });
+
         // Start after a small delay
-        setTimeout(tick, 800);
+        animationTimeout = setTimeout(tick, 800);
         render();
     })();
     </script>
@@ -715,6 +759,30 @@ tmux new-session context-pilot</code></pre>
             if (!localStorage.getItem('theme')) {
                 html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
             }
+        });
+    })();
+    </script>
+
+    <!-- Back to Top Button Script -->
+    <script>
+    (function() {
+        const backToTop = document.getElementById('back-to-top');
+        
+        // Show/hide button based on scroll position
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 400) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+        
+        // Scroll to top on click
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
         });
     })();
     </script>
