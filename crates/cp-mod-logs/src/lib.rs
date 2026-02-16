@@ -385,7 +385,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'entries' array".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -394,7 +394,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Empty 'entries' array".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -412,7 +412,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         touch_logs_panel(state);
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Created {} log(s)", count), is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Created {} log(s)", count), is_error: false, ..Default::default() }
 }
 
 fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -423,7 +423,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'log_ids' array".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -435,7 +435,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'content' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -443,7 +443,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Guardrail: minimum 10 entries
     if log_ids.len() < 10 {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Must summarize at least 10 logs, got {}", log_ids.len()),
             is_error: true,
         };
@@ -456,7 +456,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
             match logs.iter().find(|l| l.id == *id) {
                 None => {
                     return ToolResult {
-                        tool_use_id: tool.id.clone(),
+                        tool_use_id: tool.id.clone(), ..Default::default()
                         content: format!("Log '{}' not found", id),
                         is_error: true,
                     };
@@ -465,7 +465,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
                     if log.parent_id.is_some() {
                         return ToolResult {
                             tool_use_id: tool.id.clone(),
-                            content: format!(
+                            content: format!(, ..Default::default()
                                 "Log '{}' already has a parent — only top-level logs can be summarized",
                                 id
                             ),
@@ -506,7 +506,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     touch_logs_panel(state);
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("Created summary {} with {} children", summary_id, log_ids.len()),
         is_error: false,
     }
@@ -519,7 +519,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -530,7 +530,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -541,7 +541,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         match logs.iter().find(|l| l.id == id) {
             None => {
                 return ToolResult {
-                    tool_use_id: tool.id.clone(),
+                    tool_use_id: tool.id.clone(), ..Default::default()
                     content: format!("Log '{}' not found", id),
                     is_error: true,
                 };
@@ -549,7 +549,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             Some(log) => {
                 if log.children_ids.is_empty() {
                     return ToolResult {
-                        tool_use_id: tool.id.clone(),
+                        tool_use_id: tool.id.clone(), ..Default::default()
                         content: format!("Log '{}' has no children — can only toggle summaries", id),
                         is_error: true,
                     };
@@ -570,7 +570,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     touch_logs_panel(state);
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
         is_error: false,
     }
@@ -584,7 +584,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -594,7 +594,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     match panel_idx {
         None => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Panel '{}' not found", panel_id),
                 is_error: true,
             };
@@ -603,7 +603,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
             if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!(
+                    content: format!(, ..Default::default()
                         "Panel '{}' is not a conversation history panel (type: {:?})",
                         panel_id, state.context[idx].context_type
                     ),
@@ -632,7 +632,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Cannot close conversation history without at least one log entry. Provide 'logs' with meaningful entries to preserve context before closing.".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -671,7 +671,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                 if tokens > MEMORY_TLDR_MAX_TOKENS {
                     return ToolResult {
                         tool_use_id: tool.id.clone(),
-                        content: format!(
+                        content: format!(, ..Default::default()
                             "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
                             tokens, MEMORY_TLDR_MAX_TOKENS
                         ),
@@ -713,5 +713,5 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     state.context.retain(|c| c.id != panel_id);
     output_parts.push(format!("Closed {} ({})", panel_id, panel_name));
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), is_error: false, ..Default::default() }
 }

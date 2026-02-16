@@ -11,7 +11,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: file_path".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -22,7 +22,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: contents".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -115,5 +115,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     result_msg.push_str("```");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false, ..Default::default() }
 }

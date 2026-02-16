@@ -20,7 +20,7 @@ pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: "Reload initiated. Restarting TUI...".to_string(),
-        is_error: false,
+        ..Default::default()
     }
 }
 

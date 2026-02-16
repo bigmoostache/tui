@@ -23,7 +23,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'memories' array parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -32,7 +32,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Empty 'memories' array".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -91,7 +91,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty() }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty(), ..Default::default() }
 }
 
 pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -101,7 +101,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'updates' array parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -110,7 +110,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Empty 'updates' array".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -232,7 +232,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: updated.is_empty() && deleted.is_empty() }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: updated.is_empty() && deleted.is_empty(), ..Default::default() }
 }
 
 #[cfg(test)]

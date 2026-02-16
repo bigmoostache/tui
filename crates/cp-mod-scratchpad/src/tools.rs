@@ -11,7 +11,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_title' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -22,7 +22,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_contents' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -53,7 +53,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -92,7 +92,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
         None => {
-            ToolResult { tool_use_id: tool.id.clone(), content: format!("Cell not found: {}", cell_id), is_error: true }
+            ToolResult { tool_use_id: tool.id.clone(), content: format!("Cell not found: {}", cell_id), is_error: true, ..Default::default() }
         }
     }
 }
@@ -105,7 +105,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_ids' array parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };

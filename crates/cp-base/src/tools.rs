@@ -8,9 +8,12 @@ pub struct ToolUse {
     pub input: Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolResult {
     pub tool_use_id: String,
     pub content: String,
+    #[serde(default)]
     pub is_error: bool,
+    #[serde(default)]
+    pub tool_name: String,
 }

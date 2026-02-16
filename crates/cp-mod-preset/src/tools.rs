@@ -42,7 +42,7 @@ pub(crate) fn execute_snapshot(
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'name' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -53,13 +53,13 @@ pub(crate) fn execute_snapshot(
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'description' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
 
     if let Err(e) = validate_name(name) {
-        return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true };
+        return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true, ..Default::default() };
     }
 
     let replace = tool.input.get("replace").and_then(|v| v.as_str());
@@ -198,7 +198,7 @@ pub(crate) fn execute_load(
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'name' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -213,7 +213,7 @@ pub(crate) fn execute_load(
         } else {
             format!("Preset '{}' not found. Available presets: {}", name, available.join(", "))
         };
-        return ToolResult { tool_use_id: tool.id.clone(), content: msg, is_error: true };
+        return ToolResult { tool_use_id: tool.id.clone(), content: msg, is_error: true, ..Default::default() };
     }
 
     let preset: Preset = match fs::read_to_string(&file_path) {

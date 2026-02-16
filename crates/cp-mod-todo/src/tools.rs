@@ -10,13 +10,13 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'todos' array parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
 
     if todos.is_empty() {
-        return ToolResult { tool_use_id: tool.id.clone(), content: "Empty 'todos' array".to_string(), is_error: true };
+        return ToolResult { tool_use_id: tool.id.clone(), content: "Empty 'todos' array".to_string(), is_error: true, ..Default::default() };
     }
 
     let mut created: Vec<String> = Vec::new();
@@ -93,7 +93,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty() }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty(), ..Default::default() }
 }
 
 pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -103,7 +103,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'updates' array parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -112,7 +112,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Empty 'updates' array".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -343,7 +343,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: output,
-        is_error: updated.is_empty() && deleted.is_empty() && propagated.is_empty(),
+        is_error: updated.is_empty() && deleted.is_empty() && propagated.is_empty(), ..Default::default()
     }
 }
 
@@ -354,7 +354,7 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -380,7 +380,7 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(idx) => idx,
         None => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Todo '{}' not found", id),
                 is_error: true,
             };
@@ -391,14 +391,14 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(aid) = after_id {
         if aid == id {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Cannot move '{}' after itself", id),
                 is_error: true,
             };
         }
         if !ts.todos.iter().any(|t| t.id == aid) {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Target '{}' not found", aid),
                 is_error: true,
             };
@@ -429,5 +429,5 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(aid) => format!("after {}", aid),
     };
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Moved {} to {}", id, position_desc), is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Moved {} to {}", id, position_desc), is_error: false, ..Default::default() }
 }

@@ -74,7 +74,7 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Missing 'paths' parameter".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -167,7 +167,7 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'descriptions' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -261,7 +261,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'filter' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -271,7 +271,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Updated tree filter:\n{}", filter), is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Updated tree filter:\n{}", filter), is_error: false, ..Default::default() }
 }
 
 /// Normalize a path to a consistent format

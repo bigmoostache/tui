@@ -11,7 +11,7 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -120,7 +120,7 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         ToolResult {
             tool_use_id: tool.id.clone(),
             content: "No changes made. Pass at least one parameter to configure.".to_string(),
-            is_error: false,
+            is_error: false, ..Default::default()
         }
     } else {
         ToolResult {

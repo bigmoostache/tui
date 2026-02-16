@@ -50,7 +50,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
     } else {
         // No pane_id provided — create a new one in the background session
         if let Err(e) = ensure_bg_session() {
-            return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true };
+            return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true, ..Default::default() };
         }
 
         let output =
@@ -116,7 +116,7 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -140,7 +140,7 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult { tool_use_id: tool.id.clone(), content: "No changes specified".to_string(), is_error: true }
+                ToolResult { tool_use_id: tool.id.clone(), content: "No changes specified".to_string(), is_error: true, ..Default::default() }
             } else {
                 let pane_id = c.get_meta_str("tmux_pane_id").unwrap_or(identifier);
                 ToolResult {
@@ -187,7 +187,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -209,7 +209,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'keys' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -221,7 +221,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             content:
                 "console_send_keys already sends Enter automatically after your keys — no need to send it separately."
                     .to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -238,7 +238,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             content:
                 "Use the git_execute or gh_execute tools instead of running git/gh commands through console_send_keys."
                     .to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 

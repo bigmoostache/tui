@@ -28,7 +28,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -39,7 +39,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Error: 'command' parameter is required".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -49,7 +49,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(a) => a,
         Err(e) => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Validation error: {}", e),
                 is_error: true,
             };
@@ -71,7 +71,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 state.context[idx].cache_deprecated = true;
                 let panel_id = state.context[idx].id.clone();
                 ToolResult {
-                    tool_use_id: tool.id.clone(),
+                    tool_use_id: tool.id.clone(), ..Default::default()
                     content: format!("Panel updated: {}", panel_id),
                     is_error: false,
                 }
@@ -92,7 +92,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 state.context.push(elem);
 
                 ToolResult {
-                    tool_use_id: tool.id.clone(),
+                    tool_use_id: tool.id.clone(), ..Default::default()
                     content: format!("Panel created: {}", panel_id),
                     is_error: false,
                 }
@@ -142,7 +142,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                         tool_use_id: tool.id.clone(),
                         content: if combined.is_empty() {
                             if is_error {
-                                "Command failed with no output".to_string()
+                                "Command failed with no output".to_string(), ..Default::default()
                             } else {
                                 "Command completed successfully".to_string()
                             }
@@ -158,7 +158,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     } else {
                         format!("Error running gh: {}", e)
                     };
-                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true }
+                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, ..Default::default() }
                 }
             }
         }

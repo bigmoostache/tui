@@ -12,7 +12,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Missing required 'name' parameter".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -20,7 +20,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Missing required 'content' parameter".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -29,13 +29,13 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Name must contain at least one alphanumeric character".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
     if PromptState::get(state).skills.iter().any(|s| s.id == id) {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Skill with ID '{}' already exists", id),
             is_error: true,
         };
@@ -56,7 +56,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("Created skill '{}' with ID '{}'", name, id),
         is_error: false,
     }
@@ -69,7 +69,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -79,7 +79,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(s) => s,
         None => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Skill '{}' not found", id),
                 is_error: true,
             };
@@ -88,7 +88,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if skill.is_builtin {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Cannot edit built-in skill '{}'", id),
             is_error: true,
         };
@@ -115,7 +115,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "No changes specified".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
@@ -138,7 +138,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("Updated skill '{}': {}", id, changes.join(", ")),
         is_error: false,
     }
@@ -151,7 +151,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -160,7 +160,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         && skill.is_builtin
     {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Cannot delete built-in skill '{}'", id),
             is_error: true,
         };
@@ -171,7 +171,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(i) => i,
         None => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Skill '{}' not found", id),
                 is_error: true,
             };
@@ -190,7 +190,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("Deleted skill '{}' ({})", skill.name, id),
         is_error: false,
     }
@@ -203,7 +203,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -214,7 +214,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(s) => s.clone(),
         None => {
             return ToolResult {
-                tool_use_id: tool.id.clone(),
+                tool_use_id: tool.id.clone(), ..Default::default()
                 content: format!("Skill '{}' not found", id),
                 is_error: true,
             };
@@ -224,7 +224,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check if already loaded
     if ps.loaded_skill_ids.contains(&id.to_string()) {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Skill '{}' is already loaded", id),
             is_error: true,
         };
@@ -255,7 +255,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult {
-        tool_use_id: tool.id.clone(),
+        tool_use_id: tool.id.clone(), ..Default::default()
         content: format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens),
         is_error: false,
     }
@@ -268,14 +268,14 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
 
     if !PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
         return ToolResult {
-            tool_use_id: tool.id.clone(),
+            tool_use_id: tool.id.clone(), ..Default::default()
             content: format!("Skill '{}' is not loaded", id),
             is_error: true,
         };
@@ -298,7 +298,7 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!(
+        content: format!(, ..Default::default()
             "Unloaded skill '{}'{}",
             name,
             panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()

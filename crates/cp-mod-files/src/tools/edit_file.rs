@@ -101,7 +101,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: file_path".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -113,7 +113,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: old_string".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -125,7 +125,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: new_string".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -249,7 +249,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     result_msg.push_str("```");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
+    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false, ..Default::default() }
 }
 
 #[cfg(test)]

@@ -19,7 +19,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Error: 'command' parameter is required".to_string(),
-                is_error: true,
+                is_error: true, ..Default::default()
             };
         }
     };
@@ -162,7 +162,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     } else {
                         format!("Error running git: {}", e)
                     };
-                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true }
+                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, ..Default::default() }
                 }
             }
         }
@@ -270,7 +270,7 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "No changes specified. Use show_diffs, show_logs, log_args, or diff_base parameters.".to_string(),
-            is_error: true,
+            is_error: true, ..Default::default()
         };
     }
 
