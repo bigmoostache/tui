@@ -78,7 +78,13 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
                 .split(area);
 
             render_content_panel(frame, state, layout[0]);
-            render_question_form(frame, state, layout[1]);
+            // Indent form by 1 col to avoid overlapping sidebar border
+            let form_area = Rect {
+                x: layout[1].x + 1,
+                width: layout[1].width.saturating_sub(1),
+                ..layout[1]
+            };
+            render_question_form(frame, state, form_area);
             return;
         }
     }
