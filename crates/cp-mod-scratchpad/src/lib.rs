@@ -6,6 +6,7 @@ pub use types::{ScratchpadCell, ScratchpadState};
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -130,6 +131,14 @@ impl Module for ScratchpadModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("scratchpad_create_cell", visualize_scratchpad_output as ToolVisualizer),
+            ("scratchpad_edit_cell", visualize_scratchpad_output as ToolVisualizer),
+            ("scratchpad_wipe", visualize_scratchpad_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "scratchpad",
@@ -146,4 +155,51 @@ impl Module for ScratchpadModule {
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Scratchpad", "A useful scratchpad for you to use however you like")]
     }
+}
+
+/// Visualizer for scratchpad tool results.
+/// Highlights cell titles and shows creation vs edit vs deletion actions.
+fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let error_color = Color::Rgb(255, 85, 85);
+    let secondary_color = Color::Rgb(150, 150, 170);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Created cell") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("Updated") {
+            Style::default().fg(info_color)
+        } else if line.starts_with("Deleted") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("C") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Cell IDs like C1, C2
+            Style::default().fg(info_color)
+        } else if line.contains(":") {
+            // Cell titles
+            Style::default().fg(secondary_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

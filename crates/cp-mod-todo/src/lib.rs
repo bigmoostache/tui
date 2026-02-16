@@ -6,6 +6,7 @@ pub use types::{TodoItem, TodoState, TodoStatus};
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -148,6 +149,14 @@ impl Module for TodoModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("todo_create", visualize_todo_output as ToolVisualizer),
+            ("todo_update", visualize_todo_output as ToolVisualizer),
+            ("todo_move", visualize_todo_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "todo",
@@ -173,4 +182,56 @@ impl Module for TodoModule {
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Todo", "Track tasks and progress during the session")]
     }
+}
+
+/// Visualizer for todo tool results.
+/// Shows todo status with colored indicators and highlights created/updated item names.
+fn visualize_todo_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123); // Green for done
+    let warning_color = Color::Rgb(241, 250, 140); // Yellow for in_progress
+    let info_color = Color::Rgb(139, 233, 253); // Cyan for pending
+    let error_color = Color::Rgb(255, 85, 85); // Red for deleted/errors
+    let secondary_color = Color::Rgb(150, 150, 170); // Gray
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.contains("done") || line.contains("Done") || line.starts_with("Created") {
+            Style::default().fg(success_color)
+        } else if line.contains("in_progress") || line.contains("in-progress") {
+            Style::default().fg(warning_color)
+        } else if line.contains("pending") || line.contains("Moved") {
+            Style::default().fg(info_color)
+        } else if line.contains("deleted") || line.contains("Deleted") {
+            Style::default().fg(error_color)
+        } else if line.contains("Updated") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("X") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Todo IDs like X1, X2
+            Style::default().fg(info_color)
+        } else if line.contains("→") {
+            // Status changes
+            Style::default().fg(secondary_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

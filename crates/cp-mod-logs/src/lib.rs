@@ -14,7 +14,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use cp_base::constants::STORE_DIR;
-use cp_base::modules::Module;
+use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::{Panel, mark_panels_dirty, now_ms};
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -262,6 +262,15 @@ impl Module for LogsModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("log_create", visualize_logs_output as ToolVisualizer),
+            ("log_summarize", visualize_logs_output as ToolVisualizer),
+            ("log_toggle", visualize_logs_output as ToolVisualizer),
+            ("close_conversation_history", visualize_logs_output as ToolVisualizer),
+        ]
+    }
+
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
             ContextType::LOGS => Some(Box::new(panel::LogsPanel)),
@@ -289,6 +298,52 @@ impl Module for LogsModule {
             needs_async_wait: false,
         }]
     }
+}
+
+/// Visualizer for logs tool results.
+/// Highlights timestamps, log entry content, and summary operations.
+fn visualize_logs_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let warning_color = Color::Rgb(241, 250, 140);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Created") {
+            Style::default().fg(success_color)
+        } else if line.contains("summary") || line.contains("Summary") {
+            Style::default().fg(info_color)
+        } else if line.contains("Expanded") || line.contains("Collapsed") {
+            Style::default().fg(warning_color)
+        } else if line.starts_with("Closed") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("L") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Log IDs like L1, L2
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }
 
 /// Helper: allocate a log ID and push a log entry (timestamped now)

@@ -9,6 +9,7 @@ pub use types::{PromptItem, PromptState, PromptType};
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -255,6 +256,23 @@ impl Module for PromptModule {
         tools::dispatch(tool, state)
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("agent_create", visualize_prompt_output as ToolVisualizer),
+            ("agent_edit", visualize_prompt_output as ToolVisualizer),
+            ("agent_delete", visualize_prompt_output as ToolVisualizer),
+            ("agent_load", visualize_prompt_output as ToolVisualizer),
+            ("skill_create", visualize_prompt_output as ToolVisualizer),
+            ("skill_edit", visualize_prompt_output as ToolVisualizer),
+            ("skill_delete", visualize_prompt_output as ToolVisualizer),
+            ("skill_load", visualize_prompt_output as ToolVisualizer),
+            ("skill_unload", visualize_prompt_output as ToolVisualizer),
+            ("command_create", visualize_prompt_output as ToolVisualizer),
+            ("command_edit", visualize_prompt_output as ToolVisualizer),
+            ("command_delete", visualize_prompt_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![
             cp_base::state::ContextTypeMeta {
@@ -302,4 +320,50 @@ impl Module for PromptModule {
             ("Command", "Manage input commands"),
         ]
     }
+}
+
+/// Visualizer for prompt/agent/skill/command tool results.
+/// Highlights entity names, shows active status, and differentiates CRUD operations visually.
+fn visualize_prompt_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let warning_color = Color::Rgb(241, 250, 140);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Created") || line.starts_with("Loaded") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("Updated") || line.starts_with("Edited") {
+            Style::default().fg(info_color)
+        } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
+            Style::default().fg(warning_color)
+        } else if line.contains("agent") || line.contains("skill") || line.contains("command") {
+            Style::default().fg(info_color)
+        } else if line.contains("'") {
+            // Entity names in quotes
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }
