@@ -5,6 +5,7 @@ pub mod constants;
 pub mod llm_types;
 pub mod modules;
 pub mod panels;
+pub mod question_form;
 pub mod state;
 pub mod tool_defs;
 pub mod tools;

@@ -304,6 +304,53 @@ impl Module for CoreModule {
         // Add module_toggle tool
         defs.push(super::module_toggle_tool_definition());
 
+        // AskUserQuestion tool (#39)
+        defs.push(ToolDefinition {
+            id: "ask_user_question".to_string(),
+            name: "Ask User Question".to_string(),
+            short_desc: "Ask user multiple-choice questions".to_string(),
+            description: "Presents 1-4 multiple-choice questions to the user as an interactive form. \
+                The form replaces the input field until the user submits answers or presses Esc to dismiss. \
+                Each question has 2-4 options plus an auto-appended \"Other\" free-text option. \
+                Use this to gather preferences, clarify ambiguous instructions, or get implementation decisions. \
+                The user can select one option (or multiple if multiSelect), or choose \"Other\" and type a custom answer. \
+                If recommending a specific option, list it first with \"(Recommended)\" in the label."
+                .to_string(),
+            params: vec![
+                ToolParam::new(
+                    "questions",
+                    ParamType::Array(Box::new(ParamType::Object(vec![
+                        ToolParam::new("question", ParamType::String)
+                            .desc("The complete question text. Should be clear, specific, and end with ?")
+                            .required(),
+                        ToolParam::new("header", ParamType::String)
+                            .desc("Very short label (max 12 chars). E.g. \"Auth method\", \"Library\"")
+                            .required(),
+                        ToolParam::new(
+                            "options",
+                            ParamType::Array(Box::new(ParamType::Object(vec![
+                                ToolParam::new("label", ParamType::String)
+                                    .desc("Display text (1-5 words)")
+                                    .required(),
+                                ToolParam::new("description", ParamType::String)
+                                    .desc("Explanation of what this option means")
+                                    .required(),
+                            ]))),
+                        )
+                        .desc("2-4 available choices. An \"Other\" free-text option is appended automatically.")
+                        .required(),
+                        ToolParam::new("multiSelect", ParamType::Boolean)
+                            .desc("If true, user can select multiple options")
+                            .required(),
+                    ]))),
+                )
+                .desc("1-4 questions to ask the user")
+                .required(),
+            ],
+            enabled: true,
+            category: "Context".to_string(),
+        });
+
         defs
     }
 
@@ -318,6 +365,9 @@ impl Module for CoreModule {
 
             // Meta tools
             "tool_manage" => Some(self::tools::manage_tools::execute(tool, state)),
+
+            // Question tool (#39)
+            "ask_user_question" => Some(self::tools::ask_question::execute(tool, state)),
 
             // module_toggle is handled in dispatch_tool() directly
             _ => None,
