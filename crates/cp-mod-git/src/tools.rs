@@ -136,7 +136,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                             combined
                         },
                         is_error,
-                    }
+                    )
                 }
                 Err(e) => {
                     let content = if e.kind() == std::io::ErrorKind::NotFound {
@@ -144,7 +144,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     } else {
                         format!("Error running git: {}", e)
                     };
-                    ToolResult { tool_use_id: tool.id.clone(), content, true)
+                    ToolResult::new(tool.id.clone(), content, true)
                 }
             }
         }
@@ -251,7 +251,5 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Mark P6 as deprecated to refresh
     cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::GIT));
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("P6 configured: {}", changes.join(", ")), false)
+    ToolResult::new(tool.id.clone(), format!("P6 configured: {}", changes.join(", ")), false)
 }

@@ -477,9 +477,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     touch_logs_panel(state);
 
-    ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()), false)
 }
 
 fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -506,9 +504,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
             Some(log) => {
                 if log.children_ids.is_empty() {
-                    return ToolResult::new(tool.id.clone(), format!("Log '{}' has no children — can only toggle summaries", id),
-                        is_error: true,
-                    };
+                    return ToolResult::new(tool.id.clone(), format!("Log '{}' has no children — can only toggle summaries", id), true);
                 }
             }
         }
@@ -525,9 +521,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     touch_logs_panel(state);
 
-    ToolResult::new(tool.id.clone(), format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id), false)
 }
 
 fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -647,5 +641,5 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     state.context.retain(|c| c.id != panel_id);
     output_parts.push(format!("Closed {} ({})", panel_id, panel_name));
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), false)
+    ToolResult::new(tool.id.clone(), output_parts.join("\n"), false)
 }

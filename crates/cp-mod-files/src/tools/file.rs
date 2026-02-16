@@ -13,9 +13,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if file is already open
     if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is already open in context", path), false);
+        return ToolResult::new(tool.id.clone(), format!("File '{}' is already open in context", path), false);
     }
 
     // Check if file exists (quick metadata check, not a full read)

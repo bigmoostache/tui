@@ -60,9 +60,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("No changes specified for cell {}", cell_id), true)
+                ToolResult::new(tool.id.clone(), format!("No changes specified for cell {}", cell_id), true)
             } else {
                 // Update Scratchpad panel timestamp
                 state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
@@ -91,9 +89,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         ss.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
         state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Wiped all {} scratchpad cell(s)", count), false);
+        return ToolResult::new(tool.id.clone(), format!("Wiped all {} scratchpad cell(s)", count), false);
     }
 
     // Otherwise, delete specific cells

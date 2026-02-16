@@ -128,7 +128,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                             combined
                         },
                         is_error,
-                    }
+                    )
                 }
                 Err(e) => {
                     let content = if e.kind() == std::io::ErrorKind::NotFound {

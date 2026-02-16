@@ -13,9 +13,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Validate glob pattern early (cheap operation)
     if globset::GlobBuilder::new(pattern).literal_separator(true).build().is_err() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Invalid glob pattern: '{}'", pattern), true);
+        return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern: '{}'", pattern), true);
     }
 
     let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());

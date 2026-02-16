@@ -177,16 +177,14 @@ pub(crate) fn execute_load(
         } else {
             format!("Preset '{}' not found. Available presets: {}", name, available.join(", "))
         };
-        return ToolResult { tool_use_id: tool.id.clone(), content: msg, true);
+        return ToolResult::new(tool.id.clone(), msg, true);
     }
 
     let preset: Preset = match fs::read_to_string(&file_path) {
         Ok(json) => match serde_json::from_str(&json) {
             Ok(p) => p,
             Err(e) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to parse preset '{}': {}", name, e), true);
+                return ToolResult::new(tool.id.clone(), format!("Failed to parse preset '{}': {}", name, e), true);
             }
         },
         Err(e) => {

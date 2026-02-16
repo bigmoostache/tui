@@ -16,9 +16,7 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_processed = SpineState::get(state).notifications.iter().find(|n| n.id == id).map(|n| n.processed);
 
     match already_processed {
-        Some(true) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Notification {} is already processed", id), false),
+        Some(true) => ToolResult::new(tool.id.clone(), format!("Notification {} is already processed", id), false),
         Some(false) => {
             SpineState::mark_notification_processed(state, id);
             ToolResult::new(tool.id.clone(), format!("Marked notification {} as processed", id), false)
@@ -105,11 +103,9 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     if changes.is_empty() {
         ToolResult::new(tool.id.clone(), "No changes made. Pass at least one parameter to configure.".to_string(), false)
     } else {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!(
-                "Spine configured:\n{}",
-                changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
-            ), false)
+        ToolResult::new(tool.id.clone(), format!(
+            "Spine configured:\n{}",
+            changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
+        ), false)
     }
 }

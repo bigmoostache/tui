@@ -39,9 +39,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Created skill '{}' with ID '{}'", name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created skill '{}' with ID '{}'", name, id), false)
 }
 
 pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -61,9 +59,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if skill.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in skill '{}'", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in skill '{}'", id), true);
     }
 
     let mut changes = Vec::new();
@@ -126,9 +122,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let idx = match ps.skills.iter().position(|s| s.id == id) {
         Some(i) => i,
         None => {
-            return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
         }
     };
 
@@ -143,9 +137,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
 }
 
 pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -167,9 +159,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if already loaded
     if ps.loaded_skill_ids.contains(&id.to_string()) {
-        return ToolResult::new(tool.id.clone(), format!("Skill '{}' is already loaded", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Skill '{}' is already loaded", id), true);
     }
 
     // Create ContextElement for the skill panel
@@ -196,9 +186,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens), false)
 }
 
 pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {

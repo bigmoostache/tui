@@ -60,9 +60,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if agent.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in agent '{}'", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in agent '{}'", id), true);
     }
 
     let mut changes = Vec::new();
@@ -115,9 +113,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let idx = match ps.agents.iter().position(|a| a.id == id) {
         Some(i) => i,
         None => {
-            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
         }
     };
 
@@ -132,9 +128,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
 
 pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -145,17 +139,13 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
-        return ToolResult::new(tool.id.clone(), format!("Switched to default agent ({})", library::default_agent_id()),
-            is_error: false,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Switched to default agent ({})", library::default_agent_id()), false);
     }
 
     let id = id.unwrap();
 
     if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
     }
 
     PromptState::get_mut(state).active_agent_id = Some(id.to_string());

@@ -39,9 +39,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Created command '{}' with ID '{}' (use as /{})", name, id, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created command '{}' with ID '{}' (use as /{})", name, id, id), false)
 }
 
 pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -60,9 +58,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if cmd.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in command '{}'", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in command '{}'", id), true);
     }
 
     let mut changes = Vec::new();
@@ -112,9 +108,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let idx = match ps.commands.iter().position(|c| c.id == id) {
         Some(i) => i,
         None => {
-            return ToolResult::new(tool.id.clone(), format!("Command '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Command '{}' not found", id), true);
         }
     };
 
@@ -123,7 +117,5 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Deleted command '{}' ({})", cmd.name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Deleted command '{}' ({})", cmd.name, id), false)
 }

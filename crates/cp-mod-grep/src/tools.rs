@@ -18,9 +18,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Validate regex pattern early (cheap operation)
     if let Err(e) = Regex::new(pattern) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Invalid regex pattern: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Invalid regex pattern: {}", e), true);
     }
 
     let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());

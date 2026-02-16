@@ -116,7 +116,7 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult { tool_use_id: tool.id.clone(), content: "No changes specified".to_string(), true)
+                ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true)
             } else {
                 let pane_id = c.get_meta_str("tmux_pane_id").unwrap_or(identifier);
                 ToolResult::new(tool.id.clone(), format!("Updated pane {}: {}", pane_id, changes.join(", ")), false)
@@ -159,9 +159,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pane_id = match resolve_pane_id(identifier, state) {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier), true);
+            return ToolResult::new(tool.id.clone(), format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier), true);
         }
     };
 
@@ -174,11 +172,9 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Reject bare "Enter" since it's sent automatically
     if keys.eq_ignore_ascii_case("enter") {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content:
-                "console_send_keys already sends Enter automatically after your keys — no need to send it separately."
-                    .to_string(), true);
+        return ToolResult::new(tool.id.clone(),
+            "console_send_keys already sends Enter automatically after your keys — no need to send it separately."
+                .to_string(), true);
     }
 
     // Reject git/gh commands — use the dedicated git_execute and gh_execute tools instead.
@@ -220,9 +216,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             let panel_msg = context_id.map(|id| format!(". Content up to date in panel {}", id)).unwrap_or_default();
 
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Sent keys to pane {}: {}{}", pane_id, keys, panel_msg), false)
+            ToolResult::new(tool.id.clone(), format!("Sent keys to pane {}: {}{}", pane_id, keys, panel_msg), false)
         }
         Ok(out) => ToolResult::new(tool.id.clone(), format!("Failed to send keys: {}", String::from_utf8_lossy(&out.stderr)), true),
         Err(e) => ToolResult::new(tool.id.clone(), format!("Failed to run tmux command: {}", e), true),

@@ -234,9 +234,7 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
         invalidate_tree_cache(state);
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty())
+    ToolResult::new(tool.id.clone(), if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty())
 }
 
 /// Execute edit_tree_filter tool (keep existing functionality)
@@ -244,9 +242,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     let filter = match tool.input.get("filter").and_then(|v| v.as_str()) {
         Some(f) => f,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'filter' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
         }
     };
 

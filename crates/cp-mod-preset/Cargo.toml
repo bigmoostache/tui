@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 cp-base.workspace = true
+ratatui.workspace = true
 cp-mod-prompt = { path = "../cp-mod-prompt" }
 serde.workspace = true
 serde_json.workspace = true

@@ -221,7 +221,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     result_msg.push_str("```");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, false)
+    ToolResult::new(tool.id.clone(), result_msg, false)
 }
 
 #[cfg(test)]
