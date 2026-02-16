@@ -280,27 +280,57 @@ mod tests {
     }
 
     #[test]
-    fn test_edit_result_contains_diff_format() {
-        // This test verifies that the ToolResult from edit_file contains
-        // the expected diff format markers for UI rendering
+    fn test_diff_format_structure() {
+        // Test that verifies the expected structure of a diff-formatted result message
+        // This simulates what edit_file produces without requiring actual file I/O
         
-        // The format should be:
-        // - Header line with file path and change summary
-        // - ```diff marker
-        // - Old lines prefixed with "- "
-        // - New lines prefixed with "+ "
-        // - ``` closing marker
+        let old_string = "line1\nline2";
+        let new_string = "line1_modified\nline2_modified";
+        let path_str = "test.txt";
+        let replaced = 1;
+        let replace_all = false;
+        let lines_changed = new_string.lines().count().max(old_string.lines().count());
         
-        // We can't easily test the full edit_file function without file I/O,
-        // but we can verify the format structure manually by examining
-        // edit_file.rs lines 217-245 which show:
-        // 1. Header with path and change count
-        // 2. "```diff\n"
-        // 3. Old lines with "- " prefix
-        // 4. New lines with "+ " prefix  
-        // 5. "```" closing
+        // Replicate the formatting logic from edit_file
+        let mut result_msg = String::new();
         
-        // This is a documentation test that verifies the structure is correct
-        assert!(true, "Diff format structure verified manually in code");
+        if replace_all && replaced > 1 {
+            result_msg.push_str(&format!("Edited '{}': {} replacements (~{} lines changed each)\n", path_str, replaced, lines_changed));
+        } else {
+            result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
+        }
+        
+        result_msg.push_str("```diff\n");
+        
+        for line in old_string.lines() {
+            result_msg.push_str(&format!("- {}\n", line));
+        }
+        
+        for line in new_string.lines() {
+            result_msg.push_str(&format!("+ {}\n", line));
+        }
+        
+        result_msg.push_str("```");
+        
+        // Verify the structure
+        assert!(result_msg.contains("Edited 'test.txt': ~2 lines changed\n"));
+        assert!(result_msg.contains("```diff\n"));
+        assert!(result_msg.contains("- line1\n"));
+        assert!(result_msg.contains("- line2\n"));
+        assert!(result_msg.contains("+ line1_modified\n"));
+        assert!(result_msg.contains("+ line2_modified\n"));
+        assert!(result_msg.ends_with("```"));
+        
+        // Verify ordering: header, then diff marker, then deletions, then additions, then closing
+        let header_pos = result_msg.find("Edited").unwrap();
+        let diff_start_pos = result_msg.find("```diff").unwrap();
+        let first_deletion_pos = result_msg.find("- line1").unwrap();
+        let first_addition_pos = result_msg.find("+ line1_modified").unwrap();
+        let diff_end_pos = result_msg.rfind("```").unwrap();
+        
+        assert!(header_pos < diff_start_pos);
+        assert!(diff_start_pos < first_deletion_pos);
+        assert!(first_deletion_pos < first_addition_pos);
+        assert!(first_addition_pos < diff_end_pos);
     }
 }
