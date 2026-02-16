@@ -1,0 +1,12 @@
+[package]
+name = "cp-mod-logs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cp-base.workspace = true
+cp-mod-memory = { path = "../cp-mod-memory" }
+ratatui.workspace = true
+crossterm.workspace = true
+serde.workspace = true
+serde_json.workspace = true

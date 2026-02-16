@@ -1,0 +1,206 @@
+use std::process::{Command, Output, Stdio};
+use std::time::Duration;
+
+use crate::panels::Panel;
+use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::tool_defs::ToolDefinition;
+use crate::tools::{ToolResult, ToolUse};
+
+/// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
+pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    let child = cmd.spawn()?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+    match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
+        Ok(result) => result,
+        Err(_) => {
+            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Command timed out after {}s", timeout_secs)))
+        }
+    }
+}
+
+/// Truncate output to max_bytes, respecting UTF-8 char boundaries.
+pub fn truncate_output(output: &str, max_bytes: usize) -> String {
+    if output.len() <= max_bytes {
+        output.to_string()
+    } else {
+        let truncated = &output[..output.floor_char_boundary(max_bytes)];
+        format!("{}\n\n[Output truncated at 1MB]", truncated)
+    }
+}
+
+/// A module that provides tools, panels, and configuration to the TUI.
+///
+/// Modules are stateless — all runtime state lives in `State`.
+/// Activation/deactivation is a config toggle that controls whether
+/// the module's tools and panels are registered.
+pub trait Module: Send + Sync {
+    /// Unique identifier (e.g., "core", "git", "tmux")
+    fn id(&self) -> &'static str;
+    /// Display name
+    fn name(&self) -> &'static str;
+    /// Short description
+    fn description(&self) -> &'static str;
+    /// IDs of modules this one depends on
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    /// Core modules cannot be deactivated
+    fn is_core(&self) -> bool {
+        false
+    }
+
+    /// Whether this module's data is global (config.json) or per-worker (worker.json)
+    fn is_global(&self) -> bool {
+        false
+    }
+
+    /// Initialize module-owned state in the State extension map.
+    /// Called once at startup for each module. Use `state.set_ext(MyState { ... })`.
+    fn init_state(&self, _state: &mut State) {}
+
+    /// Reset module-owned state to defaults (e.g., when loading a preset).
+    /// Called by preset system to clear module data without full restart.
+    fn reset_state(&self, _state: &mut State) {}
+
+    /// Serialize this module's data from State into a JSON value for persistence.
+    /// Returns Value::Null if this module has no data to persist.
+    /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
+    fn save_module_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// Deserialize this module's data from a JSON value and apply it to State.
+    /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
+    fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    /// Serialize worker-specific data for modules that are global but also need per-worker state.
+    /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// Deserialize worker-specific data. Always loaded from WorkerState.
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    /// Tool definitions provided by this module
+    fn tool_definitions(&self) -> Vec<ToolDefinition>;
+    /// Execute a tool. Returns None if this module doesn't own the tool.
+    fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult>;
+
+    /// Create a panel for the given context type. Returns None if not owned by this module.
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>>;
+
+    /// Fixed panel types owned by this module (P0-P7)
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+    /// Dynamic panel types this module can create (File, Glob, Grep, Tmux)
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
+    /// Used by ensure_default_contexts to create missing panels generically.
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
+
+    /// Context type metadata for the registry.
+    /// Each module declares its owned context types with icon, fixed/cache flags, and sort order.
+    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+        vec![]
+    }
+
+    // === Overview delegation ===
+    // These methods let modules provide their own overview content instead of
+    // hardcoding module knowledge in the binary's overview panel.
+
+    /// Return display name for a context type owned by this module (e.g., "todo" → "wip").
+    /// Used in the Overview panel's context elements table.
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    /// Return detail string for a context element owned by this module (e.g., file path, pattern).
+    /// Used in the Overview panel's context elements table.
+    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+        None
+    }
+
+    /// Return LLM-facing overview text for this module's state (e.g., "Todos: 3/5 done").
+    /// Appended to the Overview context sent to the LLM.
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    /// Return TUI-rendered overview section(s) for this module.
+    /// Each element is (section_order, rendered_lines). Sections are sorted by order.
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    /// Handle closing a context element of this module's type.
+    /// Returns None if this module doesn't own the context type.
+    /// Returns Some(Err(message)) if the close should be blocked/redirected.
+    /// Returns Some(Ok(description)) if cleanup succeeded — caller removes the context element.
+    fn on_close_context(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    /// Return tool category descriptions for tools owned by this module.
+    /// Each entry is (category_id, description). Used in the Overview panel's tool listing.
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![]
+    }
+
+    // === Lifecycle hooks ===
+
+    /// Called when the user submits a message (before streaming starts).
+    /// Modules can reset counters, create notifications, etc.
+    fn on_user_message(&self, _state: &mut State) {}
+
+    /// Called when streaming is stopped by the user (Esc key).
+    /// Modules can update their state to reflect the stop.
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    // === File watcher delegation ===
+
+    /// Return filesystem paths this module wants the file watcher to monitor.
+    /// Called periodically to sync watchers. Includes both global paths (e.g., .git/)
+    /// and per-context-element paths (e.g., individual file paths).
+    fn watch_paths(&self, _state: &State) -> Vec<crate::panels::WatchSpec> {
+        vec![]
+    }
+
+    /// Check if a filesystem change event should invalidate a specific context element.
+    /// `is_dir_event`: true for directory changes, false for file changes.
+    /// Returns true if the element should be marked cache_deprecated.
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    /// Whether watcher-triggered invalidation should schedule immediate cache refresh.
+    /// If false, invalidation only marks the panel dirty for timer-based refresh.
+    /// Default is true. Override to false for modules where immediate refresh would
+    /// create feedback loops (e.g., git: `git status` writes `.git/index`).
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
+    }
+}

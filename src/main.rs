@@ -49,15 +49,21 @@ fn main() -> io::Result<()> {
 
     let mut state = load_state();
 
+    // Set callback hooks for extracted module crates
+    state.highlight_fn = Some(highlight::highlight_file);
+
     // Validate module dependencies at startup
     modules::validate_dependencies(&state.active_modules);
+
+    // Initialize the ContextType registry from all modules (must happen before any is_fixed/icon/needs_cache calls)
+    modules::init_registry();
 
     // Ensure default context elements and seed exist
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
 
     // Ensure built-in presets exist on disk
-    modules::preset::builtin::ensure_builtin_presets();
+    cp_mod_preset::builtin::ensure_builtin_presets();
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();

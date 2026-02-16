@@ -28,7 +28,7 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
     // messages the LLM already saw (e.g., user sent a message during a tool
     // call pause — the message is in context, LLM responds, but without this
     // the notification would still be "unprocessed" when the stream ends).
-    state.mark_user_message_notifications_processed();
+    cp_mod_spine::SpineState::mark_user_message_notifications_processed(state);
 
     // Detach old conversation chunks before anything else
     detach_conversation_chunks(state);
@@ -288,21 +288,10 @@ pub fn detach_conversation_chunks(state: &mut State) {
         state.context.push(ContextElement {
             id: panel_id,
             uid: Some(panel_uid),
-            context_type: ContextType::ConversationHistory,
+            context_type: ContextType::new(ContextType::CONVERSATION_HISTORY),
             name: chunk_name,
             token_count,
-            file_path: None,
-            glob_pattern: None,
-            glob_path: None,
-            grep_pattern: None,
-            grep_path: None,
-            grep_file_pattern: None,
-            tmux_pane_id: None,
-            tmux_lines: None,
-            tmux_last_keys: None,
-            tmux_description: None,
-            result_command: None,
-            skill_prompt_id: None,
+            metadata: std::collections::HashMap::new(),
             cached_content: Some(content),
             history_messages: Some(history_msgs),
             cache_deprecated: false,

@@ -21,6 +21,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use cp_mod_logs::LogsState;
+
 use crate::config::set_active_theme;
 use crate::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
 use crate::state::{ContextElement, ContextType, Message, PanelData, SharedConfig, State, WorkerState};
@@ -39,7 +41,11 @@ pub fn load_state() -> State {
         load_state_new()
     } else {
         // Fresh start - create default state
-        let state = State::default();
+        let mut state = State::default();
+        // Initialize module-owned state (TypeMap entries)
+        for module in crate::modules::all_modules() {
+            module.init_state(&mut state);
+        }
         set_active_theme(&state.active_theme);
         state
     }
@@ -51,21 +57,10 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     ContextElement {
         id: local_id.to_string(),
         uid: Some(panel.uid.clone()),
-        context_type: panel.panel_type,
+        context_type: panel.panel_type.clone(),
         name: panel.name.clone(),
         token_count: panel.token_count,
-        file_path: panel.file_path.clone(),
-        glob_pattern: panel.glob_pattern.clone(),
-        glob_path: panel.glob_path.clone(),
-        grep_pattern: panel.grep_pattern.clone(),
-        grep_path: panel.grep_path.clone(),
-        grep_file_pattern: panel.grep_file_pattern.clone(),
-        tmux_pane_id: panel.tmux_pane_id.clone(),
-        tmux_lines: panel.tmux_lines,
-        tmux_last_keys: None,
-        tmux_description: panel.tmux_description.clone(),
-        result_command: panel.result_command.clone(),
-        skill_prompt_id: panel.skill_prompt_id.clone(),
+        metadata: panel.metadata.clone(),
         cached_content: None,
         history_messages: None,
         cache_deprecated: true, // Will be refreshed on load
@@ -94,7 +89,7 @@ fn load_state_new() -> State {
     let important = &worker_state.important_panel_uids;
 
     // Load Conversation panel (special: not in FIXED_PANEL_ORDER, uses id "chat")
-    if let Some(uid) = important.get(&ContextType::Conversation)
+    if let Some(uid) = important.get(&ContextType::new(ContextType::CONVERSATION))
         && let Some(panel_data) = panel::load_panel(uid)
     {
         context.push(panel_to_context(&panel_data, "chat"));
@@ -104,9 +99,9 @@ fn load_state_new() -> State {
     let defaults = crate::modules::all_fixed_panel_defaults();
     for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
         let id = format!("P{}", pos);
-        if *ct == ContextType::System {
+        if *ct == ContextType::SYSTEM {
             // System panel is not stored in panels/ - comes from systems[]
-            context.push(crate::modules::make_default_context_element(&id, *ct, name, *cache_deprecated));
+            context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
         } else if let Some(uid) = important.get(ct)
             && let Some(panel_data) = panel::load_panel(uid)
         {
@@ -123,7 +118,7 @@ fn load_state_new() -> State {
                 let mut elem = panel_to_context(&p, local_id);
 
                 // For ConversationHistory panels, load history messages and rebuild cached content
-                if p.panel_type == ContextType::ConversationHistory && !p.message_uids.is_empty() {
+                if p.panel_type == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
                     let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
                     if !msgs.is_empty() {
                         let content = crate::state::format_messages_to_chunk(&msgs);
@@ -154,7 +149,7 @@ fn load_state_new() -> State {
 
     // Load messages from the conversation panel
     let message_uids: Vec<String> = important
-        .get(&ContextType::Conversation)
+        .get(&ContextType::new(ContextType::CONVERSATION))
         .and_then(|uid| panel::load_panel(uid))
         .map(|p| p.message_uids)
         .unwrap_or_default();
@@ -192,6 +187,11 @@ fn load_state_new() -> State {
         ..State::default()
     };
 
+    // Initialize module-owned state (TypeMap entries) before loading persisted data
+    for module in crate::modules::all_modules() {
+        module.init_state(&mut state);
+    }
+
     // Load module data from appropriate config (global → SharedConfig, worker → WorkerState)
     let null = serde_json::Value::Null;
     for module in crate::modules::all_modules() {
@@ -215,7 +215,7 @@ fn load_state_new() -> State {
 
     // Load GitHub token from environment
     dotenvy::dotenv().ok();
-    state.github_token = std::env::var("GITHUB_TOKEN").ok();
+    cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
 
     // Set the global active theme
     set_active_theme(&state.active_theme);
@@ -235,7 +235,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::constants::STATES_DIR),
         dir.join(crate::constants::PANELS_DIR),
         dir.join(crate::constants::MESSAGES_DIR),
-        dir.join(crate::constants::LOGS_DIR),
+        dir.join(cp_mod_logs::LOGS_DIR),
     ];
 
     // Build module data maps
@@ -272,16 +272,21 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     }
 
     // Chunked log files (global, shared across workers)
-    writes.extend(crate::modules::logs::build_log_write_ops(&state.logs, state.next_log_id));
+    let logs_state = LogsState::get(state);
+    writes.extend(
+        cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
+            .into_iter()
+            .map(|(path, content)| WriteOp { path, content }),
+    );
 
     // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
-        let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::Conversation)
-            && ctx.context_type != ContextType::System
-            && ctx.context_type != ContextType::Library;
+        let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::CONVERSATION)
+            && ctx.context_type != ContextType::SYSTEM
+            && ctx.context_type != ContextType::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
-            important_uids.insert(ctx.context_type, uid.clone());
+            important_uids.insert(ctx.context_type.clone(), uid.clone());
         }
     }
 
@@ -289,7 +294,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     let panel_uid_to_local_id: HashMap<String, String> = state
         .context
         .iter()
-        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type != ContextType::Conversation)
+        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type != ContextType::CONVERSATION)
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
 
@@ -315,20 +320,20 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in state.context.iter() {
-        if ctx.context_type == ContextType::System || ctx.context_type == ContextType::Library {
+        if ctx.context_type == ContextType::SYSTEM || ctx.context_type == ContextType::LIBRARY {
             continue;
         }
         if let Some(uid) = &ctx.uid {
             known_uids.insert(uid.clone());
             let panel_data = PanelData {
                 uid: uid.clone(),
-                panel_type: ctx.context_type,
+                panel_type: ctx.context_type.clone(),
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
-                message_uids: if ctx.context_type == ContextType::Conversation {
+                message_uids: if ctx.context_type == ContextType::CONVERSATION {
                     state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
-                } else if ctx.context_type == ContextType::ConversationHistory {
+                } else if ctx.context_type == ContextType::CONVERSATION_HISTORY {
                     ctx.history_messages
                         .as_ref()
                         .map(|msgs| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
@@ -336,17 +341,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 } else {
                     vec![]
                 },
-                file_path: ctx.file_path.clone(),
-                glob_pattern: ctx.glob_pattern.clone(),
-                glob_path: ctx.glob_path.clone(),
-                grep_pattern: ctx.grep_pattern.clone(),
-                grep_path: ctx.grep_path.clone(),
-                grep_file_pattern: ctx.grep_file_pattern.clone(),
-                tmux_pane_id: ctx.tmux_pane_id.clone(),
-                tmux_lines: ctx.tmux_lines,
-                tmux_description: ctx.tmux_description.clone(),
-                result_command: ctx.result_command.clone(),
-                skill_prompt_id: ctx.skill_prompt_id.clone(),
+                metadata: ctx.metadata.clone(),
                 content_hash: ctx.content_hash.clone(),
                 panel_total_cost: if ctx.panel_total_cost > 0.0 { Some(ctx.panel_total_cost) } else { None },
             };
@@ -359,7 +354,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     // History messages for ConversationHistory panels
     let messages_dir = dir.join(crate::constants::MESSAGES_DIR);
     for ctx in &state.context {
-        if ctx.context_type == ContextType::ConversationHistory
+        if ctx.context_type == ContextType::CONVERSATION_HISTORY
             && let Some(ref msgs) = ctx.history_messages
         {
             for msg in msgs {

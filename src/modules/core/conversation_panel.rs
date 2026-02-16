@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
+use cp_mod_prompt::PromptState;
+
 use crate::actions::Action;
 use crate::core::panels::{ContextItem, Panel};
 use crate::state::{
@@ -57,7 +59,8 @@ impl ConversationPanel {
         std::hash::Hash::hash(&state.is_streaming, &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
-        let history_count = state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).count();
+        let history_count =
+            state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
@@ -109,7 +112,7 @@ impl ConversationPanel {
         // Prepend frozen ConversationHistory panels (oldest first)
         {
             let mut history_panels: Vec<_> =
-                state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).collect();
+                state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).collect();
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {
@@ -208,7 +211,7 @@ impl ConversationPanel {
                     state.input_cursor,
                     viewport_width,
                     base_style,
-                    &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                    &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                     &state.paste_buffers,
                     &state.paste_buffer_labels,
                 );
@@ -223,7 +226,7 @@ impl ConversationPanel {
                 state.input_cursor,
                 viewport_width,
                 base_style,
-                &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                 &state.paste_buffers,
                 &state.paste_buffer_labels,
             );

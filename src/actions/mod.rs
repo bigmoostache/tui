@@ -15,6 +15,7 @@ pub use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern
 
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
+use cp_mod_prompt::PromptState;
 
 /// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
 fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
@@ -45,65 +46,8 @@ fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
     cursor
 }
 
-#[derive(Debug, Clone)]
-pub enum Action {
-    InputChar(char),
-    InsertText(String),
-    PasteText(String),
-    InputBackspace,
-    InputDelete,
-    InputSubmit,
-    CursorWordLeft,
-    CursorWordRight,
-    DeleteWordLeft,
-    RemoveListItem, // Remove empty list item, keep newline
-    CursorHome,
-    CursorEnd,
-    ClearConversation,
-    NewContext,
-    SelectNextContext,
-    SelectPrevContext,
-    AppendChars(String),
-    StreamDone {
-        _input_tokens: usize,
-        output_tokens: usize,
-        cache_hit_tokens: usize,
-        cache_miss_tokens: usize,
-        stop_reason: Option<String>,
-    },
-    StreamError(String),
-    ScrollUp(f32),
-    ScrollDown(f32),
-    StopStreaming,
-    TmuxSendKeys {
-        pane_id: String,
-        keys: String,
-    },
-    TogglePerfMonitor,
-    ToggleConfigView,
-    ConfigSelectProvider(crate::llms::LlmProvider),
-    ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
-    ConfigSelectGrokModel(crate::llms::GrokModel),
-    ConfigSelectGroqModel(crate::llms::GroqModel),
-    ConfigSelectDeepSeekModel(crate::llms::DeepSeekModel),
-    ConfigSelectNextBar,
-    ConfigSelectPrevBar,
-    ConfigIncreaseSelectedBar,
-    ConfigDecreaseSelectedBar,
-    ConfigNextTheme,
-    ConfigPrevTheme,
-    OpenCommandPalette,
-    SelectContextById(String),
-    None,
-}
-
-pub enum ActionResult {
-    Nothing,
-    StopStream,
-    StartApiCheck,
-    Save,
-    SaveMessage(String),
-}
+// Re-export Action/ActionResult from cp-base (shared with module crates)
+pub use cp_base::actions::{Action, ActionResult};
 
 pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions
@@ -117,7 +61,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input_cursor += c.len_utf8();
 
             // After typing a space or newline, check if preceding text is a /command
-            if (c == ' ' || c == '\n') && !state.commands.is_empty() {
+            if (c == ' ' || c == '\n') && !PromptState::get(state).commands.is_empty() {
                 // Find start of current "word" — scan back past the space we just inserted
                 let before_space = state.input_cursor - 1; // position of the space
                 let bytes = state.input.as_bytes();
@@ -131,19 +75,24 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     word_start -= 1;
                 }
                 let word = &state.input[word_start..before_space];
-                if let Some(cmd_name) = word.strip_prefix('/')
-                    && let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name)
-                {
-                    let content = cmd.content.clone();
-                    let label = cmd_name.to_string();
-                    let idx = state.paste_buffers.len();
-                    state.paste_buffers.push(content);
-                    state.paste_buffer_labels.push(Some(label.clone()));
-                    let sentinel = format!("\x00{}\x00", idx);
-                    // Replace /command<space> with sentinel
-                    state.input =
-                        format!("{}{}\n{}", &state.input[..word_start], sentinel, &state.input[state.input_cursor..],);
-                    state.input_cursor = word_start + sentinel.len() + 1;
+                if let Some(cmd_name) = word.strip_prefix('/') {
+                    let cmd_content =
+                        PromptState::get(state).commands.iter().find(|c| c.id == cmd_name).map(|c| c.content.clone());
+                    if let Some(content) = cmd_content {
+                        let label = cmd_name.to_string();
+                        let idx = state.paste_buffers.len();
+                        state.paste_buffers.push(content);
+                        state.paste_buffer_labels.push(Some(label.clone()));
+                        let sentinel = format!("\x00{}\x00", idx);
+                        // Replace /command<space> with sentinel
+                        state.input = format!(
+                            "{}{}\n{}",
+                            &state.input[..word_start],
+                            sentinel,
+                            &state.input[state.input_cursor..],
+                        );
+                        state.input_cursor = word_start + sentinel.len() + 1;
+                    }
                 }
             }
 
@@ -289,21 +238,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.context.push(ContextElement {
                 id: context_id,
                 uid: None,
-                context_type: ContextType::Conversation,
+                context_type: ContextType::new(ContextType::CONVERSATION),
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
-                file_path: None,
-                glob_pattern: None,
-                glob_path: None,
-                grep_pattern: None,
-                grep_path: None,
-                grep_file_pattern: None,
-                tmux_pane_id: None,
-                tmux_lines: None,
-                tmux_last_keys: None,
-                tmux_description: None,
-                result_command: None,
-                skill_prompt_id: None,
+                metadata: std::collections::HashMap::new(),
                 cached_content: None,
                 history_messages: None,
                 cache_deprecated: false,
@@ -398,7 +336,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StopStreaming => {
             if state.is_streaming {
                 state.is_streaming = false;
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;
@@ -416,8 +354,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::TmuxSendKeys { pane_id, keys } => {
             use std::process::Command;
             let _ = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.tmux_pane_id.as_ref() == Some(&pane_id)) {
-                ctx.tmux_last_keys = Some(keys);
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(&pane_id)) {
+                ctx.set_meta("tmux_last_keys", &keys);
                 ctx.cache_deprecated = true;
             }
             ActionResult::Nothing

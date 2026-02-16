@@ -6,11 +6,11 @@ use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
-use crate::api::{StreamEvent, start_streaming};
+use crate::api::{StreamEvent, StreamParams, start_streaming};
 use crate::background::{TlDrResult, generate_tldr};
 use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
-use crate::core::panels::{mark_panels_dirty, now_ms};
+use crate::core::panels::now_ms;
 use crate::events::handle_event;
 use crate::gh_watcher::GhWatcher;
 use crate::help::CommandPalette;
@@ -34,10 +34,8 @@ pub struct App {
     gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     watched_file_paths: std::collections::HashSet<String>,
-    /// Tracks which directory paths are being watched (for tree)
+    /// Tracks which directory paths are being watched
     watched_dir_paths: std::collections::HashSet<String>,
-    /// Tracks .git/ paths being watched (for GitResult panel deprecation)
-    watched_git_paths: std::collections::HashSet<String>,
     /// Last time we checked timer-based caches
     last_timer_check_ms: u64,
     /// Last time we checked ownership
@@ -87,7 +85,6 @@ impl App {
             gh_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
-            watched_git_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
@@ -126,8 +123,9 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            use crate::modules::spine::types::NotificationType;
-            self.state.create_notification(
+            use cp_mod_spine::{NotificationType, SpineState};
+            SpineState::create_notification(
+                &mut self.state,
                 NotificationType::ReloadResume,
                 "reload_resume".to_string(),
                 "Resuming after TUI reload".to_string(),
@@ -265,8 +263,27 @@ impl App {
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
+                    // Log every error to disk for debugging
+                    let attempt = self.state.api_retry_count + 1;
+                    let will_retry = attempt <= MAX_API_RETRIES;
+                    let provider = format!("{:?}", self.state.llm_provider);
+                    let model = self.state.current_model();
+                    let log_msg = format!(
+                        "Attempt {}/{} ({})\n\
+                         Provider: {} | Model: {}\n\
+                         Last request dump: .context-pilot/last_requests/\n\n\
+                         {}\n",
+                        attempt,
+                        MAX_API_RETRIES + 1,
+                        if will_retry { "will retry" } else { "giving up" },
+                        provider,
+                        model,
+                        e
+                    );
+                    crate::persistence::log_error(&log_msg);
+
                     // Check if we should retry
-                    if self.state.api_retry_count < MAX_API_RETRIES {
+                    if will_retry {
                         self.state.api_retry_count += 1;
                         self.pending_retry_error = Some(e);
                     } else {
@@ -294,15 +311,16 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages,
-                    ctx.context_items,
-                    ctx.tools,
-                    None,
-                    system_prompt.clone(),
-                    Some(system_prompt),
-                    DEFAULT_WORKER_ID.to_string(),
+                    StreamParams {
+                        provider: self.state.llm_provider,
+                        model: self.state.current_model(),
+                        messages: ctx.messages,
+                        context_items: ctx.context_items,
+                        tools: ctx.tools,
+                        system_prompt: system_prompt.clone(),
+                        seed_content: Some(system_prompt),
+                        worker_id: DEFAULT_WORKER_ID.to_string(),
+                    },
                     tx.clone(),
                 );
                 self.state.dirty = true;
@@ -322,7 +340,10 @@ impl App {
 
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
         while let Ok(tldr) = tldr_rx.try_recv() {
-            self.state.pending_tldrs = self.state.pending_tldrs.saturating_sub(1);
+            {
+                let ts = cp_mod_tree::TreeState::get_mut(&mut self.state);
+                ts.pending_tldrs = ts.pending_tldrs.saturating_sub(1);
+            }
             self.state.dirty = true;
             if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
                 msg.tl_dr = Some(tldr.tl_dr);
@@ -364,6 +385,7 @@ impl App {
         let mut tool_results: Vec<ToolResult> = Vec::new();
 
         // Finalize current assistant message
+        let mut needs_tldr: Option<(String, String)> = None;
         if let Some(msg) = self.state.messages.last_mut()
             && msg.role == "assistant"
         {
@@ -372,9 +394,12 @@ impl App {
             let op = build_message_op(msg);
             self.writer.send_message(op);
             if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
-                self.state.pending_tldrs += 1;
-                generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
+                needs_tldr = Some((msg.id.clone(), msg.content.clone()));
             }
+        }
+        if let Some((id, content)) = needs_tldr {
+            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
+            generate_tldr(id, content, tldr_tx.clone());
         }
 
         // Create tool call messages
@@ -518,15 +543,16 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
-            self.state.llm_provider,
-            self.state.current_model(),
-            ctx.messages,
-            ctx.context_items,
-            ctx.tools,
-            None,
-            system_prompt.clone(),
-            Some(system_prompt),
-            DEFAULT_WORKER_ID.to_string(),
+            StreamParams {
+                provider: self.state.llm_provider,
+                model: self.state.current_model(),
+                messages: ctx.messages,
+                context_items: ctx.context_items,
+                tools: ctx.tools,
+                system_prompt: system_prompt.clone(),
+                seed_content: Some(system_prompt),
+                worker_id: DEFAULT_WORKER_ID.to_string(),
+            },
             tx.clone(),
         );
     }
@@ -568,18 +594,18 @@ impl App {
 
         if needs_tmux {
             // send_keys: deprecate tmux panels and wait for refresh
-            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::Tmux);
+            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
             // Trigger tmux panel refreshes
             for ctx in &self.state.context {
-                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
-                    let panel = crate::core::panels::get_panel(ctx.context_type);
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated && !ctx.cache_in_flight {
+                    let panel = crate::core::panels::get_panel(&ctx.context_type);
                     if let Some(request) = panel.build_cache_request(ctx, &self.state) {
                         crate::cache::process_cache_request(request, self.cache_tx.clone());
                     }
                 }
             }
             for ctx in &mut self.state.context {
-                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated {
                     ctx.cache_in_flight = true;
                 }
             }
@@ -636,7 +662,7 @@ impl App {
                         }
                     });
                     if let Some((msg_id, content)) = tldr_info {
-                        self.state.pending_tldrs += 1;
+                        cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
                         generate_tldr(msg_id, content, tldr_tx.clone());
                     }
                     self.save_state_async();
@@ -665,8 +691,11 @@ impl App {
                 // uncontrollable — the user can never stop it with Esc. (#44)
                 // We set user_stopped instead of disabling continue_until_todos_done,
                 // so auto-continuation resumes when the user sends a new message.
-                self.state.spine_config.user_stopped = true;
-                self.state.touch_panel(ContextType::Spine);
+                // Notify all modules that the user stopped streaming
+                for module in crate::modules::all_modules() {
+                    module.on_stream_stop(&mut self.state);
+                }
+                self.state.touch_panel(ContextType::new(ContextType::SPINE));
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
                 {
@@ -689,7 +718,7 @@ impl App {
                     }
                 });
                 if let Some((msg_id, content)) = tldr_info {
-                    self.state.pending_tldrs += 1;
+                    cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
                     generate_tldr(msg_id, content, tldr_tx.clone());
                 }
                 self.save_state_async();
@@ -704,46 +733,14 @@ impl App {
         }
     }
 
-    /// Set up file watchers for all current file contexts and tree open folders
+    /// Set up file watchers from all modules' watch_paths().
     fn setup_file_watchers(&mut self) {
-        let Some(watcher) = &mut self.file_watcher else { return };
-
-        // Watch files in File contexts
-        for ctx in &self.state.context {
-            if ctx.context_type == ContextType::File
-                && let Some(path) = &ctx.file_path
-                && !self.watched_file_paths.contains(path)
-                && watcher.watch_file(path).is_ok()
-            {
-                self.watched_file_paths.insert(path.clone());
-            }
-        }
-
-        // Watch directories for Tree panel (only open folders)
-        for folder in &self.state.tree_open_folders {
-            if !self.watched_dir_paths.contains(folder) && watcher.watch_dir(folder).is_ok() {
-                self.watched_dir_paths.insert(folder.clone());
-            }
-        }
-
-        // Watch .git/ paths for GitResult panel deprecation
-        if self.watched_git_paths.is_empty() {
-            for path in &[".git/HEAD", ".git/index", ".git/MERGE_HEAD", ".git/REBASE_HEAD", ".git/CHERRY_PICK_HEAD"] {
-                if watcher.watch_file(path).is_ok() {
-                    self.watched_git_paths.insert(path.to_string());
-                }
-            }
-            for path in &[".git/refs/heads", ".git/refs/tags", ".git/refs/remotes"] {
-                if watcher.watch_dir_recursive(path).is_ok() {
-                    self.watched_git_paths.insert(path.to_string());
-                }
-            }
-        }
+        self.sync_file_watchers();
     }
 
     /// Sync GhWatcher with current GithubResult panels
     fn sync_gh_watches(&self) {
-        let token = match &self.state.github_token {
+        let token = match &cp_mod_github::GithubState::get(&self.state).github_token {
             Some(t) => t.clone(),
             None => return,
         };
@@ -751,10 +748,14 @@ impl App {
             .state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::GithubResult)
-            .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
+            .filter(|c| c.context_type == ContextType::GITHUB_RESULT)
+            .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);
+
+        // Sync branch PR watch — poll for PRs on the current git branch
+        let branch = cp_mod_git::GitState::get(&self.state).git_branch.as_deref();
+        self.gh_watcher.sync_branch_pr(branch, Some(&token));
     }
 
     /// Schedule initial cache refreshes for fixed context elements only.
@@ -768,7 +769,7 @@ impl App {
             if !ctx.context_type.is_fixed() {
                 continue;
             }
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -795,13 +796,25 @@ impl App {
                 continue;
             }
 
-            // GitStatus: match by context_type
-            if matches!(update, CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged) {
-                let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
+            // ModuleSpecific: match by context_type
+            if let CacheUpdate::ModuleSpecific { ref context_type, ref data, .. } = update {
+                // Special case: BranchPrUpdate targets GithubState, not a panel
+                if context_type.as_str() == ContextType::GITHUB_RESULT
+                    && data.is::<cp_mod_github::watcher::BranchPrUpdate>()
+                {
+                    if let CacheUpdate::ModuleSpecific { data, .. } = update
+                        && let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
+                    {
+                        cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
+                        state.dirty = true;
+                    }
+                    continue;
+                }
+
+                let idx = state.context.iter().position(|c| c.context_type == *context_type);
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);
-                let panel = crate::core::panels::get_panel(ctx.context_type);
-                // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
+                let panel = crate::core::panels::get_panel(&ctx.context_type);
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
                 state.context.insert(idx, ctx);
@@ -814,7 +827,7 @@ impl App {
             let idx = state.context.iter().position(|c| c.id == *context_id);
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
             let _changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
@@ -823,7 +836,7 @@ impl App {
         }
     }
 
-    /// Process file watcher events
+    /// Process file watcher events — delegates invalidation to modules via trait methods.
     fn process_watcher_events(&mut self) {
         let _guard = crate::profile!("app::watcher_events");
         // Collect events (immutable borrow on file_watcher released after this block)
@@ -835,71 +848,32 @@ impl App {
             return;
         }
 
-        // First pass: mark deprecated, collect indices and paths needing re-watch
+        let modules = crate::modules::all_modules();
+
+        // First pass: ask modules which panels to invalidate
         let mut refresh_indices = Vec::new();
         let mut rewatch_paths: Vec<String> = Vec::new();
         for event in &events {
-            match event {
-                WatchEvent::FileChanged(path) => {
-                    // Check if this is a .git/ file change (HEAD, index)
-                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
-                    if is_git_event {
-                        // Git events: only mark deprecated, don't spawn immediately.
-                        // The timer-based check will handle refresh at the proper interval,
-                        // preventing the feedback loop (git status → .git/index → watcher → repeat).
-                        mark_panels_dirty(&mut self.state, ContextType::Git);
-                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
-                    } else {
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type {
-                                ContextType::File => ctx.file_path.as_deref() == Some(path.as_str()),
-                                // File content change affects grep results
-                                ContextType::Grep => {
-                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
-                                    path.starts_with(base)
-                                }
-                                _ => false,
-                            };
-                            if should_dirty {
-                                ctx.cache_deprecated = true;
-                                refresh_indices.push(i);
-                            }
+            let (path, is_dir_event) = match event {
+                WatchEvent::FileChanged(p) => (p, false),
+                WatchEvent::DirChanged(p) => (p, true),
+            };
+
+            for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                for module in &modules {
+                    if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
+                        ctx.cache_deprecated = true;
+                        if module.watcher_immediate_refresh() {
+                            refresh_indices.push(i);
                         }
                         self.state.dirty = true;
-                    }
-                    rewatch_paths.push(path.clone());
-                }
-                WatchEvent::DirChanged(path) => {
-                    // Check if this is a .git/ directory change
-                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
-                    if is_git_event {
-                        // Git events: only mark deprecated (same as FileChanged above)
-                        mark_panels_dirty(&mut self.state, ContextType::Git);
-                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
-                    } else {
-                        // Directory changed: invalidate Tree, Glob, and Grep panels
-                        // whose search paths overlap with the changed directory.
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type {
-                                ContextType::Tree => true,
-                                ContextType::Glob => {
-                                    let base = ctx.glob_path.as_deref().unwrap_or(".");
-                                    path.starts_with(base) || base.starts_with(path.as_str())
-                                }
-                                ContextType::Grep => {
-                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
-                                    path.starts_with(base) || base.starts_with(path.as_str())
-                                }
-                                _ => false,
-                            };
-                            if should_dirty {
-                                ctx.cache_deprecated = true;
-                                refresh_indices.push(i);
-                            }
-                        }
-                        self.state.dirty = true;
+                        break; // Only one module owns each context type
                     }
                 }
+            }
+
+            if !is_dir_event {
+                rewatch_paths.push(path.clone());
             }
         }
 
@@ -911,7 +885,7 @@ impl App {
                 continue;
             }
             let ctx = &self.state.context[i];
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -948,8 +922,8 @@ impl App {
         let _guard = crate::profile!("app::timer_deprecation");
         self.last_timer_check_ms = current_ms;
 
-        // Ensure all File panels have active watchers
-        self.ensure_file_watchers();
+        // Ensure all module-requested paths have active watchers
+        self.sync_file_watchers();
 
         let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
 
@@ -958,7 +932,7 @@ impl App {
                 continue;
             }
 
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
 
             // Case 1: Initial load — panel has no content yet
             if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {
@@ -996,34 +970,31 @@ impl App {
         }
     }
 
-    /// Ensure all File/Glob/Grep panels have active file/directory watchers.
-    /// Called every timer tick to catch panels created during tool execution.
-    fn ensure_file_watchers(&mut self) {
+    /// Sync file watchers from all modules' watch_paths().
+    /// Called periodically to catch panels created during tool execution.
+    fn sync_file_watchers(&mut self) {
+        use cp_base::panels::WatchSpec;
         let Some(watcher) = &mut self.file_watcher else { return };
 
-        for ctx in &self.state.context {
-            // File panels: watch individual files
-            if ctx.context_type == ContextType::File
-                && let Some(path) = &ctx.file_path
-                && !self.watched_file_paths.contains(path)
-                && watcher.watch_file(path).is_ok()
-            {
-                self.watched_file_paths.insert(path.clone());
-            }
-
-            // Glob panels: watch base directory
-            if ctx.context_type == ContextType::Glob {
-                let dir = ctx.glob_path.as_deref().unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
-                    self.watched_dir_paths.insert(dir.to_string());
-                }
-            }
-
-            // Grep panels: watch search directory
-            if ctx.context_type == ContextType::Grep {
-                let dir = ctx.grep_path.as_deref().unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
-                    self.watched_dir_paths.insert(dir.to_string());
+        let modules = crate::modules::all_modules();
+        for module in &modules {
+            for spec in module.watch_paths(&self.state) {
+                match spec {
+                    WatchSpec::File(path) => {
+                        if !self.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
+                            self.watched_file_paths.insert(path);
+                        }
+                    }
+                    WatchSpec::Dir(path) => {
+                        if !self.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
+                            self.watched_dir_paths.insert(path);
+                        }
+                    }
+                    WatchSpec::DirRecursive(path) => {
+                        if !self.watched_dir_paths.contains(&path) && watcher.watch_dir_recursive(&path).is_ok() {
+                            self.watched_dir_paths.insert(path);
+                        }
+                    }
                 }
             }
         }
@@ -1033,7 +1004,7 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
-        use crate::modules::spine::engine::{SpineDecision, apply_continuation, check_spine};
+        use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
@@ -1052,22 +1023,25 @@ impl App {
                     if self.state.messages.len() >= 2 {
                         let user_msg = &self.state.messages[self.state.messages.len() - 2];
                         if user_msg.role == "user" && user_msg.tl_dr.is_none() {
-                            self.state.pending_tldrs += 1;
-                            generate_tldr(user_msg.id.clone(), user_msg.content.clone(), tldr_tx.clone());
+                            let tldr_id = user_msg.id.clone();
+                            let tldr_content = user_msg.content.clone();
+                            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
+                            generate_tldr(tldr_id, tldr_content, tldr_tx.clone());
                         }
                     }
                     let ctx = prepare_stream_context(&mut self.state, false);
                     let system_prompt = get_active_agent_content(&self.state);
                     start_streaming(
-                        self.state.llm_provider,
-                        self.state.current_model(),
-                        ctx.messages,
-                        ctx.context_items,
-                        ctx.tools,
-                        None,
-                        system_prompt.clone(),
-                        Some(system_prompt),
-                        DEFAULT_WORKER_ID.to_string(),
+                        StreamParams {
+                            provider: self.state.llm_provider,
+                            model: self.state.current_model(),
+                            messages: ctx.messages,
+                            context_items: ctx.context_items,
+                            tools: ctx.tools,
+                            system_prompt: system_prompt.clone(),
+                            seed_content: Some(system_prompt),
+                            worker_id: DEFAULT_WORKER_ID.to_string(),
+                        },
                         tx.clone(),
                     );
                     self.save_state_async();
@@ -1087,7 +1061,7 @@ impl App {
 
         // Check if there's any active operation that needs spinner animation
         let has_active_spinner = self.state.is_streaming
-            || self.state.pending_tldrs > 0
+            || cp_mod_tree::TreeState::get(&self.state).pending_tldrs > 0
             || self.state.api_check_in_progress
             || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 

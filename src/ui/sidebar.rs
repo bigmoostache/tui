@@ -2,7 +2,7 @@ use ratatui::{prelude::*, widgets::Paragraph};
 
 use super::{chars, helpers::*, spinner, theme};
 use crate::constants::SIDEBAR_HELP_HEIGHT;
-use crate::state::State;
+use crate::state::{ContextType, State};
 
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
@@ -49,17 +49,18 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context[i].context_type != crate::state::ContextType::Conversation)
+        .filter(|&i| state.context[i].context_type != ContextType::new(ContextType::CONVERSATION))
         .partition(|&i| state.context[i].context_type.is_fixed());
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
-    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == crate::state::ContextType::Conversation)
+    if let Some(conv_idx) =
+        state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
     {
         let is_selected = conv_idx == state.selected_context;
         let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
         let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
         let name_color = if is_selected { theme::accent() } else { theme::text_secondary() };
-        let icon = crate::state::ContextType::Conversation.icon();
+        let icon = ContextType::new(ContextType::CONVERSATION).icon();
         let conv_tokens = format_number(state.context[conv_idx].token_count);
 
         lines.push(Line::from(vec![
@@ -179,6 +180,65 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Separator before token stats
     lines.push(Line::from(""));
+
+    // PR card (if current branch has an active PR)
+    if let Some(pr) = &cp_mod_github::GithubState::get(state).branch_pr {
+        let state_color = match pr.state.as_str() {
+            "OPEN" => theme::success(),
+            "MERGED" => theme::accent(),
+            "CLOSED" => theme::error(),
+            _ => theme::text_secondary(),
+        };
+
+        // PR number + state
+        lines.push(Line::from(vec![
+            Span::styled(" ", base_style),
+            Span::styled(format!("PR#{}", pr.number), Style::default().fg(theme::accent()).bold()),
+            Span::styled(" ", base_style),
+            Span::styled(pr.state.to_lowercase(), Style::default().fg(state_color)),
+        ]));
+
+        // Title (truncated)
+        let title = truncate_string(&pr.title, 32);
+        lines.push(Line::from(vec![
+            Span::styled(" ", base_style),
+            Span::styled(title, Style::default().fg(theme::text_secondary())),
+        ]));
+
+        // +/- stats and review/checks on one line
+        let mut detail_spans = vec![Span::styled(" ", base_style)];
+        if let (Some(add), Some(del)) = (pr.additions, pr.deletions) {
+            detail_spans.push(Span::styled(format!("+{}", add), Style::default().fg(theme::success())));
+            detail_spans.push(Span::styled(format!(" -{}", del), Style::default().fg(theme::error())));
+        }
+        if let Some(ref review) = pr.review_decision {
+            let (icon, color) = match review.as_str() {
+                "APPROVED" => (" ✓", theme::success()),
+                "CHANGES_REQUESTED" => (" ✗", theme::error()),
+                "REVIEW_REQUIRED" => (" ●", theme::warning()),
+                _ => (" ?", theme::text_muted()),
+            };
+            detail_spans.push(Span::styled(icon, Style::default().fg(color)));
+        }
+        if let Some(ref checks) = pr.checks_status {
+            let (icon, color) = match checks.as_str() {
+                "passing" => (" ●", theme::success()),
+                "failing" => (" ●", theme::error()),
+                "pending" => (" ●", theme::warning()),
+                _ => (" ●", theme::text_muted()),
+            };
+            detail_spans.push(Span::styled(icon, Style::default().fg(color)));
+        }
+        if detail_spans.len() > 1 {
+            lines.push(Line::from(detail_spans));
+        }
+
+        lines.push(Line::from(vec![Span::styled(
+            format!(" {}", chars::HORIZONTAL.repeat(34)),
+            Style::default().fg(theme::border()),
+        )]));
+        lines.push(Line::from(""));
+    }
 
     // Token stats (cache hit / cache miss / output) — only when any value is non-zero
     if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {

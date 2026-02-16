@@ -70,11 +70,21 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
 
 fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
-    let context_type =
-        state.context.get(state.selected_context).map(|c| c.context_type).unwrap_or(ContextType::Conversation);
+    let context_type = state
+        .context
+        .get(state.selected_context)
+        .map(|c| c.context_type.clone())
+        .unwrap_or(ContextType::new(ContextType::CONVERSATION));
 
-    let panel = panels::get_panel(context_type);
-    panel.render(frame, state, area);
+    let panel = panels::get_panel(&context_type);
+
+    // ConversationPanel overrides render() with custom scrollbar + caching.
+    // All other panels use render_panel_default (which calls panel.content()).
+    if context_type == ContextType::CONVERSATION {
+        panel.render(frame, state, area);
+    } else {
+        panels::render_panel_default(panel.as_ref(), frame, state, area);
+    }
 }
 
 fn render_perf_overlay(frame: &mut Frame, area: Rect) {
@@ -492,6 +502,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     {
         use crate::config::{THEME_ORDER, get_theme};
         let current_theme = get_theme(&state.active_theme);
+        let fallback_icon = "📄".to_string();
 
         // Show theme name and preview icons
         lines.push(Line::from(vec![
@@ -503,8 +514,8 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
                     "{} {} {} {}",
                     current_theme.messages.user,
                     current_theme.messages.assistant,
-                    current_theme.context.tree,
-                    current_theme.context.file,
+                    current_theme.context.get("tree").unwrap_or(&fallback_icon),
+                    current_theme.context.get("file").unwrap_or(&fallback_icon),
                 ),
                 Style::default().fg(theme::text()),
             ),

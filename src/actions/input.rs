@@ -1,9 +1,11 @@
-use crate::modules::spine::types::NotificationType;
 use crate::persistence::{delete_message, save_message};
-use crate::state::{ContextType, Message, PromptItem, State, estimate_tokens};
+use crate::state::{ContextType, Message, State, estimate_tokens};
+use cp_mod_prompt::{PromptItem, PromptState};
+use cp_mod_spine::{NotificationType, SpineState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
+use crate::modules::all_modules;
 
 /// Handle InputSubmit action — context switching, message creation, stream start
 pub fn handle_input_submit(state: &mut State) -> ActionResult {
@@ -23,7 +25,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     }
 
-    let content = replace_commands(&state.input, &state.commands);
+    let content = replace_commands(&state.input, &PromptState::get(state).commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
     let content = expand_paste_sentinels(&content, &state.paste_buffers);
     state.input.clear();
@@ -50,7 +52,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         ctx.token_count += user_token_estimate;
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
@@ -59,10 +61,10 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     // This works both during streaming (missed-message scenario) and when idle
     create_user_notification(state, &user_id_str, &content_preview);
 
-    // Any human input resets auto-continuation counters — human is back in the loop
-    state.spine_config.auto_continuation_count = 0;
-    state.spine_config.autonomous_start_ms = None;
-    state.spine_config.user_stopped = false;
+    // Notify all modules that the user sent a message
+    for module in all_modules() {
+        module.on_user_message(state);
+    }
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
@@ -97,7 +99,7 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
     state.messages.clear();
     state.input.clear();
     // Reset token count for Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         ctx.token_count = 0;
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
@@ -108,7 +110,12 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    state.create_notification(NotificationType::UserMessage, user_id.to_string(), content_preview.to_string());
+    SpineState::create_notification(
+        state,
+        NotificationType::UserMessage,
+        user_id.to_string(),
+        content_preview.to_string(),
+    );
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.

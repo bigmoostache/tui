@@ -2,7 +2,7 @@ use crate::modules;
 use crate::state::{ContextType, State};
 
 // Re-export agent/seed functions from prompt module
-pub use crate::modules::prompt::seed::{ensure_default_agent, get_active_agent_content};
+pub use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
@@ -21,8 +21,9 @@ fn assign_panel_uid(state: &mut State, context_type: ContextType) {
 /// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
 pub fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.context.iter().any(|c| c.context_type == ContextType::Conversation) {
-        let elem = modules::make_default_context_element("chat", ContextType::Conversation, "Chat", true);
+    if !state.context.iter().any(|c| c.context_type == ContextType::CONVERSATION) {
+        let elem =
+            modules::make_default_context_element("chat", ContextType::new(ContextType::CONVERSATION), "Chat", true);
         state.context.insert(0, elem);
     }
 
@@ -42,18 +43,18 @@ pub fn ensure_default_contexts(state: &mut State) {
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
         let id = format!("P{}", pos + 1);
         let insert_pos = (pos + 1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem = modules::make_default_context_element(&id, *ct, name, *cache_deprecated);
+        let elem = modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated);
         state.context.insert(insert_pos, elem);
     }
 
     // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
-    assign_panel_uid(state, ContextType::Conversation);
+    assign_panel_uid(state, ContextType::new(ContextType::CONVERSATION));
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
     // Library panels don't need UIDs (rendered from in-memory state)
     for (_, _, ct, _, _) in &defaults {
-        if *ct != ContextType::Library && state.context.iter().any(|c| c.context_type == *ct) {
-            assign_panel_uid(state, *ct);
+        if *ct != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == *ct) {
+            assign_panel_uid(state, ct.clone());
         }
     }
 }

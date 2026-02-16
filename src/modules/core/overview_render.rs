@@ -1,6 +1,13 @@
+use std::collections::HashMap;
+
 use ratatui::prelude::*;
 
-use crate::state::{ContextType, MemoryImportance, State, TodoStatus};
+use cp_mod_memory::{MemoryImportance, MemoryState};
+use cp_mod_prompt::PromptState;
+use cp_mod_todo::{TodoState, TodoStatus};
+
+use crate::modules::all_modules;
+use crate::state::{State, get_context_type_meta};
 use crate::ui::{
     chars,
     helpers::{Cell, format_number, render_table},
@@ -91,8 +98,9 @@ pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>
 /// Render the GIT STATUS section (branch, file changes table).
 pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
+    let gs = cp_mod_git::GitState::get(state);
 
-    if !state.git_is_repo {
+    if !gs.git_is_repo {
         return text;
     }
 
@@ -103,7 +111,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
     text.push(Line::from(""));
 
     // Branch name
-    if let Some(branch) = &state.git_branch {
+    if let Some(branch) = &gs.git_branch {
         let branch_color = if branch.starts_with("detached:") { theme::warning() } else { theme::accent() };
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
@@ -112,7 +120,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
         ]));
     }
 
-    if state.git_file_changes.is_empty() {
+    if gs.git_file_changes.is_empty() {
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
@@ -120,7 +128,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
     } else {
         text.push(Line::from(""));
 
-        use crate::state::GitChangeType;
+        use cp_mod_git::GitChangeType;
 
         let mut total_add: i32 = 0;
         let mut total_del: i32 = 0;
@@ -132,7 +140,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
             Cell::right("Net", Style::default()),
         ];
 
-        let rows: Vec<Vec<Cell>> = state
+        let rows: Vec<Vec<Cell>> = gs
             .git_file_changes
             .iter()
             .map(|file| {
@@ -221,45 +229,18 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
 
     let now_ms = crate::core::panels::now_ms();
 
+    let modules = all_modules();
+
     let rows: Vec<Vec<Cell>> = sorted_contexts
         .iter()
         .map(|ctx| {
-            let type_name = match ctx.context_type {
-                ContextType::System => "system",
-                ContextType::Conversation => "conversation",
-                ContextType::File => "file",
-                ContextType::Tree => "tree",
-                ContextType::Glob => "glob",
-                ContextType::Grep => "grep",
-                ContextType::Tmux => "tmux",
-                ContextType::Todo => "todo",
-                ContextType::Memory => "memory",
-                ContextType::Overview => "overview",
-                ContextType::Git => "git",
-                ContextType::GitResult => "git-result",
-                ContextType::GithubResult => "github-result",
-                ContextType::Scratchpad => "scratchpad",
-                ContextType::Library => "library",
-                ContextType::Skill => "skill",
-                ContextType::ConversationHistory => "chat-history",
-                ContextType::Spine => "spine",
-                ContextType::Logs => "logs",
-            };
+            // Look up display_name from registry, fallback to raw context type string
+            let type_name = get_context_type_meta(ctx.context_type.as_str())
+                .map(|m| m.display_name)
+                .unwrap_or(ctx.context_type.as_str());
 
-            let details = match ctx.context_type {
-                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
-                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Tmux => {
-                    let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
-                    let desc = ctx.tmux_description.as_deref().unwrap_or("");
-                    if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
-                }
-                ContextType::GitResult | ContextType::GithubResult => {
-                    ctx.result_command.as_deref().unwrap_or("").to_string()
-                }
-                _ => String::new(),
-            };
+            // Ask modules for detail string
+            let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
             let truncated_details = if details.len() > 30 {
                 format!("{}...", &details[..details.floor_char_boundary(27)])
@@ -324,10 +305,11 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
         ),
     ]));
 
-    let total_todos = state.todos.len();
+    let ts = TodoState::get(state);
+    let total_todos = ts.todos.len();
     if total_todos > 0 {
-        let done_todos = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
-        let in_progress = state.todos.iter().filter(|t| t.status == TodoStatus::InProgress).count();
+        let done_todos = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
+        let in_progress = ts.todos.iter().filter(|t| t.status == TodoStatus::InProgress).count();
         let pending = total_todos - done_todos - in_progress;
 
         text.push(Line::from(vec![
@@ -342,12 +324,13 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
         ]));
     }
 
-    let total_memories = state.memories.len();
+    let mems = &MemoryState::get(state).memories;
+    let total_memories = mems.len();
     if total_memories > 0 {
-        let critical = state.memories.iter().filter(|m| m.importance == MemoryImportance::Critical).count();
-        let high = state.memories.iter().filter(|m| m.importance == MemoryImportance::High).count();
-        let medium = state.memories.iter().filter(|m| m.importance == MemoryImportance::Medium).count();
-        let low = state.memories.iter().filter(|m| m.importance == MemoryImportance::Low).count();
+        let critical = mems.iter().filter(|m| m.importance == MemoryImportance::Critical).count();
+        let high = mems.iter().filter(|m| m.importance == MemoryImportance::High).count();
+        let medium = mems.iter().filter(|m| m.importance == MemoryImportance::Medium).count();
+        let low = mems.iter().filter(|m| m.importance == MemoryImportance::Low).count();
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
@@ -366,11 +349,12 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
 /// Render the AGENTS section (system prompts table).
 pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
+    let ps = PromptState::get(state);
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
         Span::styled("AGENTS".to_string(), Style::default().fg(theme::text_muted()).bold()),
-        Span::styled(format!("  ({} available)", state.agents.len()), Style::default().fg(theme::text_muted())),
+        Span::styled(format!("  ({} available)", ps.agents.len()), Style::default().fg(theme::text_muted())),
     ]));
     text.push(Line::from(""));
 
@@ -381,11 +365,11 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
         Cell::new("Description", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = state
+    let rows: Vec<Vec<Cell>> = ps
         .agents
         .iter()
         .map(|agent| {
-            let is_active = state.active_agent_id.as_deref() == Some(&agent.id);
+            let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
             let (active_str, active_color) =
                 if is_active { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
 
@@ -413,13 +397,13 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
     text.extend(render_table(&header, &rows, None, 1));
 
     // Skills section
-    if !state.skills.is_empty() {
+    if !ps.skills.is_empty() {
         text.extend(separator());
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("SKILLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
             Span::styled(
-                format!("  ({} available, {} loaded)", state.skills.len(), state.loaded_skill_ids.len()),
+                format!("  ({} available, {} loaded)", ps.skills.len(), ps.loaded_skill_ids.len()),
                 Style::default().fg(theme::text_muted()),
             ),
         ]));
@@ -432,11 +416,11 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
             Cell::new("Description", Style::default()),
         ];
 
-        let skill_rows: Vec<Vec<Cell>> = state
+        let skill_rows: Vec<Vec<Cell>> = ps
             .skills
             .iter()
             .map(|skill| {
-                let is_loaded = state.loaded_skill_ids.contains(&skill.id);
+                let is_loaded = ps.loaded_skill_ids.contains(&skill.id);
                 let (loaded_str, loaded_color) =
                     if is_loaded { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
                 vec![
@@ -452,12 +436,12 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
     }
 
     // Commands section
-    if !state.commands.is_empty() {
+    if !ps.commands.is_empty() {
         text.extend(separator());
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("COMMANDS".to_string(), Style::default().fg(theme::text_muted()).bold()),
-            Span::styled(format!("  ({} available)", state.commands.len()), Style::default().fg(theme::text_muted())),
+            Span::styled(format!("  ({} available)", ps.commands.len()), Style::default().fg(theme::text_muted())),
         ]));
         text.push(Line::from(""));
 
@@ -467,7 +451,7 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
             Cell::new("Description", Style::default()),
         ];
 
-        let cmd_rows: Vec<Vec<Cell>> = state
+        let cmd_rows: Vec<Vec<Cell>> = ps
             .commands
             .iter()
             .map(|cmd| {
@@ -489,7 +473,7 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
 pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
 
-    let presets = crate::modules::preset::tools::list_presets_with_info();
+    let presets = cp_mod_preset::tools::list_presets_with_info();
     if presets.is_empty() {
         return text;
     }
@@ -555,32 +539,23 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     ]));
     text.push(Line::from(""));
 
-    use crate::constants::tool_categories;
-    use crate::tool_defs::ToolCategory;
+    // Build category descriptions from modules
+    let cat_descs: HashMap<&str, &str> = all_modules().iter().flat_map(|m| m.tool_category_descriptions()).collect();
 
-    for category in ToolCategory::all() {
-        let category_tools: Vec<_> = state.tools.iter().filter(|t| &t.category == category).collect();
+    // Collect unique categories in order of first appearance
+    let mut seen_cats = std::collections::HashSet::new();
+    let categories: Vec<String> =
+        state.tools.iter().filter(|t| seen_cats.insert(t.category.clone())).map(|t| t.category.clone()).collect();
+
+    for category in &categories {
+        let category_tools: Vec<_> = state.tools.iter().filter(|t| t.category == *category).collect();
 
         if category_tools.is_empty() {
             continue;
         }
 
-        let (cat_name, cat_desc) = match category {
-            ToolCategory::File => ("FILE", tool_categories::file_desc()),
-            ToolCategory::Tree => ("TREE", tool_categories::tree_desc()),
-            ToolCategory::Console => ("CONSOLE", tool_categories::console_desc()),
-            ToolCategory::Context => ("CONTEXT", tool_categories::context_desc()),
-            ToolCategory::Skill => ("SKILL", "Manage knowledge skills"),
-            ToolCategory::Agent => ("AGENT", "Manage system prompt agents"),
-            ToolCategory::Command => ("COMMAND", "Manage input commands"),
-            ToolCategory::System => ("SYSTEM", "System configuration and control"),
-            ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
-            ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
-            ToolCategory::Git => ("GIT", tool_categories::git_desc()),
-            ToolCategory::Github => ("GITHUB", "GitHub API operations via gh CLI"),
-            ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
-            ToolCategory::Spine => ("SPINE", "Auto-continuation and stream control"),
-        };
+        let cat_name = category.to_uppercase();
+        let cat_desc = cat_descs.get(category.as_str()).copied().unwrap_or("");
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),

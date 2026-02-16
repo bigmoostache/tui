@@ -11,8 +11,8 @@ mod tools;
 use serde_json::json;
 
 use crate::core::panels::Panel;
-use crate::state::{ContextType, State};
-use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
 
 use self::conversation_panel::ConversationPanel;
@@ -145,22 +145,90 @@ impl Module for CoreModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Overview]
+        vec![ContextType::new(ContextType::OVERVIEW)]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::ConversationHistory]
+        vec![ContextType::new(ContextType::CONVERSATION_HISTORY)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Overview, "World", false)]
+        vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Conversation => Some(Box::new(ConversationPanel)),
-            ContextType::Overview => Some(Box::new(OverviewPanel)),
-            ContextType::ConversationHistory => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
+    fn on_close_context(
+        &self,
+        ctx: &crate::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
+            return Some(Err(format!(
+                "{} — Cannot close conversation history with context_close. \
+                 Use close_conversation_history instead, which lets you create logs \
+                 and memories to preserve important information before closing.",
+                ctx.id
+            )));
+        }
+        None
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Context", "Manage conversation context and system prompts"),
+            ("System", "System configuration and control"),
+        ]
+    }
+
+    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+        vec![
+            ContextTypeMeta {
+                context_type: "overview",
+                icon_id: "overview",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(2),
+                display_name: "overview",
+                short_name: "world",
+                needs_async_wait: false,
+            },
+            ContextTypeMeta {
+                context_type: "system",
+                icon_id: "system",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "system",
+                short_name: "seed",
+                needs_async_wait: false,
+            },
+            ContextTypeMeta {
+                context_type: "conversation",
+                icon_id: "conversation",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "conversation",
+                short_name: "chat",
+                needs_async_wait: false,
+            },
+            ContextTypeMeta {
+                context_type: "conversation_history",
+                icon_id: "conversation",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "chat-history",
+                short_name: "history",
+                needs_async_wait: false,
+            },
+        ]
+    }
+
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::CONVERSATION => Some(Box::new(ConversationPanel)),
+            ContextType::OVERVIEW => Some(Box::new(OverviewPanel)),
+            ContextType::CONVERSATION_HISTORY => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
             _ => None,
         }
     }
@@ -179,7 +247,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
 
             // System tools (reload stays in core)
@@ -190,7 +258,7 @@ impl Module for CoreModule {
                 description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
                 params: vec![],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
 
             // Meta tools
@@ -213,7 +281,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
         ];
 
@@ -230,7 +298,7 @@ impl Module for CoreModule {
                 ToolParam::new("page", ParamType::Integer).desc("Page number (1-indexed)").required(),
             ],
             enabled: false,
-            category: ToolCategory::Context,
+            category: "Context".to_string(),
         });
 
         // Add module_toggle tool

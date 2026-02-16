@@ -1,0 +1,96 @@
+use cp_base::constants::icons;
+use cp_base::state::State;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+/// Todo item status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TodoStatus {
+    #[default]
+    Pending, // ' '
+    InProgress, // '~'
+    Done,       // 'x'
+}
+
+impl TodoStatus {
+    pub fn icon(&self) -> String {
+        match self {
+            TodoStatus::Pending => icons::todo_pending(),
+            TodoStatus::InProgress => icons::todo_in_progress(),
+            TodoStatus::Done => icons::todo_done(),
+        }
+    }
+}
+
+impl FromStr for TodoStatus {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            " " | "pending" => Ok(TodoStatus::Pending),
+            "~" | "in_progress" => Ok(TodoStatus::InProgress),
+            "x" | "X" | "done" => Ok(TodoStatus::Done),
+            _ => Err(()),
+        }
+    }
+}
+
+/// A todo item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TodoItem {
+    /// Todo ID (X1, X2, ...)
+    pub id: String,
+    /// Parent todo ID (for nesting)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// Todo name/title
+    pub name: String,
+    /// Detailed description
+    #[serde(default)]
+    pub description: String,
+    /// Status: pending, in_progress, done
+    #[serde(default)]
+    pub status: TodoStatus,
+}
+
+/// Module-owned state for the Todo module
+#[derive(Debug)]
+pub struct TodoState {
+    pub todos: Vec<TodoItem>,
+    pub next_todo_id: usize,
+}
+
+impl Default for TodoState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TodoState {
+    pub fn new() -> Self {
+        Self { todos: vec![], next_todo_id: 1 }
+    }
+
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("TodoState not initialized")
+    }
+
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("TodoState not initialized")
+    }
+
+    /// Check if there are any pending or in-progress todos
+    pub fn has_incomplete_todos(&self) -> bool {
+        self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+    }
+
+    /// Get a summary of incomplete todos for spine auto-continuation messages
+    pub fn incomplete_todos_summary(&self) -> Vec<String> {
+        self.todos
+            .iter()
+            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
+            .collect()
+    }
+}

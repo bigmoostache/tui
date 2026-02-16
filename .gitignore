@@ -1,4 +1,4 @@
-/target
+**/target
 .env
 /.context-pilot
 snake
@@ -9,3 +9,4 @@ test_lorem.txt
 .claude/
 test.md
 report/code-audit.md
+test

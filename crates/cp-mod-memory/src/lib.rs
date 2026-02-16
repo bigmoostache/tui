@@ -1,0 +1,177 @@
+mod panel;
+mod tools;
+pub mod types;
+
+pub use types::{MemoryImportance, MemoryItem, MemoryState};
+
+/// Maximum token length for memory tl_dr field (enforced on create/update)
+pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
+
+use serde_json::json;
+
+use cp_base::panels::Panel;
+use cp_base::state::{ContextType, State};
+use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ToolResult, ToolUse};
+
+use self::panel::MemoryPanel;
+use cp_base::modules::Module;
+
+pub struct MemoryModule;
+
+impl Module for MemoryModule {
+    fn id(&self) -> &'static str {
+        "memory"
+    }
+    fn name(&self) -> &'static str {
+        "Memory"
+    }
+    fn description(&self) -> &'static str {
+        "Persistent memory items across conversations"
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
+
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(MemoryState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(MemoryState::new());
+    }
+
+    fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ms = MemoryState::get(state);
+        json!({
+            "memories": ms.memories,
+            "next_memory_id": ms.next_memory_id,
+            "open_memory_ids": ms.open_memory_ids,
+        })
+    }
+
+    fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let ms = MemoryState::get_mut(state);
+        if let Some(arr) = data.get("memories")
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            ms.memories = v;
+        }
+        if let Some(v) = data.get("next_memory_id").and_then(|v| v.as_u64()) {
+            ms.next_memory_id = v as usize;
+        }
+        if let Some(arr) = data.get("open_memory_ids")
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            ms.open_memory_ids = v;
+        }
+    }
+
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![ContextType::new(ContextType::MEMORY)]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![(ContextType::new(ContextType::MEMORY), "Memories", false)]
+    }
+
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::MEMORY => Some(Box::new(MemoryPanel)),
+            _ => None,
+        }
+    }
+
+    fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        vec![
+            ToolDefinition {
+                id: "memory_create".to_string(),
+                name: "Create Memories".to_string(),
+                short_desc: "Store persistent memories".to_string(),
+                description: "Creates memory items for important information to remember across the conversation."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new(
+                        "memories",
+                        ParamType::Array(Box::new(ParamType::Object(vec![
+                            ToolParam::new("content", ParamType::String).desc("Memory content").required(),
+                            ToolParam::new("contents", ParamType::String)
+                                .desc("Rich body text (visible when memory is opened)"),
+                            ToolParam::new("importance", ParamType::String)
+                                .desc("Importance level")
+                                .enum_vals(&["low", "medium", "high", "critical"]),
+                            ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
+                                .desc("Freeform labels for categorization (e.g., ['architecture', 'bug'])"),
+                        ]))),
+                    )
+                    .desc("Array of memories to create")
+                    .required(),
+                ],
+                enabled: true,
+                category: "Memory".to_string(),
+            },
+            ToolDefinition {
+                id: "memory_update".to_string(),
+                name: "Update Memories".to_string(),
+                short_desc: "Modify stored notes".to_string(),
+                description: "Updates or deletes existing memory items.".to_string(),
+                params: vec![
+                    ToolParam::new(
+                        "updates",
+                        ParamType::Array(Box::new(ParamType::Object(vec![
+                            ToolParam::new("id", ParamType::String).desc("Memory ID (e.g., M1)").required(),
+                            ToolParam::new("content", ParamType::String).desc("New content"),
+                            ToolParam::new("contents", ParamType::String)
+                                .desc("New rich body text (visible when memory is opened)"),
+                            ToolParam::new("importance", ParamType::String)
+                                .desc("New importance level")
+                                .enum_vals(&["low", "medium", "high", "critical"]),
+                            ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
+                                .desc("New labels (replaces existing)"),
+                            ToolParam::new("open", ParamType::Boolean)
+                                .desc("Set true to show full contents in panel, false to show only tl;dr"),
+                            ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete"),
+                        ]))),
+                    )
+                    .desc("Array of memory updates")
+                    .required(),
+                ],
+                enabled: true,
+                category: "Memory".to_string(),
+            },
+        ]
+    }
+
+    fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
+        match tool.name.as_str() {
+            "memory_create" => Some(self::tools::execute_create(tool, state)),
+            "memory_update" => Some(self::tools::execute_update(tool, state)),
+            _ => None,
+        }
+    }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "memory",
+            icon_id: "memory",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(4),
+            display_name: "memory",
+            short_name: "memories",
+            needs_async_wait: false,
+        }]
+    }
+
+    fn overview_context_section(&self, state: &State) -> Option<String> {
+        let ms = MemoryState::get(state);
+        if ms.memories.is_empty() {
+            return None;
+        }
+        Some(format!("Memories: {}\n", ms.memories.len()))
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Memory", "Store persistent memories across the conversation")]
+    }
+}
