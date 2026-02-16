@@ -233,6 +233,8 @@ fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
         vec![
             Span::styled(" ↑↓", Style::default().fg(theme::accent())),
             Span::styled(" navigate  ", Style::default().fg(theme::text_muted())),
+            Span::styled("←→", Style::default().fg(theme::accent())),
+            Span::styled(" questions  ", Style::default().fg(theme::text_muted())),
             Span::styled("Space", Style::default().fg(theme::accent())),
             Span::styled(" toggle  ", Style::default().fg(theme::text_muted())),
             Span::styled("Enter", Style::default().fg(theme::accent())),
@@ -244,6 +246,8 @@ fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
         vec![
             Span::styled(" ↑↓", Style::default().fg(theme::accent())),
             Span::styled(" navigate  ", Style::default().fg(theme::text_muted())),
+            Span::styled("←→", Style::default().fg(theme::accent())),
+            Span::styled(" questions  ", Style::default().fg(theme::text_muted())),
             Span::styled("Enter", Style::default().fg(theme::accent())),
             Span::styled(" select & next  ", Style::default().fg(theme::text_muted())),
             Span::styled("Esc", Style::default().fg(theme::accent())),

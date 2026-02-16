@@ -218,4 +218,24 @@ impl PendingQuestionForm {
             ans.other_text.pop();
         }
     }
+
+    /// Go to previous question (Left arrow). Always allowed if not on first.
+    pub fn prev_question(&mut self) {
+        if self.current_question > 0 {
+            self.current_question -= 1;
+        }
+    }
+
+    /// Go to next question (Right arrow). Only allowed if current question has an answer.
+    pub fn next_question(&mut self) {
+        if self.current_question < self.questions.len() - 1 && self.current_question_answered() {
+            self.current_question += 1;
+        }
+    }
+
+    /// Check if the current question has been answered (selection or other text)
+    pub fn current_question_answered(&self) -> bool {
+        let ans = &self.answers[self.current_question];
+        !ans.selected.is_empty() || (ans.typing_other && !ans.other_text.is_empty())
+    }
 }

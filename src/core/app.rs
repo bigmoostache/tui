@@ -1276,6 +1276,12 @@ impl App {
             KeyCode::Down if !typing_other => {
                 form.cursor_down();
             }
+            KeyCode::Left => {
+                form.prev_question();
+            }
+            KeyCode::Right => {
+                form.next_question();
+            }
             KeyCode::Enter => {
                 form.handle_enter();
             }
