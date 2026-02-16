@@ -1,6 +1,7 @@
 mod panel;
 mod tools;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -106,6 +107,10 @@ impl Module for FilesModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![("file_edit", visualize_diff as ToolVisualizer), ("Write", visualize_diff as ToolVisualizer)]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "file",
@@ -151,4 +156,63 @@ impl Module for FilesModule {
         }
         ctx.context_type.as_str() == ContextType::FILE && ctx.get_meta_str("file_path") == Some(changed_path)
     }
+}
+
+/// Visualizer for file_edit and Write tool results.
+/// Parses ```diff blocks and renders deleted lines in red, added lines in green.
+/// Non-diff content is rendered in secondary text color.
+fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let error_color = Color::Rgb(255, 85, 85);
+    let success_color = Color::Rgb(80, 250, 123);
+    let secondary_color = Color::Rgb(150, 150, 170);
+
+    let mut lines = Vec::new();
+    let mut in_diff_block = false;
+
+    for line in content.lines() {
+        // Detect diff block markers
+        if line.trim() == "```diff" {
+            in_diff_block = true;
+            continue;
+        }
+        if line.trim() == "```" && in_diff_block {
+            in_diff_block = false;
+            continue;
+        }
+
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        if in_diff_block {
+            let style = if line.starts_with("- ") {
+                Style::default().fg(error_color)
+            } else if line.starts_with("+ ") {
+                Style::default().fg(success_color)
+            } else {
+                Style::default().fg(secondary_color)
+            };
+
+            // Truncate long lines to available width
+            let display = if line.len() > width {
+                format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+            } else {
+                line.to_string()
+            };
+            lines.push(Line::from(Span::styled(display, style)));
+        } else {
+            // Non-diff content: plain secondary text
+            let display = if line.len() > width {
+                format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+            } else {
+                line.to_string()
+            };
+            lines.push(Line::from(Span::styled(display, Style::default().fg(secondary_color))));
+        }
+    }
+
+    lines
 }

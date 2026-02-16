@@ -442,10 +442,12 @@ impl App {
         self.state.global_next_uid += 1;
         let tool_result_records: Vec<ToolResultRecord> = tool_results
             .iter()
-            .map(|r| ToolResultRecord {
+            .zip(tools.iter())
+            .map(|(r, t)| ToolResultRecord {
                 tool_use_id: r.tool_use_id.clone(),
                 content: r.content.clone(),
                 is_error: r.is_error,
+                tool_name: t.name.clone(),
             })
             .collect();
         let result_msg = Message {

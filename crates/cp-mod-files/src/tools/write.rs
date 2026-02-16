@@ -115,9 +115,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     result_msg.push_str("```");
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: result_msg,
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
 }

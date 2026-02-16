@@ -4,6 +4,18 @@ use crate::constants::icons;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::ui::{helpers::wrap_text, markdown::*, theme};
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
+use crate::modules::{ToolVisualizer, build_visualizer_registry};
+
+/// Lazily built registry of tool_name -> visualizer function.
+static VISUALIZER_REGISTRY: OnceLock<HashMap<String, ToolVisualizer>> = OnceLock::new();
+
+fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
+    VISUALIZER_REGISTRY.get_or_init(build_visualizer_registry)
+}
+
 /// Render a single message to lines (without caching logic)
 pub(crate) fn render_message(
     msg: &Message,
@@ -64,56 +76,56 @@ pub(crate) fn render_message(
             let prefix_width = 4;
             let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 
-            let mut is_first = true;
-            let mut in_diff_block = false;
+            // Check if a module registered a custom visualizer for this tool
+            let registry = get_visualizer_registry();
+            let custom_lines = if !result.tool_name.is_empty() {
+                registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
+            } else {
+                None
+            };
 
-            for line in result.content.lines() {
-                // Detect diff block markers
-                if line.trim() == "```diff" {
-                    in_diff_block = true;
-                    continue;
-                }
-                if line.trim() == "```" && in_diff_block {
-                    in_diff_block = false;
-                    continue;
-                }
-
-                if line.is_empty() {
-                    lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
-                    continue;
-                }
-
-                // Determine line style based on diff markers
-                let (line_content, line_style) = if in_diff_block {
-                    if line.starts_with("- ") {
-                        // Deleted line: red color
-                        (line.to_string(), Style::default().fg(theme::error()))
-                    } else if line.starts_with("+ ") {
-                        // Added line: green color
-                        (line.to_string(), Style::default().fg(theme::success()))
-                    } else {
-                        // Regular line in diff block
-                        (line.to_string(), Style::default().fg(theme::text_secondary()))
-                    }
-                } else {
-                    // Regular non-diff line
-                    (line.to_string(), Style::default().fg(theme::text_secondary()))
-                };
-
-                let wrapped = wrap_text(&line_content, wrap_width);
-                for wrapped_line in wrapped {
+            if let Some(vis_lines) = custom_lines {
+                // Use module-provided visualization
+                let mut is_first = true;
+                for vis_line in vis_lines {
                     if is_first {
-                        lines.push(Line::from(vec![
+                        let mut line_spans = vec![
                             Span::styled(status_icon.clone(), Style::default().fg(status_color)),
                             Span::styled(" ".to_string(), base_style),
-                            Span::styled(wrapped_line, line_style),
-                        ]));
+                        ];
+                        line_spans.extend(vis_line.spans);
+                        lines.push(Line::from(line_spans));
                         is_first = false;
                     } else {
-                        lines.push(Line::from(vec![
-                            Span::styled(" ".repeat(prefix_width), base_style),
-                            Span::styled(wrapped_line, line_style),
-                        ]));
+                        let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
+                        line_spans.extend(vis_line.spans);
+                        lines.push(Line::from(line_spans));
+                    }
+                }
+            } else {
+                // Fallback: plain text rendering with wrapping
+                let mut is_first = true;
+                for line in result.content.lines() {
+                    if line.is_empty() {
+                        lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
+                        continue;
+                    }
+
+                    let wrapped = wrap_text(line, wrap_width);
+                    for wrapped_line in wrapped {
+                        if is_first {
+                            lines.push(Line::from(vec![
+                                Span::styled(status_icon.clone(), Style::default().fg(status_color)),
+                                Span::styled(" ".to_string(), base_style),
+                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
+                            ]));
+                            is_first = false;
+                        } else {
+                            lines.push(Line::from(vec![
+                                Span::styled(" ".repeat(prefix_width), base_style),
+                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
+                            ]));
+                        }
                     }
                 }
             }
