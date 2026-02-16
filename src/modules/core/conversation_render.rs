@@ -65,25 +65,54 @@ pub(crate) fn render_message(
             let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 
             let mut is_first = true;
+            let mut in_diff_block = false;
+            
             for line in result.content.lines() {
+                // Detect diff block markers
+                if line.trim() == "```diff" {
+                    in_diff_block = true;
+                    continue;
+                }
+                if line.trim() == "```" && in_diff_block {
+                    in_diff_block = false;
+                    continue;
+                }
+                
                 if line.is_empty() {
                     lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                     continue;
                 }
 
-                let wrapped = wrap_text(line, wrap_width);
+                // Determine line style based on diff markers
+                let (line_content, line_style) = if in_diff_block {
+                    if let Some(content) = line.strip_prefix("- ") {
+                        // Deleted line: red color
+                        (format!("- {}", content), Style::default().fg(theme::error()))
+                    } else if let Some(content) = line.strip_prefix("+ ") {
+                        // Added line: green color
+                        (format!("+ {}", content), Style::default().fg(theme::success()))
+                    } else {
+                        // Regular line in diff block
+                        (line.to_string(), Style::default().fg(theme::text_secondary()))
+                    }
+                } else {
+                    // Regular non-diff line
+                    (line.to_string(), Style::default().fg(theme::text_secondary()))
+                };
+
+                let wrapped = wrap_text(&line_content, wrap_width);
                 for wrapped_line in wrapped {
                     if is_first {
                         lines.push(Line::from(vec![
                             Span::styled(status_icon.clone(), Style::default().fg(status_color)),
                             Span::styled(" ".to_string(), base_style),
-                            Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
+                            Span::styled(wrapped_line, line_style),
                         ]));
                         is_first = false;
                     } else {
                         lines.push(Line::from(vec![
                             Span::styled(" ".repeat(prefix_width), base_style),
-                            Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
+                            Span::styled(wrapped_line, line_style),
                         ]));
                     }
                 }
