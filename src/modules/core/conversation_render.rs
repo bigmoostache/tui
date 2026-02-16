@@ -152,7 +152,7 @@ pub(crate) fn render_message(
         _ => &msg.content,
     };
 
-    let prefix = format!("{}{}", role_icon, status_icon);
+    let prefix = format!("{}{} ", role_icon, status_icon);
     let prefix_width = prefix.chars().count();
     let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 
