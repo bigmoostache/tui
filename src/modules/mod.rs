@@ -1,6 +1,6 @@
 pub mod core;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
@@ -23,7 +23,7 @@ pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
 
 // Re-export Module trait and helpers from cp-base
-pub use cp_base::modules::Module;
+pub use cp_base::modules::{Module, ToolVisualizer};
 
 /// Initialize the global ContextType registry from all modules.
 /// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
@@ -89,6 +89,19 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
 /// Returns the default set of active module IDs (all modules).
 pub fn default_active_modules() -> HashSet<String> {
     all_modules().iter().map(|m| m.id().to_string()).collect()
+}
+
+/// Build a registry of tool visualizers from all modules.
+/// Maps tool_id -> visualizer function. Used by conversation_render to
+/// dispatch custom rendering for tool results.
+pub fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
+    let mut registry = HashMap::new();
+    for module in all_modules() {
+        for (tool_id, visualizer) in module.tool_visualizers() {
+            registry.insert(tool_id.to_string(), visualizer);
+        }
+    }
+    registry
 }
 
 /// Collect tool definitions from all active modules.

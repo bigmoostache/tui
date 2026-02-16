@@ -102,9 +102,18 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let action = if is_new { "Created" } else { "Wrote" };
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("{} '{}' ({} lines, {} tokens)", action, path_str, line_count, token_count),
-        is_error: false,
+    let mut result_msg = format!("{} '{}' ({} lines, {} tokens)\n", action, path_str, line_count, token_count);
+
+    // Add diff-style preview of written content (truncated for large files)
+    result_msg.push_str("```diff\n");
+    for (i, line) in contents.lines().enumerate() {
+        if i >= 20 {
+            result_msg.push_str(&format!("+ ... ({} more lines)\n", line_count - 20));
+            break;
+        }
+        result_msg.push_str(&format!("+ {}\n", line));
     }
+    result_msg.push_str("```");
+
+    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
 }

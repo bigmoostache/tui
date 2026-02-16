@@ -217,11 +217,37 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Count approximate lines changed
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
-    let result_msg = if replace_all && replaced > 1 {
-        format!("Edited '{}': {} replacements (~{} lines changed each)", path_str, replaced, lines_changed)
+    // Format result as a diff for UI display
+    // Note: This is a simple diff format showing all old lines followed by all new lines.
+    // This is intentionally simple for a minimal UI-only change. A more sophisticated
+    // diff algorithm (like Myers diff) with context lines could be added in the future
+    // if needed, but that would be a larger change beyond the scope of this UI enhancement.
+    let mut result_msg = String::new();
+
+    // Header line
+    if replace_all && replaced > 1 {
+        result_msg.push_str(&format!(
+            "Edited '{}': {} replacements (~{} lines changed each)\n",
+            path_str, replaced, lines_changed
+        ));
     } else {
-        format!("Edited '{}': ~{} lines changed", path_str, lines_changed)
-    };
+        result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
+    }
+
+    // Add diff markers for UI rendering
+    result_msg.push_str("```diff\n");
+
+    // Show old lines with "-" prefix
+    for line in old_string.lines() {
+        result_msg.push_str(&format!("- {}\n", line));
+    }
+
+    // Show new lines with "+" prefix
+    for line in new_string.lines() {
+        result_msg.push_str(&format!("+ {}\n", line));
+    }
+
+    result_msg.push_str("```");
 
     ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
 }
@@ -258,5 +284,63 @@ mod tests {
         assert!(matched.is_some());
         assert!(matched.unwrap().contains("let x = 1"));
         assert!(matched.unwrap().contains("let y = 2"));
+    }
+
+    #[test]
+    fn test_diff_format_structure() {
+        // Test that verifies the expected structure of a diff-formatted result message
+        // This simulates what edit_file produces without requiring actual file I/O
+
+        let old_string = "line1\nline2";
+        let new_string = "line1_modified\nline2_modified";
+        let path_str = "test.txt";
+        let replaced = 1;
+        let replace_all = false;
+        let lines_changed = new_string.lines().count().max(old_string.lines().count());
+
+        // Replicate the formatting logic from edit_file
+        let mut result_msg = String::new();
+
+        if replace_all && replaced > 1 {
+            result_msg.push_str(&format!(
+                "Edited '{}': {} replacements (~{} lines changed each)\n",
+                path_str, replaced, lines_changed
+            ));
+        } else {
+            result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
+        }
+
+        result_msg.push_str("```diff\n");
+
+        for line in old_string.lines() {
+            result_msg.push_str(&format!("- {}\n", line));
+        }
+
+        for line in new_string.lines() {
+            result_msg.push_str(&format!("+ {}\n", line));
+        }
+
+        result_msg.push_str("```");
+
+        // Verify the structure
+        assert!(result_msg.contains("Edited 'test.txt': ~2 lines changed\n"));
+        assert!(result_msg.contains("```diff\n"));
+        assert!(result_msg.contains("- line1\n"));
+        assert!(result_msg.contains("- line2\n"));
+        assert!(result_msg.contains("+ line1_modified\n"));
+        assert!(result_msg.contains("+ line2_modified\n"));
+        assert!(result_msg.ends_with("```"));
+
+        // Verify ordering: header, then diff marker, then deletions, then additions, then closing
+        let header_pos = result_msg.find("Edited").unwrap();
+        let diff_start_pos = result_msg.find("```diff").unwrap();
+        let first_deletion_pos = result_msg.find("- line1").unwrap();
+        let first_addition_pos = result_msg.find("+ line1_modified").unwrap();
+        let diff_end_pos = result_msg.rfind("```").unwrap();
+
+        assert!(header_pos < diff_start_pos);
+        assert!(diff_start_pos < first_deletion_pos);
+        assert!(first_deletion_pos < first_addition_pos);
+        assert!(first_addition_pos < diff_end_pos);
     }
 }

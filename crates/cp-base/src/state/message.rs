@@ -33,6 +33,9 @@ pub struct ToolResultRecord {
     pub content: String,
     #[serde(default)]
     pub is_error: bool,
+    /// Name of the tool that produced this result (for visualization dispatch)
+    #[serde(default)]
+    pub tool_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +181,7 @@ pub mod test_helpers {
                 tool_use_id: tool_use_id.to_string(),
                 content: content.to_string(),
                 is_error: false,
+                tool_name: String::new(),
             });
             b
         }

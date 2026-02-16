@@ -6,6 +6,11 @@ use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::{ToolResult, ToolUse};
 
+/// A function that transforms tool result content into styled terminal lines.
+/// Receives the raw content string and available display width.
+/// Used by modules to register custom visualizations for their tool results.
+pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>>;
+
 /// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
 pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
@@ -112,6 +117,17 @@ pub trait Module: Send + Sync {
     /// Context type metadata for the registry.
     /// Each module declares its owned context types with icon, fixed/cache flags, and sort order.
     fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+        vec![]
+    }
+
+    /// Return tool result visualizers owned by this module.
+    /// Each entry maps a tool_id to a function that transforms the tool result
+    /// content into styled terminal lines. If no visualizer is registered for a
+    /// tool, the core renderer falls back to plain text display.
+    ///
+    /// The visualizer receives the raw result content string and the available
+    /// display width, and returns colored/styled `Line`s for the TUI.
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![]
     }
 
