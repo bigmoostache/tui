@@ -77,6 +77,75 @@ fn markdown_display_width(text: &str) -> usize {
     width
 }
 
+/// Wrap text to fit within a given width, breaking on word boundaries.
+/// Returns a Vec of lines, each fitting within `width` characters.
+fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    if markdown_display_width(text) <= width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0;
+
+    for word in text.split_whitespace() {
+        let word_width = markdown_display_width(word);
+
+        if current_width == 0 {
+            // First word on line — always add it (even if longer than width)
+            if word_width > width {
+                // Break long word character by character
+                for ch in word.chars() {
+                    if current_width >= width {
+                        lines.push(std::mem::take(&mut current_line));
+                        current_width = 0;
+                    }
+                    current_line.push(ch);
+                    current_width += 1;
+                }
+            } else {
+                current_line.push_str(word);
+                current_width = word_width;
+            }
+        } else if current_width + 1 + word_width <= width {
+            // Fits on current line with a space
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            // Doesn't fit — start a new line
+            lines.push(std::mem::take(&mut current_line));
+            if word_width > width {
+                current_width = 0;
+                for ch in word.chars() {
+                    if current_width >= width {
+                        lines.push(std::mem::take(&mut current_line));
+                        current_width = 0;
+                    }
+                    current_line.push(ch);
+                    current_width += 1;
+                }
+            } else {
+                current_line.push_str(word);
+                current_width = word_width;
+            }
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+
+    lines
+}
+
 /// Render a markdown table with aligned columns
 pub fn render_markdown_table(
     lines: &[&str],
@@ -164,59 +233,54 @@ pub fn render_markdown_table(
             }
             result.push(spans);
         } else {
-            // Render data row
-            let mut spans: Vec<Span<'static>> = Vec::new();
+            // Render data row (with multi-line wrapping)
             let is_header = row_idx == 0;
 
+            // Wrap each cell's content to its column width
+            let mut wrapped_cells: Vec<Vec<String>> = Vec::new();
+            let mut max_lines = 1usize;
+
             for (col, width) in col_widths.iter().enumerate() {
-                if col > 0 {
-                    spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
-                }
-
                 let cell = row.get(col).map(|s| s.as_str()).unwrap_or("");
-                let display_width = markdown_display_width(cell);
-
-                // Truncate cell content if it exceeds column width
-                let truncated_cell = if display_width > *width && *width > 2 {
-                    let mut truncated = String::new();
-                    let mut w = 0;
-                    let target = width - 1; // leave room for ellipsis
-                    for ch in cell.chars() {
-                        if w >= target {
-                            break;
-                        }
-                        truncated.push(ch);
-                        w += 1;
-                    }
-                    truncated.push('…');
-                    truncated
-                } else {
-                    cell.to_string()
-                };
-
-                let truncated_display_width = if display_width > *width && *width > 2 {
-                    *width
-                } else {
-                    display_width
-                };
-                let padding_needed = width.saturating_sub(truncated_display_width);
-
-                if is_header {
-                    spans.push(Span::styled(
-                        truncated_cell,
-                        Style::default().fg(theme::accent()).bold(),
-                    ));
-                } else {
-                    let cell_spans = parse_inline_markdown(&truncated_cell);
-                    spans.extend(cell_spans);
-                }
-
-                // Add padding
-                if padding_needed > 0 {
-                    spans.push(Span::styled(" ".repeat(padding_needed), Style::default()));
-                }
+                let cell_lines = wrap_cell_text(cell, *width);
+                max_lines = max_lines.max(cell_lines.len());
+                wrapped_cells.push(cell_lines);
             }
-            result.push(spans);
+
+            // Render each display line of this logical row
+            for line_idx in 0..max_lines {
+                let mut spans: Vec<Span<'static>> = Vec::new();
+
+                for (col, width) in col_widths.iter().enumerate() {
+                    if col > 0 {
+                        spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
+                    }
+
+                    let cell_text = wrapped_cells
+                        .get(col)
+                        .and_then(|lines| lines.get(line_idx))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    let display_width = markdown_display_width(cell_text);
+                    let padding_needed = width.saturating_sub(display_width);
+
+                    if is_header {
+                        spans.push(Span::styled(
+                            cell_text.to_string(),
+                            Style::default().fg(theme::accent()).bold(),
+                        ));
+                    } else {
+                        let cell_spans = parse_inline_markdown(cell_text);
+                        spans.extend(cell_spans);
+                    }
+
+                    if padding_needed > 0 {
+                        spans.push(Span::styled(" ".repeat(padding_needed), Style::default()));
+                    }
+                }
+                result.push(spans);
+            }
         }
     }
 
