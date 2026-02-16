@@ -1,6 +1,7 @@
 use cp_base::constants::icons;
 use cp_base::state::State;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Todo item status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -20,13 +21,17 @@ impl TodoStatus {
             TodoStatus::Done => icons::todo_done(),
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for TodoStatus {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            " " | "pending" => Some(TodoStatus::Pending),
-            "~" | "in_progress" => Some(TodoStatus::InProgress),
-            "x" | "X" | "done" => Some(TodoStatus::Done),
-            _ => None,
+            " " | "pending" => Ok(TodoStatus::Pending),
+            "~" | "in_progress" => Ok(TodoStatus::InProgress),
+            "x" | "X" | "done" => Ok(TodoStatus::Done),
+            _ => Err(()),
         }
     }
 }

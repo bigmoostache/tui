@@ -39,6 +39,12 @@ pub struct PromptState {
     pub library_preview: Option<(PromptType, String)>,
 }
 
+impl Default for PromptState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PromptState {
     pub fn new() -> Self {
         Self {

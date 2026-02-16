@@ -39,12 +39,12 @@ impl Panel for FilePanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
-        let path = ctx.file_path.as_ref()?;
+        let path = ctx.get_meta_str("file_path")?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::FILE),
             data: Box::new(FileCacheRequest {
                 context_id: ctx.id.clone(),
-                file_path: path.clone(),
+                file_path: path.to_string(),
                 current_source_hash: ctx.source_hash.clone(),
             }),
         })
@@ -111,7 +111,7 @@ impl Panel for FilePanel {
             .iter()
             .filter(|c| c.context_type == ContextType::FILE)
             .filter_map(|c| {
-                let path = c.file_path.as_ref()?;
+                let path = c.get_meta_str("file_path")?;
                 // Use cached content only - no blocking file reads
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);
@@ -124,7 +124,7 @@ impl Panel for FilePanel {
         let selected = state.context.get(state.selected_context);
 
         let (content, file_path) = if let Some(ctx) = selected {
-            let path = ctx.file_path.as_deref().unwrap_or("");
+            let path = ctx.get_meta_str("file_path").unwrap_or("");
             // Use cached content only - no blocking file reads
             let content = ctx.cached_content.clone().unwrap_or_else(|| {
                 if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }

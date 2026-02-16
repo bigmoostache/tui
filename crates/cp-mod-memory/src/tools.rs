@@ -56,7 +56,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         let importance = memory_value
             .get("importance")
             .and_then(|v| v.as_str())
-            .and_then(MemoryImportance::from_str)
+            .and_then(|s| s.parse().ok())
             .unwrap_or(MemoryImportance::Medium);
 
         let labels: Vec<String> = memory_value
@@ -166,7 +166,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str())
-                    && let Some(importance) = MemoryImportance::from_str(importance_str)
+                    && let Some(importance) = importance_str.parse::<MemoryImportance>().ok()
                 {
                     m.importance = importance;
                     changes.push("importance");

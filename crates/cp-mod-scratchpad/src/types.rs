@@ -20,6 +20,12 @@ pub struct ScratchpadState {
     pub next_scratchpad_id: usize,
 }
 
+impl Default for ScratchpadState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScratchpadState {
     pub fn new() -> Self {
         Self { scratchpad_cells: vec![], next_scratchpad_id: 1 }

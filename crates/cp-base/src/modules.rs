@@ -2,7 +2,7 @@ use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
 use crate::panels::Panel;
-use crate::state::{ContextType, State};
+use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::{ToolResult, ToolUse};
 
@@ -106,6 +106,12 @@ pub trait Module: Send + Sync {
     /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
     /// Used by ensure_default_contexts to create missing panels generically.
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
+
+    /// Context type metadata for the registry.
+    /// Each module declares its owned context types with icon, fixed/cache flags, and sort order.
+    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
         vec![]
     }
 }

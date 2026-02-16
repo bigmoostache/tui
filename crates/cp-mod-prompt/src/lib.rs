@@ -254,4 +254,27 @@ impl Module for PromptModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         tools::dispatch(tool, state)
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![
+            cp_base::state::ContextTypeMeta {
+                context_type: "library",
+                icon_id: "library",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(1),
+                display_name: "library",
+                short_name: "library",
+            },
+            cp_base::state::ContextTypeMeta {
+                context_type: "skill",
+                icon_id: "skill",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "skill",
+                short_name: "skill",
+            },
+        ]
+    }
 }

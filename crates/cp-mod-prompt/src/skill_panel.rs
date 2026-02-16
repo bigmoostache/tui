@@ -13,8 +13,8 @@ impl Panel for SkillPanel {
         let selected = state.context.get(state.selected_context);
         if let Some(ctx) = selected
             && ctx.context_type == ContextType::new(ContextType::SKILL)
-            && let Some(skill_id) = &ctx.skill_prompt_id
-            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| &s.id == skill_id)
+            && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
+            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == skill_id)
         {
             return format!("Skill: {}", skill.name);
         }
@@ -27,8 +27,8 @@ impl Panel for SkillPanel {
         // Find the skill panel context element that is currently selected
         let selected = state.context.get(state.selected_context);
         if let Some(ctx) = selected
-            && let Some(skill_id) = &ctx.skill_prompt_id
-            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| &s.id == skill_id)
+            && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
+            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == skill_id)
         {
             lines.push(Line::from(vec![
                 Span::styled("Skill: ", Style::default().fg(theme::text_muted())),
@@ -57,7 +57,7 @@ impl Panel for SkillPanel {
             .iter()
             .enumerate()
             .filter(|(_, c)| c.context_type == ContextType::new(ContextType::SKILL))
-            .filter_map(|(idx, c)| c.skill_prompt_id.as_ref().map(|sid| (sid.clone(), c.id.clone(), idx)))
+            .filter_map(|(idx, c)| c.get_meta_str("skill_prompt_id").map(|sid| (sid.to_string(), c.id.clone(), idx)))
             .collect();
 
         // Collect content from PromptState first to avoid borrow conflict with state.context

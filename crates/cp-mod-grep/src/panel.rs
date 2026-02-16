@@ -43,14 +43,14 @@ impl Panel for GrepPanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
-        let pattern = ctx.grep_pattern.as_ref()?;
+        let pattern = ctx.get_meta_str("grep_pattern")?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::GREP),
             data: Box::new(GrepCacheRequest {
                 context_id: ctx.id.clone(),
-                pattern: pattern.clone(),
-                path: ctx.grep_path.clone(),
-                file_pattern: ctx.grep_file_pattern.clone(),
+                pattern: pattern.to_string(),
+                path: ctx.get_meta_str("grep_path").map(|s| s.to_string()),
+                file_pattern: ctx.get_meta_str("grep_file_pattern").map(|s| s.to_string()),
             }),
         })
     }
@@ -93,7 +93,7 @@ impl Panel for GrepPanel {
             .iter()
             .filter(|c| c.context_type == ContextType::GREP)
             .filter_map(|c| {
-                let pattern = c.grep_pattern.as_ref()?;
+                let pattern = c.get_meta_str("grep_pattern")?;
                 // Use cached content only - no blocking operations
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);

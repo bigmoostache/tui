@@ -1,6 +1,59 @@
-use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
-use crate::constants::{CHARS_PER_TOKEN, icons};
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+
+use crate::config::{active_theme, normalize_icon};
+use crate::constants::CHARS_PER_TOKEN;
+
+// =============================================================================
+// ContextType Registry — modules register metadata at startup
+// =============================================================================
+
+/// Metadata for a context type, provided by the owning module.
+pub struct ContextTypeMeta {
+    /// The context type string (e.g., "todo", "git_result")
+    pub context_type: &'static str,
+    /// Key into the theme's context icon HashMap (e.g., "todo", "git")
+    pub icon_id: &'static str,
+    /// Whether this is a fixed/sidebar panel
+    pub is_fixed: bool,
+    /// Whether this context type uses background cache loading
+    pub needs_cache: bool,
+    /// Sort order for fixed panels (P1=0, P2=1, ...). None for dynamic panels.
+    pub fixed_order: Option<u8>,
+    /// UI display name for overview tables (e.g., "todo", "git-result")
+    pub display_name: &'static str,
+    /// Short name for LLM context (e.g., "wip", "git-cmd")
+    pub short_name: &'static str,
+}
+
+static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<ContextTypeMeta>> = OnceLock::new();
+
+/// Initialize the global context type registry. Called once at startup.
+/// Modules provide their metadata via `Module::context_type_metadata()`.
+pub fn init_context_type_registry(metadata: Vec<ContextTypeMeta>) {
+    CONTEXT_TYPE_REGISTRY.get_or_init(|| metadata);
+}
+
+/// Look up metadata for a context type string.
+pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
+    CONTEXT_TYPE_REGISTRY.get().and_then(|registry| registry.iter().find(|m| m.context_type == ct))
+}
+
+/// Return the canonical fixed panel order, derived from the registry.
+/// Sorted by `fixed_order` for panels that declare `is_fixed = true`.
+pub fn fixed_panel_order() -> Vec<&'static str> {
+    let Some(registry) = CONTEXT_TYPE_REGISTRY.get() else { return vec![] };
+    let mut fixed: Vec<_> = registry.iter().filter(|m| m.is_fixed && m.fixed_order.is_some()).collect();
+    fixed.sort_by_key(|m| m.fixed_order.unwrap());
+    fixed.iter().map(|m| m.context_type).collect()
+}
+
+// =============================================================================
+// ContextType
+// =============================================================================
 
 /// A string-backed context type identifier.
 ///
@@ -49,52 +102,21 @@ impl ContextType {
     pub const SPINE: &str = "spine";
     pub const LOGS: &str = "logs";
 
-    /// Returns true if this is a fixed/system context type
+    /// Returns true if this is a fixed/system context type (looked up from registry).
     pub fn is_fixed(&self) -> bool {
-        matches!(
-            self.0.as_str(),
-            Self::TODO
-                | Self::LIBRARY
-                | Self::OVERVIEW
-                | Self::TREE
-                | Self::MEMORY
-                | Self::SPINE
-                | Self::LOGS
-                | Self::GIT
-                | Self::SCRATCHPAD
-        )
+        get_context_type_meta(self.0.as_str()).map(|m| m.is_fixed).unwrap_or(false)
     }
 
-    /// Get icon for this context type (normalized to 2 cells)
+    /// Get icon for this context type (normalized to 2 cells, looked up from registry + theme).
     pub fn icon(&self) -> String {
-        match self.0.as_str() {
-            Self::SYSTEM => icons::ctx_system(),
-            Self::CONVERSATION => icons::ctx_conversation(),
-            Self::FILE => icons::ctx_file(),
-            Self::TREE => icons::ctx_tree(),
-            Self::GLOB => icons::ctx_glob(),
-            Self::GREP => icons::ctx_grep(),
-            Self::TMUX => icons::ctx_tmux(),
-            Self::TODO => icons::ctx_todo(),
-            Self::MEMORY => icons::ctx_memory(),
-            Self::OVERVIEW => icons::ctx_overview(),
-            Self::GIT | Self::GIT_RESULT | Self::GITHUB_RESULT => icons::ctx_git(),
-            Self::SCRATCHPAD => icons::ctx_scratchpad(),
-            Self::LIBRARY => icons::ctx_library(),
-            Self::SKILL => icons::ctx_skill(),
-            Self::CONVERSATION_HISTORY => icons::ctx_conversation(),
-            Self::SPINE => icons::ctx_spine(),
-            Self::LOGS => icons::ctx_memory(),
-            _ => icons::ctx_file(), // fallback for unknown types
-        }
+        let icon_id = get_context_type_meta(self.0.as_str()).map(|m| m.icon_id).unwrap_or("file");
+        let raw = active_theme().context.get(icon_id).unwrap_or("📄");
+        normalize_icon(raw)
     }
 
     /// Returns true if this context type uses cached_content from background loading.
     pub fn needs_cache(&self) -> bool {
-        matches!(
-            self.0.as_str(),
-            Self::FILE | Self::TREE | Self::GLOB | Self::GREP | Self::TMUX | Self::GIT | Self::GIT_RESULT | Self::GITHUB_RESULT
-        )
+        get_context_type_meta(self.0.as_str()).map(|m| m.needs_cache).unwrap_or(false)
     }
 }
 
@@ -128,42 +150,11 @@ pub struct ContextElement {
     pub context_type: ContextType,
     pub name: String,
     pub token_count: usize,
-    /// File path (for File context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub file_path: Option<String>,
-    /// Glob pattern (for Glob context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glob_pattern: Option<String>,
-    /// Glob search path (for Glob context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glob_path: Option<String>,
-    /// Grep regex pattern (for Grep context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_pattern: Option<String>,
-    /// Grep search path (for Grep context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_path: Option<String>,
-    /// Grep file filter pattern (for Grep context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_file_pattern: Option<String>,
-    /// Tmux pane ID (for Tmux context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_pane_id: Option<String>,
-    /// Number of lines to capture from tmux pane
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_lines: Option<usize>,
-    /// Last keys sent to this tmux pane
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_last_keys: Option<String>,
-    /// Description of what this tmux pane is for
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_description: Option<String>,
-    /// Command string for GitResult/GithubResult panels
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result_command: Option<String>,
-    /// Skill prompt ID (links to PromptItem.id for Skill panels)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub skill_prompt_id: Option<String>,
+    /// Generic metadata bag for module-specific panel data.
+    /// Keys are module-defined strings (e.g., "file_path", "tmux_pane_id").
+    /// Replaces former hardcoded Option<> fields per module.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, serde_json::Value>,
 
     // === Caching fields (not persisted) ===
     /// Cached content for LLM context and UI rendering
@@ -204,6 +195,31 @@ pub struct ContextElement {
     pub panel_total_cost: f64,
 }
 
+// === ContextElement metadata helpers ===
+impl ContextElement {
+    /// Get a typed value from the metadata bag.
+    pub fn get_meta<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+        self.metadata.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Set a typed value in the metadata bag.
+    pub fn set_meta<T: Serialize>(&mut self, key: &str, value: &T) {
+        if let Ok(v) = serde_json::to_value(value) {
+            self.metadata.insert(key.to_string(), v);
+        }
+    }
+
+    /// Fast path: get a metadata value as &str (avoids clone/deser for the common string case).
+    pub fn get_meta_str(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).and_then(|v| v.as_str())
+    }
+
+    /// Fast path: get a metadata value as usize.
+    pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
+        self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n as usize)
+    }
+}
+
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
 pub fn estimate_tokens(text: &str) -> usize {
     (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize
@@ -228,18 +244,7 @@ pub fn make_default_context_element(
         context_type,
         name: name.to_string(),
         token_count: 0,
-        file_path: None,
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: None,
-        grep_path: None,
-        grep_file_pattern: None,
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        skill_prompt_id: None,
+        metadata: HashMap::new(),
         cached_content: None,
         history_messages: None,
         cache_deprecated,
@@ -260,6 +265,16 @@ mod tests {
     use super::*;
     use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
+    /// Initialize a minimal registry for tests.
+    fn init_test_registry() {
+        let _ = CONTEXT_TYPE_REGISTRY.set(vec![
+            ContextTypeMeta { context_type: "todo", icon_id: "todo", is_fixed: true, needs_cache: false, fixed_order: Some(0), display_name: "todo", short_name: "todo" },
+            ContextTypeMeta { context_type: "git", icon_id: "git", is_fixed: true, needs_cache: true, fixed_order: Some(7), display_name: "git", short_name: "changes" },
+            ContextTypeMeta { context_type: "file", icon_id: "file", is_fixed: false, needs_cache: true, fixed_order: None, display_name: "file", short_name: "file" },
+            ContextTypeMeta { context_type: "conversation", icon_id: "conversation", is_fixed: false, needs_cache: false, fixed_order: None, display_name: "conversation", short_name: "convo" },
+        ]);
+    }
+
     #[test]
     fn context_type_serde_roundtrip() {
         let ct = ContextType::new("todo");
@@ -279,6 +294,7 @@ mod tests {
 
     #[test]
     fn context_type_is_fixed() {
+        init_test_registry();
         assert!(ContextType::new(ContextType::TODO).is_fixed());
         assert!(ContextType::new(ContextType::GIT).is_fixed());
         assert!(!ContextType::new(ContextType::FILE).is_fixed());
@@ -287,6 +303,7 @@ mod tests {
 
     #[test]
     fn context_type_needs_cache() {
+        init_test_registry();
         assert!(ContextType::new(ContextType::FILE).needs_cache());
         assert!(ContextType::new(ContextType::GIT).needs_cache());
         assert!(!ContextType::new(ContextType::TODO).needs_cache());

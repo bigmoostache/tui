@@ -78,28 +78,17 @@ pub struct MessageIcons {
     pub error: String,
 }
 
+/// Context panel icons — a string-keyed map loaded from theme YAML.
+/// Keys match module icon_ids (e.g., "tree", "todo", "git").
 #[derive(Debug, Deserialize, Clone)]
-pub struct ContextIcons {
-    pub system: String,
-    pub conversation: String,
-    pub tree: String,
-    pub todo: String,
-    pub memory: String,
-    pub overview: String,
-    pub file: String,
-    pub glob: String,
-    pub grep: String,
-    pub tmux: String,
-    pub git: String,
-    pub scratchpad: String,
-    pub library: String,
-    pub skill: String,
-    #[serde(default = "default_spine_icon")]
-    pub spine: String,
-}
+#[serde(transparent)]
+pub struct ContextIcons(pub HashMap<String, String>);
 
-fn default_spine_icon() -> String {
-    "⚡".to_string()
+impl ContextIcons {
+    /// Look up an icon by key (e.g., "tree", "git").
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(|s| s.as_str())
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

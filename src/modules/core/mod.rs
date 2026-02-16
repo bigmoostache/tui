@@ -11,7 +11,7 @@ mod tools;
 use serde_json::json;
 
 use crate::core::panels::Panel;
-use crate::state::{ContextType, State};
+use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
 
@@ -154,6 +154,47 @@ impl Module for CoreModule {
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
+    }
+
+    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+        vec![
+            ContextTypeMeta {
+                context_type: "overview",
+                icon_id: "overview",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(2),
+                display_name: "overview",
+                short_name: "world",
+            },
+            ContextTypeMeta {
+                context_type: "system",
+                icon_id: "system",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "system",
+                short_name: "seed",
+            },
+            ContextTypeMeta {
+                context_type: "conversation",
+                icon_id: "conversation",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "conversation",
+                short_name: "chat",
+            },
+            ContextTypeMeta {
+                context_type: "conversation_history",
+                icon_id: "conversation",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "chat-history",
+                short_name: "history",
+            },
+        ]
     }
 
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {

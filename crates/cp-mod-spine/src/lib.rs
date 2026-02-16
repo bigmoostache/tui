@@ -142,6 +142,18 @@ impl Module for SpineModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "spine",
+            icon_id: "spine",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(5),
+            display_name: "spine",
+            short_name: "spine",
+        }]
+    }
 }
 
 /// Prune processed notifications: keep all unprocessed + latest 10 processed.

@@ -502,6 +502,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     {
         use crate::config::{THEME_ORDER, get_theme};
         let current_theme = get_theme(&state.active_theme);
+        let fallback_icon = "📄".to_string();
 
         // Show theme name and preview icons
         lines.push(Line::from(vec![
@@ -513,8 +514,8 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
                     "{} {} {} {}",
                     current_theme.messages.user,
                     current_theme.messages.assistant,
-                    current_theme.context.tree,
-                    current_theme.context.file,
+                    current_theme.context.get("tree").unwrap_or(&fallback_icon),
+                    current_theme.context.get("file").unwrap_or(&fallback_icon),
                 ),
                 Style::default().fg(theme::text()),
             ),

@@ -116,9 +116,6 @@ pub const PANELS_DIR: &str = "panels";
 /// Default worker ID
 pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
-/// Maximum size for command output cached in result panels (bytes)
-pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
-
 // =============================================================================
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)
 // =============================================================================

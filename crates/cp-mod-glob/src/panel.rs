@@ -42,13 +42,13 @@ impl Panel for GlobPanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
-        let pattern = ctx.glob_pattern.as_ref()?;
+        let pattern = ctx.get_meta_str("glob_pattern")?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::GLOB),
             data: Box::new(GlobCacheRequest {
                 context_id: ctx.id.clone(),
-                pattern: pattern.clone(),
-                base_path: ctx.glob_path.clone(),
+                pattern: pattern.to_string(),
+                base_path: ctx.get_meta_str("glob_path").map(|s| s.to_string()),
             }),
         })
     }
@@ -91,7 +91,7 @@ impl Panel for GlobPanel {
             .iter()
             .filter(|c| c.context_type == ContextType::GLOB)
             .filter_map(|c| {
-                let pattern = c.glob_pattern.as_ref()?;
+                let pattern = c.get_meta_str("glob_pattern")?;
                 // Use cached content only - no blocking operations
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);

@@ -105,4 +105,16 @@ impl Module for FilesModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "file",
+            icon_id: "file",
+            is_fixed: false,
+            needs_cache: true,
+            fixed_order: None,
+            display_name: "file",
+            short_name: "file",
+        }]
+    }
 }

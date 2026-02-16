@@ -66,7 +66,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         let status = todo_value
             .get("status")
             .and_then(|v| v.as_str())
-            .and_then(TodoStatus::from_str)
+            .and_then(|s| s.parse().ok())
             .unwrap_or(TodoStatus::Pending);
 
         let ts = TodoState::get_mut(state);
@@ -219,7 +219,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         // Pre-check: if setting status to done, verify all children are done
         let status_str = update_value.get("status").and_then(|v| v.as_str());
         if let Some(s) = status_str
-            && let Some(status) = TodoStatus::from_str(s)
+            && let Some(status) = s.parse::<TodoStatus>().ok()
             && status == TodoStatus::Done
         {
             let ts = TodoState::get(state);
@@ -260,7 +260,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 if let Some(status_str) = update_value.get("status").and_then(|v| v.as_str())
-                    && let Some(status) = TodoStatus::from_str(status_str)
+                    && let Some(status) = status_str.parse::<TodoStatus>().ok()
                 {
                     t.status = status;
                     changes.push("status");

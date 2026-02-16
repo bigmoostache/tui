@@ -241,53 +241,6 @@ pub mod icons {
         normalize_icon(&active_theme().messages.error)
     }
 
-    // Context panel types (normalized to 2 cells)
-    pub fn ctx_system() -> String {
-        normalize_icon(&active_theme().context.system)
-    }
-    pub fn ctx_conversation() -> String {
-        normalize_icon(&active_theme().context.conversation)
-    }
-    pub fn ctx_tree() -> String {
-        normalize_icon(&active_theme().context.tree)
-    }
-    pub fn ctx_todo() -> String {
-        normalize_icon(&active_theme().context.todo)
-    }
-    pub fn ctx_memory() -> String {
-        normalize_icon(&active_theme().context.memory)
-    }
-    pub fn ctx_overview() -> String {
-        normalize_icon(&active_theme().context.overview)
-    }
-    pub fn ctx_file() -> String {
-        normalize_icon(&active_theme().context.file)
-    }
-    pub fn ctx_glob() -> String {
-        normalize_icon(&active_theme().context.glob)
-    }
-    pub fn ctx_grep() -> String {
-        normalize_icon(&active_theme().context.grep)
-    }
-    pub fn ctx_tmux() -> String {
-        normalize_icon(&active_theme().context.tmux)
-    }
-    pub fn ctx_git() -> String {
-        normalize_icon(&active_theme().context.git)
-    }
-    pub fn ctx_scratchpad() -> String {
-        normalize_icon(&active_theme().context.scratchpad)
-    }
-    pub fn ctx_library() -> String {
-        normalize_icon(&active_theme().context.library)
-    }
-    pub fn ctx_skill() -> String {
-        normalize_icon(&active_theme().context.skill)
-    }
-    pub fn ctx_spine() -> String {
-        normalize_icon(&active_theme().context.spine)
-    }
-
     // Message status (normalized to 2 cells)
     pub fn status_full() -> String {
         normalize_icon(&active_theme().status.full)

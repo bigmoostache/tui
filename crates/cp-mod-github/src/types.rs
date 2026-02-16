@@ -4,6 +4,12 @@ pub struct GithubState {
     pub github_token: Option<String>,
 }
 
+impl Default for GithubState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GithubState {
     pub fn new() -> Self {
         Self { github_token: None }

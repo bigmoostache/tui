@@ -44,6 +44,12 @@ pub struct LogsState {
     pub open_log_ids: Vec<String>,
 }
 
+impl Default for LogsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LogsState {
     pub fn new() -> Self {
         Self {

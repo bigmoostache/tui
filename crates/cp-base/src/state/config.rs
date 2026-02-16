@@ -126,40 +126,12 @@ pub struct PanelData {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub message_uids: Vec<String>,
 
-    // === File/Glob/Grep/Tmux panel metadata ===
-    /// File path (for File context)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub file_path: Option<String>,
-    /// Glob pattern
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glob_pattern: Option<String>,
-    /// Glob search path
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glob_path: Option<String>,
-    /// Grep regex pattern
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_pattern: Option<String>,
-    /// Grep search path
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_path: Option<String>,
-    /// Grep file filter pattern
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grep_file_pattern: Option<String>,
-    /// Tmux pane ID
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_pane_id: Option<String>,
-    /// Number of lines to capture from tmux pane
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_lines: Option<usize>,
-    /// Tmux pane description
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tmux_description: Option<String>,
-    /// Command string for GitResult/GithubResult panels
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result_command: Option<String>,
-    /// Skill prompt ID (for Skill panels)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub skill_prompt_id: Option<String>,
+    // === Generic metadata bag for module-specific panel data ===
+    /// Keys are module-defined strings (e.g., "file_path", "tmux_pane_id").
+    /// Replaces former hardcoded Option<> fields per module.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, serde_json::Value>,
+
     /// Content hash for change detection across reloads
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,

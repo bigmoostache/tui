@@ -26,7 +26,7 @@ impl Panel for TmuxPanel {
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         // Get current tmux pane ID
-        let pane_id = state.context.get(state.selected_context).and_then(|c| c.tmux_pane_id.clone())?;
+        let pane_id = state.context.get(state.selected_context).and_then(|c| c.get_meta_str("tmux_pane_id").map(|s| s.to_string()))?;
 
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 
@@ -52,7 +52,7 @@ impl Panel for TmuxPanel {
     }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context) {
-            let pane_id = ctx.tmux_pane_id.as_deref().unwrap_or("?");
+            let pane_id = ctx.get_meta_str("tmux_pane_id").unwrap_or("?");
             format!("tmux {}", pane_id)
         } else {
             "Tmux".to_string()
@@ -60,13 +60,13 @@ impl Panel for TmuxPanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
-        let pane_id = ctx.tmux_pane_id.as_ref()?;
+        let pane_id = ctx.get_meta_str("tmux_pane_id")?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::TMUX),
             data: Box::new(TmuxCacheRequest {
                 context_id: ctx.id.clone(),
-                pane_id: pane_id.clone(),
-                lines: ctx.tmux_lines,
+                pane_id: pane_id.to_string(),
+                lines: ctx.get_meta_usize("tmux_lines"),
                 current_source_hash: ctx.source_hash.clone(),
             }),
         })
@@ -119,11 +119,11 @@ impl Panel for TmuxPanel {
             .iter()
             .filter(|c| c.context_type == ContextType::TMUX)
             .filter_map(|c| {
-                let pane_id = c.tmux_pane_id.as_ref()?;
+                let pane_id = c.get_meta_str("tmux_pane_id")?;
                 // Use cached content only - no blocking operations
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);
-                let desc = c.tmux_description.as_deref().unwrap_or("");
+                let desc = c.get_meta_str("tmux_description").unwrap_or("");
                 let header = if desc.is_empty() {
                     format!("Tmux Pane {}", pane_id)
                 } else {
@@ -140,8 +140,8 @@ impl Panel for TmuxPanel {
             let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
                 if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }
             });
-            let desc = ctx.tmux_description.clone().unwrap_or_default();
-            let last = ctx.tmux_last_keys.clone();
+            let desc = ctx.get_meta_str("tmux_description").unwrap_or("").to_string();
+            let last = ctx.get_meta_str("tmux_last_keys").map(|s| s.to_string());
             (content, desc, last)
         } else {
             (String::new(), String::new(), None)

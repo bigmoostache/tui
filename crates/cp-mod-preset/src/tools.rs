@@ -6,8 +6,7 @@ use cp_base::constants::STORE_DIR;
 
 use crate::PRESETS_DIR;
 use cp_base::modules::Module;
-use cp_base::panels::now_ms;
-use cp_base::state::{ContextElement, ContextType, State};
+use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tool_defs::ToolDefinition;
 use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
@@ -120,16 +119,16 @@ pub(crate) fn execute_snapshot(
         .map(|ctx| PresetPanelConfig {
             panel_type: ctx.context_type.clone(),
             name: ctx.name.clone(),
-            file_path: ctx.file_path.clone(),
-            glob_pattern: ctx.glob_pattern.clone(),
-            glob_path: ctx.glob_path.clone(),
-            grep_pattern: ctx.grep_pattern.clone(),
-            grep_path: ctx.grep_path.clone(),
-            grep_file_pattern: ctx.grep_file_pattern.clone(),
-            tmux_pane_id: ctx.tmux_pane_id.clone(),
-            tmux_lines: ctx.tmux_lines,
-            tmux_description: ctx.tmux_description.clone(),
-            skill_prompt_id: ctx.skill_prompt_id.clone(),
+            file_path: ctx.get_meta_str("file_path").map(|s| s.to_string()),
+            glob_pattern: ctx.get_meta_str("glob_pattern").map(|s| s.to_string()),
+            glob_path: ctx.get_meta_str("glob_path").map(|s| s.to_string()),
+            grep_pattern: ctx.get_meta_str("grep_pattern").map(|s| s.to_string()),
+            grep_path: ctx.get_meta_str("grep_path").map(|s| s.to_string()),
+            grep_file_pattern: ctx.get_meta_str("grep_file_pattern").map(|s| s.to_string()),
+            tmux_pane_id: ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string()),
+            tmux_lines: ctx.get_meta_usize("tmux_lines"),
+            tmux_description: ctx.get_meta_str("tmux_description").map(|s| s.to_string()),
+            skill_prompt_id: ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()),
         })
         .collect();
 
@@ -289,7 +288,7 @@ pub(crate) fn execute_load(
     // 5. Remove existing dynamic panels (kill tmux panes first)
     for ctx in &state.context {
         if ctx.context_type == ContextType::TMUX
-            && let Some(pane_id) = &ctx.tmux_pane_id
+            && let Some(pane_id) = ctx.get_meta_str("tmux_pane_id")
         {
             let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane_id]).output();
         }
@@ -302,37 +301,39 @@ pub(crate) fn execute_load(
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid += 1;
 
-        state.context.push(ContextElement {
-            id: context_id,
-            uid: Some(uid),
-            context_type: panel_cfg.panel_type.clone(),
-            name: panel_cfg.name.clone(),
-            token_count: 0,
-            file_path: panel_cfg.file_path.clone(),
-            glob_pattern: panel_cfg.glob_pattern.clone(),
-            glob_path: panel_cfg.glob_path.clone(),
-            grep_pattern: panel_cfg.grep_pattern.clone(),
-            grep_path: panel_cfg.grep_path.clone(),
-            grep_file_pattern: panel_cfg.grep_file_pattern.clone(),
-            tmux_pane_id: panel_cfg.tmux_pane_id.clone(),
-            tmux_lines: panel_cfg.tmux_lines,
-            tmux_last_keys: None,
-            tmux_description: panel_cfg.tmux_description.clone(),
-            result_command: None,
-            skill_prompt_id: panel_cfg.skill_prompt_id.clone(),
-            cached_content: None,
-            history_messages: None,
-            cache_deprecated: true,
-            cache_in_flight: false,
-            last_refresh_ms: now_ms(),
-            content_hash: None,
-            source_hash: None,
-            current_page: 0,
-            total_pages: 1,
-            full_token_count: 0,
-            panel_cache_hit: false,
-            panel_total_cost: 0.0,
-        });
+        let mut elem = make_default_context_element(&context_id, panel_cfg.panel_type.clone(), &panel_cfg.name, true);
+        elem.uid = Some(uid);
+        if let Some(ref v) = panel_cfg.file_path {
+            elem.set_meta("file_path", v);
+        }
+        if let Some(ref v) = panel_cfg.glob_pattern {
+            elem.set_meta("glob_pattern", v);
+        }
+        if let Some(ref v) = panel_cfg.glob_path {
+            elem.set_meta("glob_path", v);
+        }
+        if let Some(ref v) = panel_cfg.grep_pattern {
+            elem.set_meta("grep_pattern", v);
+        }
+        if let Some(ref v) = panel_cfg.grep_path {
+            elem.set_meta("grep_path", v);
+        }
+        if let Some(ref v) = panel_cfg.grep_file_pattern {
+            elem.set_meta("grep_file_pattern", v);
+        }
+        if let Some(ref v) = panel_cfg.tmux_pane_id {
+            elem.set_meta("tmux_pane_id", v);
+        }
+        if let Some(v) = panel_cfg.tmux_lines {
+            elem.set_meta("tmux_lines", &v);
+        }
+        if let Some(ref v) = panel_cfg.tmux_description {
+            elem.set_meta("tmux_description", v);
+        }
+        if let Some(ref v) = panel_cfg.skill_prompt_id {
+            elem.set_meta("skill_prompt_id", v);
+        }
+        state.context.push(elem);
     }
 
     // 6b. Restore loaded_skill_ids (filter to skills that still exist)
@@ -352,8 +353,8 @@ pub(crate) fn execute_load(
             .collect();
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SKILL
-                && let Some(ref skill_id) = ctx.skill_prompt_id
-                && let Some((_, content)) = skill_contents.iter().find(|(id, _)| id == skill_id)
+                && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string())
+                && let Some((_, content)) = skill_contents.iter().find(|(id, _)| *id == skill_id)
             {
                 ctx.cached_content = Some(content.clone());
             }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use cp_base::state::State;
 
@@ -13,16 +14,21 @@ pub enum MemoryImportance {
     Critical,
 }
 
-impl MemoryImportance {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for MemoryImportance {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "low" => Some(MemoryImportance::Low),
-            "medium" => Some(MemoryImportance::Medium),
-            "high" => Some(MemoryImportance::High),
-            "critical" => Some(MemoryImportance::Critical),
-            _ => None,
+            "low" => Ok(MemoryImportance::Low),
+            "medium" => Ok(MemoryImportance::Medium),
+            "high" => Ok(MemoryImportance::High),
+            "critical" => Ok(MemoryImportance::Critical),
+            _ => Err(()),
         }
     }
+}
+
+impl MemoryImportance {
 
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -60,6 +66,12 @@ pub struct MemoryState {
     pub memories: Vec<MemoryItem>,
     pub next_memory_id: usize,
     pub open_memory_ids: Vec<String>,
+}
+
+impl Default for MemoryState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryState {

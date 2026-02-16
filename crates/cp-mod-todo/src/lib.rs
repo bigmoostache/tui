@@ -147,4 +147,16 @@ impl Module for TodoModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "todo",
+            icon_id: "todo",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(0),
+            display_name: "todo",
+            short_name: "wip",
+        }]
+    }
 }

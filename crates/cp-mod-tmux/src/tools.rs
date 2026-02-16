@@ -76,7 +76,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if this pane is already being monitored
-    if state.context.iter().any(|c| c.tmux_pane_id.as_deref() == Some(&pane_id)) {
+    if state.context.iter().any(|c| c.get_meta_str("tmux_pane_id") == Some(&pane_id)) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Pane {} is already being monitored", pane_id),
@@ -93,9 +93,9 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = format!("tmux:{}", pane_id);
     let mut elem = make_default_context_element(&context_id, ContextType::new(ContextType::TMUX), &name, true);
     elem.uid = Some(uid);
-    elem.tmux_pane_id = Some(pane_id.clone());
-    elem.tmux_lines = Some(lines);
-    elem.tmux_description = Some(description.clone());
+    elem.set_meta("tmux_pane_id", &pane_id);
+    elem.set_meta("tmux_lines", &lines);
+    elem.set_meta("tmux_description", &description);
     state.context.push(elem);
 
     ToolResult {
@@ -122,26 +122,26 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Find the context by context_id or pane_id
-    let ctx = state.context.iter_mut().find(|c| c.id == identifier || c.tmux_pane_id.as_deref() == Some(identifier));
+    let ctx = state.context.iter_mut().find(|c| c.id == identifier || c.get_meta_str("tmux_pane_id") == Some(identifier));
 
     match ctx {
         Some(c) => {
             let mut changes = Vec::new();
 
             if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
-                c.tmux_description = Some(desc.to_string());
+                c.set_meta("tmux_description", &desc.to_string());
                 changes.push(format!("description='{}'", desc));
             }
 
             if let Some(lines) = tool.input.get("lines").and_then(|v| v.as_u64()) {
-                c.tmux_lines = Some(lines as usize);
+                c.set_meta("tmux_lines", &(lines as usize));
                 changes.push(format!("lines={}", lines));
             }
 
             if changes.is_empty() {
                 ToolResult { tool_use_id: tool.id.clone(), content: "No changes specified".to_string(), is_error: true }
             } else {
-                let pane_id = c.tmux_pane_id.as_deref().unwrap_or(identifier);
+                let pane_id = c.get_meta_str("tmux_pane_id").unwrap_or(identifier);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Updated pane {}: {}", pane_id, changes.join(", ")),
@@ -162,11 +162,11 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
 fn resolve_pane_id(identifier: &str, state: &State) -> Option<String> {
     // First, try to find by context_id
     if let Some(ctx) = state.context.iter().find(|c| c.id == identifier) {
-        return ctx.tmux_pane_id.clone();
+        return ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string());
     }
     // Then try to find by pane_id directly
-    if let Some(ctx) = state.context.iter().find(|c| c.tmux_pane_id.as_deref() == Some(identifier)) {
-        return ctx.tmux_pane_id.clone();
+    if let Some(ctx) = state.context.iter().find(|c| c.get_meta_str("tmux_pane_id") == Some(identifier)) {
+        return ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string());
     }
     // If it looks like a tmux pane ID (starts with %), return it as-is
     if identifier.starts_with('%') {
@@ -258,9 +258,9 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             // Update last_keys on the context element
             let context_id = if let Some(ctx) =
-                state.context.iter_mut().find(|c| c.tmux_pane_id.as_deref() == Some(pane_id.as_str()))
+                state.context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(pane_id.as_str()))
             {
-                ctx.tmux_last_keys = Some(keys.to_string());
+                ctx.set_meta("tmux_last_keys", &keys.to_string());
                 Some(ctx.id.clone())
             } else {
                 None

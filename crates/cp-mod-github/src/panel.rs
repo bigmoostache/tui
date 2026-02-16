@@ -25,7 +25,7 @@ impl Panel for GithubResultPanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
-        let command = ctx.result_command.as_ref()?;
+        let command = ctx.get_meta_str("result_command")?.to_string();
         let token = GithubState::get(state).github_token.as_ref()?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::GITHUB_RESULT),
@@ -119,10 +119,10 @@ impl Panel for GithubResultPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type == ContextType::GITHUB_RESULT
-            && let Some(cmd) = &ctx.result_command
+            && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short =
-                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
+                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.to_string() };
             return short;
         }
         "GitHub Result".to_string()
@@ -135,7 +135,7 @@ impl Panel for GithubResultPanel {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
-            let header = ctx.result_command.as_deref().unwrap_or("GitHub Result");
+            let header = ctx.get_meta_str("result_command").unwrap_or("GitHub Result");
             let output = paginate_content(content, ctx.current_page, ctx.total_pages);
             items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
         }

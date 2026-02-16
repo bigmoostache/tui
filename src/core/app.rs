@@ -721,11 +721,11 @@ impl App {
         // Watch files in File contexts
         for ctx in &self.state.context {
             if ctx.context_type == ContextType::FILE
-                && let Some(path) = &ctx.file_path
+                && let Some(path) = ctx.get_meta_str("file_path")
                 && !self.watched_file_paths.contains(path)
                 && watcher.watch_file(path).is_ok()
             {
-                self.watched_file_paths.insert(path.clone());
+                self.watched_file_paths.insert(path.to_string());
             }
         }
 
@@ -762,7 +762,7 @@ impl App {
             .context
             .iter()
             .filter(|c| c.context_type == ContextType::GITHUB_RESULT)
-            .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
+            .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);
     }
@@ -861,10 +861,10 @@ impl App {
                     } else {
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
                             let should_dirty = match ctx.context_type.as_str() {
-                                ContextType::FILE => ctx.file_path.as_deref() == Some(path.as_str()),
+                                ContextType::FILE => ctx.get_meta_str("file_path") == Some(path.as_str()),
                                 // File content change affects grep results
                                 ContextType::GREP => {
-                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
+                                    let base = ctx.get_meta_str("grep_path").unwrap_or(".");
                                     path.starts_with(base)
                                 }
                                 _ => false,
@@ -892,11 +892,11 @@ impl App {
                             let should_dirty = match ctx.context_type.as_str() {
                                 ContextType::TREE => true,
                                 ContextType::GLOB => {
-                                    let base = ctx.glob_path.as_deref().unwrap_or(".");
+                                    let base = ctx.get_meta_str("glob_path").unwrap_or(".");
                                     path.starts_with(base) || base.starts_with(path.as_str())
                                 }
                                 ContextType::GREP => {
-                                    let base = ctx.grep_path.as_deref().unwrap_or(".");
+                                    let base = ctx.get_meta_str("grep_path").unwrap_or(".");
                                     path.starts_with(base) || base.starts_with(path.as_str())
                                 }
                                 _ => false,
@@ -1013,16 +1013,16 @@ impl App {
         for ctx in &self.state.context {
             // File panels: watch individual files
             if ctx.context_type == ContextType::FILE
-                && let Some(path) = &ctx.file_path
+                && let Some(path) = ctx.get_meta_str("file_path")
                 && !self.watched_file_paths.contains(path)
                 && watcher.watch_file(path).is_ok()
             {
-                self.watched_file_paths.insert(path.clone());
+                self.watched_file_paths.insert(path.to_string());
             }
 
             // Glob panels: watch base directory
             if ctx.context_type == ContextType::GLOB {
-                let dir = ctx.glob_path.as_deref().unwrap_or(".");
+                let dir = ctx.get_meta_str("glob_path").unwrap_or(".");
                 if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
                     self.watched_dir_paths.insert(dir.to_string());
                 }
@@ -1030,7 +1030,7 @@ impl App {
 
             // Grep panels: watch search directory
             if ctx.context_type == ContextType::GREP {
-                let dir = ctx.grep_path.as_deref().unwrap_or(".");
+                let dir = ctx.get_meta_str("grep_path").unwrap_or(".");
                 if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
                     self.watched_dir_paths.insert(dir.to_string());
                 }

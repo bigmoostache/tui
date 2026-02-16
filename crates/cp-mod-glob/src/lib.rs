@@ -56,4 +56,16 @@ impl Module for GlobModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "glob",
+            icon_id: "glob",
+            is_fixed: false,
+            needs_cache: true,
+            fixed_order: None,
+            display_name: "glob",
+            short_name: "glob",
+        }]
+    }
 }

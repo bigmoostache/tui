@@ -244,18 +244,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 context_type: ContextType::new(ContextType::CONVERSATION),
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
-                file_path: None,
-                glob_pattern: None,
-                glob_path: None,
-                grep_pattern: None,
-                grep_path: None,
-                grep_file_pattern: None,
-                tmux_pane_id: None,
-                tmux_lines: None,
-                tmux_last_keys: None,
-                tmux_description: None,
-                result_command: None,
-                skill_prompt_id: None,
+                metadata: std::collections::HashMap::new(),
                 cached_content: None,
                 history_messages: None,
                 cache_deprecated: false,
@@ -368,8 +357,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::TmuxSendKeys { pane_id, keys } => {
             use std::process::Command;
             let _ = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.tmux_pane_id.as_ref() == Some(&pane_id)) {
-                ctx.tmux_last_keys = Some(keys);
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(&pane_id)) {
+                ctx.set_meta("tmux_last_keys", &keys);
                 ctx.cache_deprecated = true;
             }
             ActionResult::Nothing

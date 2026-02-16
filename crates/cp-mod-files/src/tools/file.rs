@@ -16,7 +16,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if file is already open
-    if state.context.iter().any(|c| c.file_path.as_deref() == Some(path)) {
+    if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("File '{}' is already open in context", path),
@@ -51,24 +51,13 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Create context element WITHOUT reading file content
     // Background cache system will populate it
-    state.context.push(ContextElement {
+    let mut elem = ContextElement {
         id: context_id.clone(),
         uid: Some(uid),
         context_type: ContextType::new(ContextType::FILE),
         name: file_name,
         token_count: 0, // Will be updated by cache
-        file_path: Some(path.to_string()),
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: None,
-        grep_path: None,
-        grep_file_pattern: None,
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        skill_prompt_id: None,
+        metadata: std::collections::HashMap::new(),
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
@@ -81,7 +70,9 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
-    });
+    };
+    elem.set_meta("file_path", &path.to_string());
+    state.context.push(elem);
 
     ToolResult {
         tool_use_id: tool.id.clone(),

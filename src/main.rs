@@ -55,6 +55,9 @@ fn main() -> io::Result<()> {
     // Validate module dependencies at startup
     modules::validate_dependencies(&state.active_modules);
 
+    // Initialize the ContextType registry from all modules (must happen before any is_fixed/icon/needs_cache calls)
+    modules::init_registry();
+
     // Ensure default context elements and seed exist
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);

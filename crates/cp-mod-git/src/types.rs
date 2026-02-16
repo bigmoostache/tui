@@ -34,6 +34,12 @@ pub struct GitState {
     pub git_diff_base: Option<String>,
 }
 
+impl Default for GitState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitState {
     pub fn new() -> Self {
         Self {

@@ -127,7 +127,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if is_loaded {
         let content_str = format!("[{}] {}\n\n{}", skill_clone.id, skill_clone.name, skill_clone.content);
         let tokens = estimate_tokens(&content_str);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.skill_prompt_id.as_deref() == Some(id)) {
+        if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("skill_prompt_id") == Some(id)) {
             ctx.cached_content = Some(content_str);
             ctx.token_count = tokens;
             ctx.name = skill_clone.name.clone();
@@ -180,7 +180,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // If loaded, unload first
     if ps.loaded_skill_ids.contains(&id.to_string()) {
-        state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
+        state.context.retain(|c| c.get_meta_str("skill_prompt_id") != Some(id));
         PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
     }
 
@@ -237,37 +237,17 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
 
-    let elem = cp_base::state::ContextElement {
-        id: panel_id.clone(),
-        uid: Some(uid),
-        context_type: ContextType::new(ContextType::SKILL),
-        name: skill.name.clone(),
-        token_count: tokens,
-        file_path: None,
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: None,
-        grep_path: None,
-        grep_file_pattern: None,
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        skill_prompt_id: Some(id.to_string()),
-        cached_content: Some(content),
-        history_messages: None,
-        cache_deprecated: false,
-        cache_in_flight: false,
-        last_refresh_ms: cp_base::panels::now_ms(),
-        content_hash: None,
-        source_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        full_token_count: 0,
-        panel_cache_hit: false,
-        panel_total_cost: 0.0,
-    };
+    let mut elem = cp_base::state::make_default_context_element(
+        &panel_id,
+        ContextType::new(ContextType::SKILL),
+        &skill.name,
+        false,
+    );
+    elem.uid = Some(uid);
+    elem.token_count = tokens;
+    elem.set_meta("skill_prompt_id", &id.to_string());
+    elem.cached_content = Some(content);
+    elem.last_refresh_ms = cp_base::panels::now_ms();
 
     state.context.push(elem);
     PromptState::get_mut(state).loaded_skill_ids.push(id.to_string());
@@ -302,9 +282,9 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Remove the skill panel from context
-    let panel_id = state.context.iter().find(|c| c.skill_prompt_id.as_deref() == Some(id)).map(|c| c.id.clone());
+    let panel_id = state.context.iter().find(|c| c.get_meta_str("skill_prompt_id") == Some(id)).map(|c| c.id.clone());
 
-    state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
+    state.context.retain(|c| c.get_meta_str("skill_prompt_id") != Some(id));
     PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));

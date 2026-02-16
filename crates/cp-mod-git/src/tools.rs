@@ -45,7 +45,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             let existing_idx = state
                 .context
                 .iter()
-                .position(|c| c.context_type == ContextType::GIT_RESULT && c.result_command.as_deref() == Some(command));
+                .position(|c| c.context_type == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command));
 
             if let Some(idx) = existing_idx {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
@@ -65,7 +65,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let mut elem =
                     cp_base::state::make_default_context_element(&panel_id, ContextType::new(ContextType::GIT_RESULT), command, true);
                 elem.uid = Some(uid);
-                elem.result_command = Some(command.to_string());
+                elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
                 ToolResult {
@@ -117,7 +117,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             } else {
                 for ctx in &mut state.context {
                     if ctx.context_type == ContextType::GIT_RESULT
-                        && let Some(ref cmd) = ctx.result_command
+                        && let Some(cmd) = ctx.get_meta_str("result_command")
                         && invalidations.iter().any(|re| re.is_match(cmd))
                     {
                         ctx.cache_deprecated = true;

@@ -43,24 +43,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Create context element WITHOUT computing results
     // Background cache system will populate it
     let name = format!("grep:{}", pattern);
-    state.context.push(ContextElement {
+    let mut elem = ContextElement {
         id: context_id.clone(),
         uid: Some(uid),
         context_type: ContextType::new(ContextType::GREP),
         name,
         token_count: 0, // Will be updated by cache
-        file_path: None,
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: Some(pattern.to_string()),
-        grep_path: path,
-        grep_file_pattern: file_pattern.clone(),
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        skill_prompt_id: None,
+        metadata: std::collections::HashMap::new(),
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
@@ -73,7 +62,15 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
-    });
+    };
+    elem.set_meta("grep_pattern", &pattern.to_string());
+    if let Some(ref p) = path {
+        elem.set_meta("grep_path", p);
+    }
+    if let Some(ref fp) = file_pattern {
+        elem.set_meta("grep_file_pattern", fp);
+    }
+    state.context.push(elem);
 
     ToolResult {
         tool_use_id: tool.id.clone(),

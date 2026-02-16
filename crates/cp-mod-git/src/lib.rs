@@ -127,4 +127,27 @@ impl Module for GitModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![
+            cp_base::state::ContextTypeMeta {
+                context_type: "git",
+                icon_id: "git",
+                is_fixed: true,
+                needs_cache: true,
+                fixed_order: Some(7),
+                display_name: "git",
+                short_name: "changes",
+            },
+            cp_base::state::ContextTypeMeta {
+                context_type: "git_result",
+                icon_id: "git",
+                is_fixed: false,
+                needs_cache: true,
+                fixed_order: None,
+                display_name: "git-result",
+                short_name: "git-cmd",
+            },
+        ]
+    }
 }

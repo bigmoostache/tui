@@ -63,7 +63,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
         CommandClass::ReadOnly => {
             // Search for existing GithubResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type == ContextType::GITHUB_RESULT && c.result_command.as_deref() == Some(command)
+                c.context_type == ContextType::GITHUB_RESULT && c.get_meta_str("result_command") == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -83,7 +83,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 let mut elem = make_default_context_element(&panel_id, ContextType::new(ContextType::GITHUB_RESULT), command, true);
                 elem.uid = Some(uid);
-                elem.result_command = Some(command.to_string());
+                elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
                 ToolResult {
@@ -106,11 +106,14 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Invalidate affected panels using heuristics
             let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::GITHUB_RESULT
-                    && let Some(ref cmd) = ctx.result_command
-                    && invalidations.iter().any(|re| re.is_match(cmd))
-                {
-                    ctx.cache_deprecated = true;
+                if ctx.context_type == ContextType::GITHUB_RESULT {
+                    let matches = ctx
+                        .get_meta_str("result_command")
+                        .map(|cmd| invalidations.iter().any(|re| re.is_match(cmd)))
+                        .unwrap_or(false);
+                    if matches {
+                        ctx.cache_deprecated = true;
+                    }
                 }
             }
             // Always invalidate Git status (PRs/merges can affect it)

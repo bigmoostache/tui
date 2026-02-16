@@ -60,7 +60,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             ContextType::SKILL => {
                 let name = ctx.name.clone();
                 // Remove from loaded_skill_ids
-                if let Some(skill_id) = ctx.skill_prompt_id.clone() {
+                if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()) {
                     PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
                 }
                 state.context.remove(idx);
@@ -71,7 +71,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 skipped.push(format!("{} — Cannot close conversation history with context_close. Use close_conversation_history instead, which lets you create logs and memories to preserve important information before closing.", id));
             }
             ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
-                let cmd = ctx.result_command.clone().unwrap_or_default();
+                let cmd = ctx.get_meta_str("result_command").unwrap_or_default().to_string();
                 state.context.remove(idx);
                 closed.push(format!("{} ({})", id, cmd));
             }
@@ -81,18 +81,18 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 closed.push(format!("{} (file: {})", id, name));
             }
             ContextType::GLOB => {
-                let pattern = ctx.glob_pattern.clone().unwrap_or_default();
+                let pattern = ctx.get_meta_str("glob_pattern").unwrap_or_default().to_string();
                 state.context.remove(idx);
                 closed.push(format!("{} (glob: {})", id, pattern));
             }
             ContextType::GREP => {
-                let pattern = ctx.grep_pattern.clone().unwrap_or_default();
+                let pattern = ctx.get_meta_str("grep_pattern").unwrap_or_default().to_string();
                 state.context.remove(idx);
                 closed.push(format!("{} (grep: {})", id, pattern));
             }
             ContextType::TMUX => {
-                let pane_id = ctx.tmux_pane_id.clone();
-                let desc = ctx.tmux_description.clone().unwrap_or_default();
+                let pane_id = ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string());
+                let desc = ctx.get_meta_str("tmux_description").unwrap_or_default().to_string();
 
                 // Kill the tmux window
                 if let Some(pane) = &pane_id {

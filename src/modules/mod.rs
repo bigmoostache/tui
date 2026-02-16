@@ -23,25 +23,18 @@ pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
 
 // Re-export Module trait and helpers from cp-base
-pub use cp_base::modules::{Module, run_with_timeout, truncate_output};
+pub use cp_base::modules::Module;
 
-/// Canonical order of fixed panels.
-/// This defines the sidebar position and ID assignment for each fixed panel.
-/// Conversation is NOT included — it's the live chat feed, not a numbered panel.
-/// System (Seed) is NOT included — agent prompt is injected as system message.
-const FIXED_PANEL_ORDER: &[&str] = &[
-    ContextType::TODO,       // P1
-    ContextType::LIBRARY,    // P2
-    ContextType::OVERVIEW,   // P3
-    ContextType::TREE,       // P4
-    ContextType::MEMORY,     // P5
-    ContextType::SPINE,      // P6
-    ContextType::LOGS,       // P7
-    ContextType::GIT,        // P8
-    ContextType::SCRATCHPAD, // P9
-];
+/// Initialize the global ContextType registry from all modules.
+/// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
+pub fn init_registry() {
+    let modules = all_modules();
+    let metadata: Vec<crate::state::ContextTypeMeta> =
+        modules.iter().flat_map(|m| m.context_type_metadata()).collect();
+    crate::state::init_context_type_registry(metadata);
+}
 
-/// Collect all fixed panel defaults in canonical P0-P7 order.
+/// Collect all fixed panel defaults in canonical order (derived from the registry).
 /// Returns (module_id, is_core, context_type, display_name, cache_deprecated) for each fixed panel.
 pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
     // Build a lookup from context_type to module defaults
@@ -53,8 +46,8 @@ pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'sta
         }
     }
 
-    // Return in canonical order
-    FIXED_PANEL_ORDER
+    // Return in canonical order (derived from registry metadata)
+    crate::state::fixed_panel_order()
         .iter()
         .filter_map(|ct_str| {
             let ct = ContextType::new(ct_str);

@@ -846,10 +846,10 @@ impl Panel for GitResultPanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
-        let command = ctx.result_command.as_ref()?;
+        let command = ctx.get_meta_str("result_command")?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::GIT_RESULT),
-            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.clone() }),
+            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_string() }),
         })
     }
 
@@ -926,10 +926,10 @@ impl Panel for GitResultPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type == ContextType::GIT_RESULT
-            && let Some(cmd) = &ctx.result_command
+            && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short =
-                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
+                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.to_string() };
             return short;
         }
         "Git Result".to_string()
@@ -942,7 +942,7 @@ impl Panel for GitResultPanel {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
-            let header = ctx.result_command.as_deref().unwrap_or("Git Result");
+            let header = ctx.get_meta_str("result_command").unwrap_or("Git Result");
             let output = paginate_content(content, ctx.current_page, ctx.total_pages);
             items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
         }

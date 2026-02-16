@@ -131,6 +131,12 @@ pub struct SpineState {
     pub config: SpineConfig,
 }
 
+impl Default for SpineState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpineState {
     pub fn new() -> Self {
         Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default() }

@@ -3,6 +3,7 @@ pub mod classify;
 mod panel;
 mod tools;
 pub mod types;
+pub mod watcher;
 
 pub use types::GithubState;
 
@@ -78,5 +79,17 @@ impl Module for GithubModule {
             "gh_execute" => Some(self::tools::execute_gh_command(tool, state)),
             _ => None,
         }
+    }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "github_result",
+            icon_id: "git",
+            is_fixed: false,
+            needs_cache: true,
+            fixed_order: None,
+            display_name: "github-result",
+            short_name: "gh-cmd",
+        }]
     }
 }

@@ -129,4 +129,16 @@ impl Module for ScratchpadModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "scratchpad",
+            icon_id: "scratchpad",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(8),
+            display_name: "scratchpad",
+            short_name: "scratch",
+        }]
+    }
 }

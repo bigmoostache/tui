@@ -149,4 +149,16 @@ impl Module for MemoryModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "memory",
+            icon_id: "memory",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(4),
+            display_name: "memory",
+            short_name: "memories",
+        }]
+    }
 }

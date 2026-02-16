@@ -277,6 +277,18 @@ impl Module for LogsModule {
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![(ContextType::new(ContextType::LOGS), "Logs", true)]
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "logs",
+            icon_id: "memory",
+            is_fixed: true,
+            needs_cache: false,
+            fixed_order: Some(6),
+            display_name: "logs",
+            short_name: "logs",
+        }]
+    }
 }
 
 /// Helper: allocate a log ID and push a log entry (timestamped now)

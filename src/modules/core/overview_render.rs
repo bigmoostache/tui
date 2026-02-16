@@ -253,16 +253,16 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             };
 
             let details = match ctx.context_type.as_str() {
-                ContextType::FILE => ctx.file_path.as_deref().unwrap_or("").to_string(),
-                ContextType::GLOB => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::GREP => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::FILE => ctx.get_meta_str("file_path").unwrap_or("").to_string(),
+                ContextType::GLOB => ctx.get_meta_str("glob_pattern").unwrap_or("").to_string(),
+                ContextType::GREP => ctx.get_meta_str("grep_pattern").unwrap_or("").to_string(),
                 ContextType::TMUX => {
-                    let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
-                    let desc = ctx.tmux_description.as_deref().unwrap_or("");
+                    let pane = ctx.get_meta_str("tmux_pane_id").unwrap_or("?");
+                    let desc = ctx.get_meta_str("tmux_description").unwrap_or("");
                     if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
                 }
                 ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
-                    ctx.result_command.as_deref().unwrap_or("").to_string()
+                    ctx.get_meta_str("result_command").unwrap_or("").to_string()
                 }
                 _ => String::new(),
             };

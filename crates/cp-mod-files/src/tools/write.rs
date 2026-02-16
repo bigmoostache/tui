@@ -59,7 +59,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_open = state
         .context
         .iter_mut()
-        .find(|c| c.context_type == ContextType::FILE && c.file_path.as_deref() == Some(path_str));
+        .find(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
 
     if let Some(ctx) = already_open {
         // Update existing context element
@@ -74,24 +74,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let file_name =
             path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path_str.to_string());
 
-        state.context.push(ContextElement {
+        let mut elem = ContextElement {
             id: context_id,
             uid: Some(uid),
             context_type: ContextType::new(ContextType::FILE),
             name: file_name,
             token_count,
-            file_path: Some(path_str.to_string()),
-            glob_pattern: None,
-            glob_path: None,
-            grep_pattern: None,
-            grep_path: None,
-            grep_file_pattern: None,
-            tmux_pane_id: None,
-            tmux_lines: None,
-            tmux_last_keys: None,
-            tmux_description: None,
-            result_command: None,
-            skill_prompt_id: None,
+            metadata: std::collections::HashMap::new(),
             cached_content: Some(contents.to_string()),
             history_messages: None,
             cache_deprecated: true,
@@ -104,7 +93,9 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             full_token_count: 0,
             panel_cache_hit: false,
             panel_total_cost: 0.0,
-        });
+        };
+        elem.set_meta("file_path", &path_str.to_string());
+        state.context.push(elem);
 
         // Invalidate tree cache
         cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::TREE));

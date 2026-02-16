@@ -165,4 +165,16 @@ impl Module for TreeModule {
             _ => None,
         }
     }
+
+    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "tree",
+            icon_id: "tree",
+            is_fixed: true,
+            needs_cache: true,
+            fixed_order: Some(3),
+            display_name: "tree",
+            short_name: "tree",
+        }]
+    }
 }

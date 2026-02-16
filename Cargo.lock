@@ -263,7 +263,9 @@ dependencies = [
  "crossterm",
  "ratatui",
  "regex",
+ "secrecy",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
