@@ -107,4 +107,19 @@ impl Module for PresetModule {
     fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
         None
     }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        let presets = tools::list_presets_with_info();
+        if presets.is_empty() {
+            return None;
+        }
+        let mut output = String::from("\nPresets:\n\n");
+        output.push_str("| Name | Type | Description |\n");
+        output.push_str("|------|------|-------------|\n");
+        for p in &presets {
+            let ptype = if p.built_in { "built-in" } else { "custom" };
+            output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
+        }
+        Some(output)
+    }
 }

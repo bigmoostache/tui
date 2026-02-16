@@ -26,6 +26,16 @@ use crate::actions::Action;
 use crate::cache::{CacheRequest, CacheUpdate};
 use crate::state::{ContextElement, ContextType, State};
 
+/// Specification for a filesystem path to watch.
+pub enum WatchSpec {
+    /// Watch a single file (non-recursive)
+    File(String),
+    /// Watch a directory (non-recursive, immediate children only)
+    Dir(String),
+    /// Watch a directory recursively
+    DirRecursive(String),
+}
+
 /// Get current time in milliseconds since UNIX epoch
 pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)

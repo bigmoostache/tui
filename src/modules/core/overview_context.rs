@@ -1,7 +1,5 @@
-use cp_mod_memory::MemoryState;
-use cp_mod_todo::{TodoState, TodoStatus};
-
-use crate::state::{ContextType, State};
+use crate::modules::all_modules;
+use crate::state::{get_context_type_meta, State};
 
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (overview_render.rs).
@@ -22,42 +20,21 @@ pub fn generate_context_content(state: &State) -> String {
     let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
+    let modules = all_modules();
+
     for ctx in &sorted_contexts {
-        let type_name = match ctx.context_type.as_str() {
-            ContextType::SYSTEM => "seed",
-            ContextType::CONVERSATION => "chat",
-            ContextType::FILE => "file",
-            ContextType::TREE => "tree",
-            ContextType::GLOB => "glob",
-            ContextType::GREP => "grep",
-            ContextType::TMUX => "tmux",
-            ContextType::TODO => "wip",
-            ContextType::MEMORY => "memories",
-            ContextType::OVERVIEW => "world",
-            ContextType::GIT => "changes",
-            ContextType::GIT_RESULT => "git-cmd",
-            ContextType::GITHUB_RESULT => "gh-cmd",
-            ContextType::SCRATCHPAD => "scratch",
-            ContextType::LIBRARY => "library",
-            ContextType::SKILL => "skill",
-            ContextType::CONVERSATION_HISTORY => "history",
-            ContextType::SPINE => "spine",
-            ContextType::LOGS => "logs",
-            other => other,
-        };
+        // Look up short_name from registry, fallback to context_type string
+        let type_name = get_context_type_meta(ctx.context_type.as_str())
+            .map(|m| m.short_name)
+            .unwrap_or(ctx.context_type.as_str());
 
-        let details = match ctx.context_type.as_str() {
-            ContextType::FILE => ctx.get_meta_str("file_path").unwrap_or("").to_string(),
-            ContextType::GLOB => ctx.get_meta_str("glob_pattern").unwrap_or("").to_string(),
-            ContextType::GREP => ctx.get_meta_str("grep_pattern").unwrap_or("").to_string(),
-            ContextType::TMUX => ctx.get_meta_str("tmux_pane_id").unwrap_or("").to_string(),
-            ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
-                ctx.get_meta_str("result_command").unwrap_or("").to_string()
-            }
-            _ => String::new(),
-        };
+        // Ask modules for detail string
+        let details = modules
+            .iter()
+            .find_map(|m| m.context_detail(ctx))
+            .unwrap_or_default();
 
-        let hit_miss = if ctx.panel_cache_hit { "✓" } else { "✗" };
+        let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
         let cost = format!("${:.2}", ctx.panel_total_cost);
 
         if details.is_empty() {
@@ -80,63 +57,10 @@ pub fn generate_context_content(state: &State) -> String {
         assistant_msgs
     ));
 
-    let ts = TodoState::get(state);
-    if !ts.todos.is_empty() {
-        let done = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
-        output.push_str(&format!("Todos: {}/{} done\n", done, ts.todos.len()));
-    }
-
-    let ms = MemoryState::get(state);
-    if !ms.memories.is_empty() {
-        output.push_str(&format!("Memories: {}\n", ms.memories.len()));
-    }
-
-    // Presets table for LLM
-    let presets = cp_mod_preset::tools::list_presets_with_info();
-    if !presets.is_empty() {
-        output.push_str("\nPresets:\n\n");
-        output.push_str("| Name | Type | Description |\n");
-        output.push_str("|------|------|-------------|\n");
-        for p in &presets {
-            let ptype = if p.built_in { "built-in" } else { "custom" };
-            output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
-        }
-    }
-
-    // Git status for LLM (as markdown table)
-    let gs = cp_mod_git::GitState::get(state);
-    if gs.git_is_repo {
-        if let Some(branch) = &gs.git_branch {
-            output.push_str(&format!("\nGit Branch: {}\n", branch));
-        }
-
-        if gs.git_file_changes.is_empty() {
-            output.push_str("Git Status: Working tree clean\n");
-        } else {
-            output.push_str("\nGit Changes:\n\n");
-            output.push_str("| File | + | - | Net |\n");
-            output.push_str("|------|---|---|-----|\n");
-
-            let mut total_add: i32 = 0;
-            let mut total_del: i32 = 0;
-
-            for file in &gs.git_file_changes {
-                total_add += file.additions;
-                total_del += file.deletions;
-                let net = file.additions - file.deletions;
-                let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
-                output.push_str(&format!(
-                    "| {} | +{} | -{} | {} |\n",
-                    file.path, file.additions, file.deletions, net_str
-                ));
-            }
-
-            let total_net = total_add - total_del;
-            let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
-            output.push_str(&format!(
-                "| **Total** | **+{}** | **-{}** | **{}** |\n",
-                total_add, total_del, total_net_str
-            ));
+    // Module-specific overview sections (todos, memories, presets, git, etc.)
+    for module in &modules {
+        if let Some(section) = module.overview_context_section(state) {
+            output.push_str(&section);
         }
     }
 
@@ -147,14 +71,8 @@ pub fn generate_context_content(state: &State) -> String {
     output.push_str("| Category | Tool | Status | Description |\n");
     output.push_str("|----------|------|--------|-------------|\n");
     for tool in &state.tools {
-        let status = if tool.enabled { "✓" } else { "✗" };
-        output.push_str(&format!(
-            "| {} | {} | {} | {} |\n",
-            tool.category,
-            tool.id,
-            status,
-            tool.short_desc
-        ));
+        let status = if tool.enabled { "\u{2713}" } else { "\u{2717}" };
+        output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc));
     }
 
     output

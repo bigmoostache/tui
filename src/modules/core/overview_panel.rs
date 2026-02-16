@@ -62,8 +62,9 @@ impl Panel for OverviewPanel {
         text.extend(overview_render::render_token_usage(state, base_style));
         text.extend(overview_render::separator());
 
-        if cp_mod_git::GitState::get(state).git_is_repo {
-            text.extend(overview_render::render_git_status(state, base_style));
+        let git_section = overview_render::render_git_status(state, base_style);
+        if !git_section.is_empty() {
+            text.extend(git_section);
             text.extend(overview_render::separator());
         }
 
@@ -76,8 +77,9 @@ impl Panel for OverviewPanel {
         text.extend(overview_render::render_seeds(state, base_style));
         text.extend(overview_render::separator());
 
-        text.extend(overview_render::render_presets(base_style));
-        if !cp_mod_preset::tools::list_presets_with_info().is_empty() {
+        let presets_section = overview_render::render_presets(base_style);
+        if !presets_section.is_empty() {
+            text.extend(presets_section);
             text.extend(overview_render::separator());
         }
 

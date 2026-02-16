@@ -66,6 +66,37 @@ impl Module for GlobModule {
             fixed_order: None,
             display_name: "glob",
             short_name: "glob",
+            needs_async_wait: false,
         }]
+    }
+
+    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+        if ctx.context_type.as_str() == cp_base::state::ContextType::GLOB {
+            Some(ctx.get_meta_str("glob_pattern").unwrap_or("").to_string())
+        } else {
+            None
+        }
+    }
+
+    fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        state
+            .context
+            .iter()
+            .filter(|c| c.context_type.as_str() == ContextType::GLOB)
+            .map(|c| cp_base::panels::WatchSpec::Dir(c.get_meta_str("glob_path").unwrap_or(".").to_string()))
+            .collect()
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        changed_path: &str,
+        is_dir_event: bool,
+    ) -> bool {
+        if !is_dir_event || ctx.context_type.as_str() != ContextType::GLOB {
+            return false;
+        }
+        let base = ctx.get_meta_str("glob_path").unwrap_or(".");
+        changed_path.starts_with(base) || base.starts_with(changed_path)
     }
 }

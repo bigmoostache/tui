@@ -159,6 +159,19 @@ impl Module for MemoryModule {
             fixed_order: Some(4),
             display_name: "memory",
             short_name: "memories",
+            needs_async_wait: false,
         }]
+    }
+
+    fn overview_context_section(&self, state: &State) -> Option<String> {
+        let ms = MemoryState::get(state);
+        if ms.memories.is_empty() {
+            return None;
+        }
+        Some(format!("Memories: {}\n", ms.memories.len()))
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Memory", "Store persistent memories across the conversation")]
     }
 }

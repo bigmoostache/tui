@@ -128,6 +128,42 @@ impl Module for TmuxModule {
             fixed_order: None,
             display_name: "tmux",
             short_name: "tmux",
+            needs_async_wait: true,
         }]
+    }
+
+    fn on_close_context(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        if ctx.context_type.as_str() != cp_base::state::ContextType::TMUX {
+            return None;
+        }
+        let desc = ctx.get_meta_str("tmux_description").unwrap_or_default().to_string();
+        if let Some(pane) = ctx.get_meta_str("tmux_pane_id") {
+            let _ = std::process::Command::new("tmux")
+                .args(["kill-window", "-t", pane])
+                .output();
+        }
+        Some(Ok(format!("tmux: {}", desc)))
+    }
+
+    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+        if ctx.context_type.as_str() == cp_base::state::ContextType::TMUX {
+            let pane = ctx.get_meta_str("tmux_pane_id").unwrap_or("?");
+            let desc = ctx.get_meta_str("tmux_description").unwrap_or("");
+            if desc.is_empty() {
+                Some(pane.to_string())
+            } else {
+                Some(format!("{}: {}", pane, desc))
+            }
+        } else {
+            None
+        }
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Console", "Execute commands and monitor terminal output")]
     }
 }

@@ -27,6 +27,8 @@ pub struct ContextTypeMeta {
     pub display_name: &'static str,
     /// Short name for LLM context (e.g., "wip", "git-cmd")
     pub short_name: &'static str,
+    /// Whether the stream should wait for this panel's cache to load after a tool opens it
+    pub needs_async_wait: bool,
 }
 
 static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<ContextTypeMeta>> = OnceLock::new();
@@ -268,10 +270,10 @@ mod tests {
     /// Initialize a minimal registry for tests.
     fn init_test_registry() {
         let _ = CONTEXT_TYPE_REGISTRY.set(vec![
-            ContextTypeMeta { context_type: "todo", icon_id: "todo", is_fixed: true, needs_cache: false, fixed_order: Some(0), display_name: "todo", short_name: "todo" },
-            ContextTypeMeta { context_type: "git", icon_id: "git", is_fixed: true, needs_cache: true, fixed_order: Some(7), display_name: "git", short_name: "changes" },
-            ContextTypeMeta { context_type: "file", icon_id: "file", is_fixed: false, needs_cache: true, fixed_order: None, display_name: "file", short_name: "file" },
-            ContextTypeMeta { context_type: "conversation", icon_id: "conversation", is_fixed: false, needs_cache: false, fixed_order: None, display_name: "conversation", short_name: "convo" },
+            ContextTypeMeta { context_type: "todo", icon_id: "todo", is_fixed: true, needs_cache: false, fixed_order: Some(0), display_name: "todo", short_name: "todo", needs_async_wait: false },
+            ContextTypeMeta { context_type: "git", icon_id: "git", is_fixed: true, needs_cache: true, fixed_order: Some(7), display_name: "git", short_name: "changes", needs_async_wait: false },
+            ContextTypeMeta { context_type: "file", icon_id: "file", is_fixed: false, needs_cache: true, fixed_order: None, display_name: "file", short_name: "file", needs_async_wait: true },
+            ContextTypeMeta { context_type: "conversation", icon_id: "conversation", is_fixed: false, needs_cache: false, fixed_order: None, display_name: "conversation", short_name: "convo", needs_async_wait: false },
         ]);
     }
 

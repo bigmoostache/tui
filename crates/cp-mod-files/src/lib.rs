@@ -115,6 +115,40 @@ impl Module for FilesModule {
             fixed_order: None,
             display_name: "file",
             short_name: "file",
+            needs_async_wait: true,
         }]
+    }
+
+    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+        if ctx.context_type.as_str() == cp_base::state::ContextType::FILE {
+            Some(ctx.get_meta_str("file_path").unwrap_or("").to_string())
+        } else {
+            None
+        }
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("File", "Read, write, and search files in the project")]
+    }
+
+    fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        state
+            .context
+            .iter()
+            .filter(|c| c.context_type.as_str() == ContextType::FILE)
+            .filter_map(|c| c.get_meta_str("file_path").map(|p| cp_base::panels::WatchSpec::File(p.to_string())))
+            .collect()
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        changed_path: &str,
+        is_dir_event: bool,
+    ) -> bool {
+        if is_dir_event {
+            return false;
+        }
+        ctx.context_type.as_str() == ContextType::FILE && ctx.get_meta_str("file_path") == Some(changed_path)
     }
 }

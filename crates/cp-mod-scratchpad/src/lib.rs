@@ -139,6 +139,11 @@ impl Module for ScratchpadModule {
             fixed_order: Some(8),
             display_name: "scratchpad",
             short_name: "scratch",
+            needs_async_wait: false,
         }]
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Scratchpad", "A useful scratchpad for you to use however you like")]
     }
 }

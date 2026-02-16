@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use ratatui::prelude::*;
 
 use cp_mod_memory::{MemoryImportance, MemoryState};
 use cp_mod_prompt::PromptState;
 use cp_mod_todo::{TodoState, TodoStatus};
 
-use crate::state::{ContextType, State};
+use crate::modules::all_modules;
+use crate::state::{get_context_type_meta, State};
 use crate::ui::{
     chars,
     helpers::{Cell, format_number, render_table},
@@ -226,46 +229,21 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
 
     let now_ms = crate::core::panels::now_ms();
 
+    let modules = all_modules();
+
     let rows: Vec<Vec<Cell>> = sorted_contexts
         .iter()
         .map(|ctx| {
-            let type_name = match ctx.context_type.as_str() {
-                ContextType::SYSTEM => "system",
-                ContextType::CONVERSATION => "conversation",
-                ContextType::FILE => "file",
-                ContextType::TREE => "tree",
-                ContextType::GLOB => "glob",
-                ContextType::GREP => "grep",
-                ContextType::TMUX => "tmux",
-                ContextType::TODO => "todo",
-                ContextType::MEMORY => "memory",
-                ContextType::OVERVIEW => "overview",
-                ContextType::GIT => "git",
-                ContextType::GIT_RESULT => "git-result",
-                ContextType::GITHUB_RESULT => "github-result",
-                ContextType::SCRATCHPAD => "scratchpad",
-                ContextType::LIBRARY => "library",
-                ContextType::SKILL => "skill",
-                ContextType::CONVERSATION_HISTORY => "chat-history",
-                ContextType::SPINE => "spine",
-                ContextType::LOGS => "logs",
-                other => other,
-            };
+            // Look up display_name from registry, fallback to raw context type string
+            let type_name = get_context_type_meta(ctx.context_type.as_str())
+                .map(|m| m.display_name)
+                .unwrap_or(ctx.context_type.as_str());
 
-            let details = match ctx.context_type.as_str() {
-                ContextType::FILE => ctx.get_meta_str("file_path").unwrap_or("").to_string(),
-                ContextType::GLOB => ctx.get_meta_str("glob_pattern").unwrap_or("").to_string(),
-                ContextType::GREP => ctx.get_meta_str("grep_pattern").unwrap_or("").to_string(),
-                ContextType::TMUX => {
-                    let pane = ctx.get_meta_str("tmux_pane_id").unwrap_or("?");
-                    let desc = ctx.get_meta_str("tmux_description").unwrap_or("");
-                    if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
-                }
-                ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
-                    ctx.get_meta_str("result_command").unwrap_or("").to_string()
-                }
-                _ => String::new(),
-            };
+            // Ask modules for detail string
+            let details = modules
+                .iter()
+                .find_map(|m| m.context_detail(ctx))
+                .unwrap_or_default();
 
             let truncated_details = if details.len() > 30 {
                 format!("{}...", &details[..details.floor_char_boundary(27)])
@@ -564,7 +542,11 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     ]));
     text.push(Line::from(""));
 
-    use crate::constants::tool_categories;
+    // Build category descriptions from modules
+    let cat_descs: HashMap<&str, &str> = all_modules()
+        .iter()
+        .flat_map(|m| m.tool_category_descriptions())
+        .collect();
 
     // Collect unique categories in order of first appearance
     let mut seen_cats = std::collections::HashSet::new();
@@ -582,23 +564,8 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
             continue;
         }
 
-        let (cat_name, cat_desc) = match category.as_str() {
-            "File" => ("FILE", tool_categories::file_desc()),
-            "Tree" => ("TREE", tool_categories::tree_desc()),
-            "Console" => ("CONSOLE", tool_categories::console_desc()),
-            "Context" => ("CONTEXT", tool_categories::context_desc()),
-            "Skill" => ("SKILL", "Manage knowledge skills"),
-            "Agent" => ("AGENT", "Manage system prompt agents"),
-            "Command" => ("COMMAND", "Manage input commands"),
-            "System" => ("SYSTEM", "System configuration and control"),
-            "Todo" => ("TODO", tool_categories::todo_desc()),
-            "Memory" => ("MEMORY", tool_categories::memory_desc()),
-            "Git" => ("GIT", tool_categories::git_desc()),
-            "GitHub" => ("GITHUB", "GitHub API operations via gh CLI"),
-            "Scratchpad" => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
-            "Spine" => ("SPINE", "Auto-continuation and stream control"),
-            other => (other, ""),
-        };
+        let cat_name = category.to_uppercase();
+        let cat_desc = cat_descs.get(category.as_str()).copied().unwrap_or("");
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),

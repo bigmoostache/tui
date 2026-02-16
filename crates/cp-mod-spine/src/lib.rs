@@ -152,7 +152,25 @@ impl Module for SpineModule {
             fixed_order: Some(5),
             display_name: "spine",
             short_name: "spine",
+            needs_async_wait: false,
         }]
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Spine", "Auto-continuation and stream control")]
+    }
+
+    fn on_user_message(&self, state: &mut State) {
+        // Human input resets auto-continuation counters — human is back in the loop
+        let ss = SpineState::get_mut(state);
+        ss.config.auto_continuation_count = 0;
+        ss.config.autonomous_start_ms = None;
+        ss.config.user_stopped = false;
+    }
+
+    fn on_stream_stop(&self, state: &mut State) {
+        // User pressed Esc — prevent spine from immediately relaunching
+        SpineState::get_mut(state).config.user_stopped = true;
     }
 }
 

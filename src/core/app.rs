@@ -10,7 +10,7 @@ use crate::api::{StreamEvent, StreamParams, start_streaming};
 use crate::background::{TlDrResult, generate_tldr};
 use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
-use crate::core::panels::{mark_panels_dirty, now_ms};
+use crate::core::panels::now_ms;
 use crate::events::handle_event;
 use crate::gh_watcher::GhWatcher;
 use crate::help::CommandPalette;
@@ -34,10 +34,8 @@ pub struct App {
     gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     watched_file_paths: std::collections::HashSet<String>,
-    /// Tracks which directory paths are being watched (for tree)
+    /// Tracks which directory paths are being watched
     watched_dir_paths: std::collections::HashSet<String>,
-    /// Tracks .git/ paths being watched (for GitResult panel deprecation)
-    watched_git_paths: std::collections::HashSet<String>,
     /// Last time we checked timer-based caches
     last_timer_check_ms: u64,
     /// Last time we checked ownership
@@ -87,7 +85,6 @@ impl App {
             gh_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
-            watched_git_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
@@ -675,7 +672,10 @@ impl App {
                 // uncontrollable — the user can never stop it with Esc. (#44)
                 // We set user_stopped instead of disabling continue_until_todos_done,
                 // so auto-continuation resumes when the user sends a new message.
-                cp_mod_spine::SpineState::get_mut(&mut self.state).config.user_stopped = true;
+                // Notify all modules that the user stopped streaming
+                for module in crate::modules::all_modules() {
+                    module.on_stream_stop(&mut self.state);
+                }
                 self.state.touch_panel(ContextType::new(ContextType::SPINE));
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
@@ -714,41 +714,9 @@ impl App {
         }
     }
 
-    /// Set up file watchers for all current file contexts and tree open folders
+    /// Set up file watchers from all modules' watch_paths().
     fn setup_file_watchers(&mut self) {
-        let Some(watcher) = &mut self.file_watcher else { return };
-
-        // Watch files in File contexts
-        for ctx in &self.state.context {
-            if ctx.context_type == ContextType::FILE
-                && let Some(path) = ctx.get_meta_str("file_path")
-                && !self.watched_file_paths.contains(path)
-                && watcher.watch_file(path).is_ok()
-            {
-                self.watched_file_paths.insert(path.to_string());
-            }
-        }
-
-        // Watch directories for Tree panel (only open folders)
-        for folder in &cp_mod_tree::TreeState::get(&self.state).tree_open_folders {
-            if !self.watched_dir_paths.contains(folder) && watcher.watch_dir(folder).is_ok() {
-                self.watched_dir_paths.insert(folder.clone());
-            }
-        }
-
-        // Watch .git/ paths for GitResult panel deprecation
-        if self.watched_git_paths.is_empty() {
-            for path in &[".git/HEAD", ".git/index", ".git/MERGE_HEAD", ".git/REBASE_HEAD", ".git/CHERRY_PICK_HEAD"] {
-                if watcher.watch_file(path).is_ok() {
-                    self.watched_git_paths.insert(path.to_string());
-                }
-            }
-            for path in &[".git/refs/heads", ".git/refs/tags", ".git/refs/remotes"] {
-                if watcher.watch_dir_recursive(path).is_ok() {
-                    self.watched_git_paths.insert(path.to_string());
-                }
-            }
-        }
+        self.sync_file_watchers();
     }
 
     /// Sync GhWatcher with current GithubResult panels
@@ -832,7 +800,7 @@ impl App {
         }
     }
 
-    /// Process file watcher events
+    /// Process file watcher events — delegates invalidation to modules via trait methods.
     fn process_watcher_events(&mut self) {
         let _guard = crate::profile!("app::watcher_events");
         // Collect events (immutable borrow on file_watcher released after this block)
@@ -844,71 +812,32 @@ impl App {
             return;
         }
 
-        // First pass: mark deprecated, collect indices and paths needing re-watch
+        let modules = crate::modules::all_modules();
+
+        // First pass: ask modules which panels to invalidate
         let mut refresh_indices = Vec::new();
         let mut rewatch_paths: Vec<String> = Vec::new();
         for event in &events {
-            match event {
-                WatchEvent::FileChanged(path) => {
-                    // Check if this is a .git/ file change (HEAD, index)
-                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
-                    if is_git_event {
-                        // Git events: only mark deprecated, don't spawn immediately.
-                        // The timer-based check will handle refresh at the proper interval,
-                        // preventing the feedback loop (git status → .git/index → watcher → repeat).
-                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT));
-                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT_RESULT));
-                    } else {
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type.as_str() {
-                                ContextType::FILE => ctx.get_meta_str("file_path") == Some(path.as_str()),
-                                // File content change affects grep results
-                                ContextType::GREP => {
-                                    let base = ctx.get_meta_str("grep_path").unwrap_or(".");
-                                    path.starts_with(base)
-                                }
-                                _ => false,
-                            };
-                            if should_dirty {
-                                ctx.cache_deprecated = true;
-                                refresh_indices.push(i);
-                            }
+            let (path, is_dir_event) = match event {
+                WatchEvent::FileChanged(p) => (p, false),
+                WatchEvent::DirChanged(p) => (p, true),
+            };
+
+            for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                for module in &modules {
+                    if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
+                        ctx.cache_deprecated = true;
+                        if module.watcher_immediate_refresh() {
+                            refresh_indices.push(i);
                         }
                         self.state.dirty = true;
-                    }
-                    rewatch_paths.push(path.clone());
-                }
-                WatchEvent::DirChanged(path) => {
-                    // Check if this is a .git/ directory change
-                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
-                    if is_git_event {
-                        // Git events: only mark deprecated (same as FileChanged above)
-                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT));
-                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT_RESULT));
-                    } else {
-                        // Directory changed: invalidate Tree, Glob, and Grep panels
-                        // whose search paths overlap with the changed directory.
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type.as_str() {
-                                ContextType::TREE => true,
-                                ContextType::GLOB => {
-                                    let base = ctx.get_meta_str("glob_path").unwrap_or(".");
-                                    path.starts_with(base) || base.starts_with(path.as_str())
-                                }
-                                ContextType::GREP => {
-                                    let base = ctx.get_meta_str("grep_path").unwrap_or(".");
-                                    path.starts_with(base) || base.starts_with(path.as_str())
-                                }
-                                _ => false,
-                            };
-                            if should_dirty {
-                                ctx.cache_deprecated = true;
-                                refresh_indices.push(i);
-                            }
-                        }
-                        self.state.dirty = true;
+                        break; // Only one module owns each context type
                     }
                 }
+            }
+
+            if !is_dir_event {
+                rewatch_paths.push(path.clone());
             }
         }
 
@@ -957,8 +886,8 @@ impl App {
         let _guard = crate::profile!("app::timer_deprecation");
         self.last_timer_check_ms = current_ms;
 
-        // Ensure all File panels have active watchers
-        self.ensure_file_watchers();
+        // Ensure all module-requested paths have active watchers
+        self.sync_file_watchers();
 
         let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
 
@@ -1005,34 +934,31 @@ impl App {
         }
     }
 
-    /// Ensure all File/Glob/Grep panels have active file/directory watchers.
-    /// Called every timer tick to catch panels created during tool execution.
-    fn ensure_file_watchers(&mut self) {
+    /// Sync file watchers from all modules' watch_paths().
+    /// Called periodically to catch panels created during tool execution.
+    fn sync_file_watchers(&mut self) {
+        use cp_base::panels::WatchSpec;
         let Some(watcher) = &mut self.file_watcher else { return };
 
-        for ctx in &self.state.context {
-            // File panels: watch individual files
-            if ctx.context_type == ContextType::FILE
-                && let Some(path) = ctx.get_meta_str("file_path")
-                && !self.watched_file_paths.contains(path)
-                && watcher.watch_file(path).is_ok()
-            {
-                self.watched_file_paths.insert(path.to_string());
-            }
-
-            // Glob panels: watch base directory
-            if ctx.context_type == ContextType::GLOB {
-                let dir = ctx.get_meta_str("glob_path").unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
-                    self.watched_dir_paths.insert(dir.to_string());
-                }
-            }
-
-            // Grep panels: watch search directory
-            if ctx.context_type == ContextType::GREP {
-                let dir = ctx.get_meta_str("grep_path").unwrap_or(".");
-                if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
-                    self.watched_dir_paths.insert(dir.to_string());
+        let modules = crate::modules::all_modules();
+        for module in &modules {
+            for spec in module.watch_paths(&self.state) {
+                match spec {
+                    WatchSpec::File(path) => {
+                        if !self.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
+                            self.watched_file_paths.insert(path);
+                        }
+                    }
+                    WatchSpec::Dir(path) => {
+                        if !self.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
+                            self.watched_dir_paths.insert(path);
+                        }
+                    }
+                    WatchSpec::DirRecursive(path) => {
+                        if !self.watched_dir_paths.contains(&path) && watcher.watch_dir_recursive(&path).is_ok() {
+                            self.watched_dir_paths.insert(path);
+                        }
+                    }
                 }
             }
         }

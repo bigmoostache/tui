@@ -265,6 +265,7 @@ impl Module for PromptModule {
                 fixed_order: Some(1),
                 display_name: "library",
                 short_name: "library",
+                needs_async_wait: false,
             },
             cp_base::state::ContextTypeMeta {
                 context_type: "skill",
@@ -274,7 +275,31 @@ impl Module for PromptModule {
                 fixed_order: None,
                 display_name: "skill",
                 short_name: "skill",
+                needs_async_wait: false,
             },
+        ]
+    }
+
+    fn on_close_context(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        state: &mut State,
+    ) -> Option<Result<String, String>> {
+        if ctx.context_type.as_str() != cp_base::state::ContextType::SKILL {
+            return None;
+        }
+        let name = ctx.name.clone();
+        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()) {
+            PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
+        }
+        Some(Ok(format!("skill: {}", name)))
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Skill", "Manage knowledge skills"),
+            ("Agent", "Manage system prompt agents"),
+            ("Command", "Manage input commands"),
         ]
     }
 }

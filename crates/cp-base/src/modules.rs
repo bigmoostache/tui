@@ -114,4 +114,93 @@ pub trait Module: Send + Sync {
     fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
         vec![]
     }
+
+    // === Overview delegation ===
+    // These methods let modules provide their own overview content instead of
+    // hardcoding module knowledge in the binary's overview panel.
+
+    /// Return display name for a context type owned by this module (e.g., "todo" → "wip").
+    /// Used in the Overview panel's context elements table.
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    /// Return detail string for a context element owned by this module (e.g., file path, pattern).
+    /// Used in the Overview panel's context elements table.
+    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+        None
+    }
+
+    /// Return LLM-facing overview text for this module's state (e.g., "Todos: 3/5 done").
+    /// Appended to the Overview context sent to the LLM.
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    /// Return TUI-rendered overview section(s) for this module.
+    /// Each element is (section_order, rendered_lines). Sections are sorted by order.
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    /// Handle closing a context element of this module's type.
+    /// Returns None if this module doesn't own the context type.
+    /// Returns Some(Err(message)) if the close should be blocked/redirected.
+    /// Returns Some(Ok(description)) if cleanup succeeded — caller removes the context element.
+    fn on_close_context(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    /// Return tool category descriptions for tools owned by this module.
+    /// Each entry is (category_id, description). Used in the Overview panel's tool listing.
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![]
+    }
+
+    // === Lifecycle hooks ===
+
+    /// Called when the user submits a message (before streaming starts).
+    /// Modules can reset counters, create notifications, etc.
+    fn on_user_message(&self, _state: &mut State) {}
+
+    /// Called when streaming is stopped by the user (Esc key).
+    /// Modules can update their state to reflect the stop.
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    // === File watcher delegation ===
+
+    /// Return filesystem paths this module wants the file watcher to monitor.
+    /// Called periodically to sync watchers. Includes both global paths (e.g., .git/)
+    /// and per-context-element paths (e.g., individual file paths).
+    fn watch_paths(&self, _state: &State) -> Vec<crate::panels::WatchSpec> {
+        vec![]
+    }
+
+    /// Check if a filesystem change event should invalidate a specific context element.
+    /// `is_dir_event`: true for directory changes, false for file changes.
+    /// Returns true if the element should be marked cache_deprecated.
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    /// Whether watcher-triggered invalidation should schedule immediate cache refresh.
+    /// If false, invalidation only marks the panel dirty for timer-based refresh.
+    /// Default is true. Override to false for modules where immediate refresh would
+    /// create feedback loops (e.g., git: `git status` writes `.git/index`).
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
+    }
 }

@@ -1,8 +1,5 @@
-use std::process::Command;
-
-use cp_mod_prompt::PromptState;
-
-use crate::state::{ContextType, State};
+use crate::modules::all_modules;
+use crate::state::State;
 use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -26,6 +23,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut not_found: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
 
+    let modules = all_modules();
+
     for id_value in ids {
         let Some(id) = id_value.as_str() else {
             errors.push("Invalid ID (not a string)".to_string());
@@ -40,92 +39,42 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         };
 
-        let ctx = &state.context[idx];
+        // Fixed panels are always protected
+        if state.context[idx].context_type.is_fixed() {
+            skipped.push(format!("{} (protected)", id));
+            continue;
+        }
 
-        match ctx.context_type.as_str() {
-            ContextType::SYSTEM
-            | ContextType::TREE
-            | ContextType::CONVERSATION
-            | ContextType::TODO
-            | ContextType::MEMORY
-            | ContextType::OVERVIEW
-            | ContextType::GIT
-            | ContextType::SCRATCHPAD
-            | ContextType::LIBRARY
-            | ContextType::SPINE
-            | ContextType::LOGS => {
-                // Protected - cannot close
-                skipped.push(format!("{} (protected)", id));
-            }
-            ContextType::SKILL => {
-                let name = ctx.name.clone();
-                // Remove from loaded_skill_ids
-                if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()) {
-                    PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
-                }
-                state.context.remove(idx);
-                closed.push(format!("{} (skill: {})", id, name));
-            }
-            ContextType::CONVERSATION_HISTORY => {
-                // Redirect to close_conversation_history tool
-                skipped.push(format!("{} — Cannot close conversation history with context_close. Use close_conversation_history instead, which lets you create logs and memories to preserve important information before closing.", id));
-            }
-            ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
-                let cmd = ctx.get_meta_str("result_command").unwrap_or_default().to_string();
-                state.context.remove(idx);
-                closed.push(format!("{} ({})", id, cmd));
-            }
-            ContextType::FILE => {
-                let name = ctx.name.clone();
-                state.context.remove(idx);
-                closed.push(format!("{} (file: {})", id, name));
-            }
-            ContextType::GLOB => {
-                let pattern = ctx.get_meta_str("glob_pattern").unwrap_or_default().to_string();
-                state.context.remove(idx);
-                closed.push(format!("{} (glob: {})", id, pattern));
-            }
-            ContextType::GREP => {
-                let pattern = ctx.get_meta_str("grep_pattern").unwrap_or_default().to_string();
-                state.context.remove(idx);
-                closed.push(format!("{} (grep: {})", id, pattern));
-            }
-            ContextType::TMUX => {
-                let pane_id = ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string());
-                let desc = ctx.get_meta_str("tmux_description").unwrap_or_default().to_string();
+        // Take the context element out so modules can mutate state without borrow conflicts
+        let ctx = state.context.remove(idx);
 
-                // Kill the tmux window
-                if let Some(pane) = &pane_id {
-                    let output = Command::new("tmux").args(["kill-window", "-t", pane]).output();
-
-                    match output {
-                        Ok(out) if out.status.success() => {
-                            state.context.remove(idx);
-                            closed.push(format!("{} (tmux: {})", id, desc));
-                        }
-                        Ok(out) => {
-                            // Still remove from context even if kill failed
-                            state.context.remove(idx);
-                            errors.push(format!(
-                                "{}: tmux kill failed: {}",
-                                id,
-                                String::from_utf8_lossy(&out.stderr).trim()
-                            ));
-                        }
-                        Err(e) => {
-                            state.context.remove(idx);
-                            errors.push(format!("{}: tmux error: {}", id, e));
-                        }
-                    }
-                } else {
-                    state.context.remove(idx);
-                    closed.push(format!("{} (tmux: {})", id, desc));
-                }
+        // Ask modules for special close handling
+        let mut close_result: Option<Result<String, String>> = None;
+        for module in &modules {
+            if let Some(result) = module.on_close_context(&ctx, state) {
+                close_result = Some(result);
+                break;
             }
-            _ => {
-                let name = ctx.name.clone();
-                state.context.remove(idx);
-                closed.push(format!("{} ({})", id, name));
+        }
+
+        match close_result {
+            Some(Ok(desc)) => {
+                // Context already removed
+                closed.push(format!("{} ({})", id, desc));
+            }
+            Some(Err(msg)) => {
+                // Put it back — close was rejected
+                state.context.insert(idx, ctx);
+                skipped.push(msg);
+            }
+            None => {
+                // Default: use context_detail for description
+                let detail = modules
+                    .iter()
+                    .find_map(|m| m.context_detail(&ctx))
+                    .unwrap_or_else(|| ctx.name.clone());
+                // Context already removed
+                closed.push(format!("{} ({})", id, detail));
             }
         }
     }

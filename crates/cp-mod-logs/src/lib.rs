@@ -287,6 +287,7 @@ impl Module for LogsModule {
             fixed_order: Some(6),
             display_name: "logs",
             short_name: "logs",
+            needs_async_wait: false,
         }]
     }
 }

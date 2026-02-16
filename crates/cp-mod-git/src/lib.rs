@@ -138,6 +138,7 @@ impl Module for GitModule {
                 fixed_order: Some(7),
                 display_name: "git",
                 short_name: "changes",
+                needs_async_wait: false,
             },
             cp_base::state::ContextTypeMeta {
                 context_type: "git_result",
@@ -147,7 +148,82 @@ impl Module for GitModule {
                 fixed_order: None,
                 display_name: "git-result",
                 short_name: "git-cmd",
+                needs_async_wait: false,
             },
         ]
+    }
+
+    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+        if ctx.context_type.as_str() == cp_base::state::ContextType::GIT_RESULT {
+            Some(ctx.get_meta_str("result_command").unwrap_or("").to_string())
+        } else {
+            None
+        }
+    }
+
+    fn overview_context_section(&self, state: &State) -> Option<String> {
+        let gs = GitState::get(state);
+        if !gs.git_is_repo {
+            return None;
+        }
+        let mut output = String::new();
+        if let Some(branch) = &gs.git_branch {
+            output.push_str(&format!("\nGit Branch: {}\n", branch));
+        }
+        if gs.git_file_changes.is_empty() {
+            output.push_str("Git Status: Working tree clean\n");
+        } else {
+            output.push_str("\nGit Changes:\n\n");
+            output.push_str("| File | + | - | Net |\n");
+            output.push_str("|------|---|---|-----|\n");
+            let mut total_add: i32 = 0;
+            let mut total_del: i32 = 0;
+            for file in &gs.git_file_changes {
+                total_add += file.additions;
+                total_del += file.deletions;
+                let net = file.additions - file.deletions;
+                let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+                output.push_str(&format!("| {} | +{} | -{} | {} |\n", file.path, file.additions, file.deletions, net_str));
+            }
+            let total_net = total_add - total_del;
+            let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+            output.push_str(&format!(
+                "| **Total** | **+{}** | **-{}** | **{}** |\n",
+                total_add, total_del, total_net_str
+            ));
+        }
+        Some(output)
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Git", "Version control operations and repository management")]
+    }
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        use cp_base::panels::WatchSpec;
+        vec![
+            WatchSpec::File(".git/HEAD".to_string()),
+            WatchSpec::File(".git/index".to_string()),
+            WatchSpec::File(".git/MERGE_HEAD".to_string()),
+            WatchSpec::File(".git/REBASE_HEAD".to_string()),
+            WatchSpec::File(".git/CHERRY_PICK_HEAD".to_string()),
+            WatchSpec::DirRecursive(".git/refs/heads".to_string()),
+            WatchSpec::DirRecursive(".git/refs/tags".to_string()),
+            WatchSpec::DirRecursive(".git/refs/remotes".to_string()),
+        ]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        let ct = ctx.context_type.as_str();
+        (ct == ContextType::GIT || ct == ContextType::GIT_RESULT) && changed_path.starts_with(".git/")
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        false // Prevent feedback loop: git status writes .git/index
     }
 }

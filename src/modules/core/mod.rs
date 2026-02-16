@@ -156,6 +156,29 @@ impl Module for CoreModule {
         vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
     }
 
+    fn on_close_context(
+        &self,
+        ctx: &crate::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
+            return Some(Err(format!(
+                "{} — Cannot close conversation history with context_close. \
+                 Use close_conversation_history instead, which lets you create logs \
+                 and memories to preserve important information before closing.",
+                ctx.id
+            )));
+        }
+        None
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Context", "Manage conversation context and system prompts"),
+            ("System", "System configuration and control"),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
         vec![
             ContextTypeMeta {
@@ -166,6 +189,7 @@ impl Module for CoreModule {
                 fixed_order: Some(2),
                 display_name: "overview",
                 short_name: "world",
+                needs_async_wait: false,
             },
             ContextTypeMeta {
                 context_type: "system",
@@ -175,6 +199,7 @@ impl Module for CoreModule {
                 fixed_order: None,
                 display_name: "system",
                 short_name: "seed",
+                needs_async_wait: false,
             },
             ContextTypeMeta {
                 context_type: "conversation",
@@ -184,6 +209,7 @@ impl Module for CoreModule {
                 fixed_order: None,
                 display_name: "conversation",
                 short_name: "chat",
+                needs_async_wait: false,
             },
             ContextTypeMeta {
                 context_type: "conversation_history",
@@ -193,6 +219,7 @@ impl Module for CoreModule {
                 fixed_order: None,
                 display_name: "chat-history",
                 short_name: "history",
+                needs_async_wait: false,
             },
         ]
     }

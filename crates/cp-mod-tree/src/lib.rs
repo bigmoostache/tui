@@ -175,6 +175,28 @@ impl Module for TreeModule {
             fixed_order: Some(3),
             display_name: "tree",
             short_name: "tree",
+            needs_async_wait: false,
         }]
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Tree", "Navigate and annotate the directory structure")]
+    }
+
+    fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        TreeState::get(state)
+            .tree_open_folders
+            .iter()
+            .map(|f| cp_base::panels::WatchSpec::Dir(f.clone()))
+            .collect()
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        ctx: &cp_base::state::ContextElement,
+        _changed_path: &str,
+        is_dir_event: bool,
+    ) -> bool {
+        is_dir_event && ctx.context_type.as_str() == ContextType::TREE
     }
 }

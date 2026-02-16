@@ -157,6 +157,20 @@ impl Module for TodoModule {
             fixed_order: Some(0),
             display_name: "todo",
             short_name: "wip",
+            needs_async_wait: false,
         }]
+    }
+
+    fn overview_context_section(&self, state: &State) -> Option<String> {
+        let ts = TodoState::get(state);
+        if ts.todos.is_empty() {
+            return None;
+        }
+        let done = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
+        Some(format!("Todos: {}/{} done\n", done, ts.todos.len()))
+    }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("Todo", "Track tasks and progress during the session")]
     }
 }

@@ -5,6 +5,7 @@ use cp_mod_spine::{NotificationType, SpineState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
+use crate::modules::all_modules;
 
 /// Handle InputSubmit action — context switching, message creation, stream start
 pub fn handle_input_submit(state: &mut State) -> ActionResult {
@@ -60,10 +61,10 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     // This works both during streaming (missed-message scenario) and when idle
     create_user_notification(state, &user_id_str, &content_preview);
 
-    // Any human input resets auto-continuation counters — human is back in the loop
-    SpineState::get_mut(state).config.auto_continuation_count = 0;
-    SpineState::get_mut(state).config.autonomous_start_ms = None;
-    SpineState::get_mut(state).config.user_stopped = false;
+    // Notify all modules that the user sent a message
+    for module in all_modules() {
+        module.on_user_message(state);
+    }
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends

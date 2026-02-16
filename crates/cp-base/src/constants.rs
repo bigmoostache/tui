@@ -265,39 +265,6 @@ pub mod icons {
 }
 
 // =============================================================================
-// TOOL CATEGORY DESCRIPTIONS (loaded from yamls/ui.yaml via config module)
-// =============================================================================
-
-pub mod tool_categories {
-    use crate::config::UI;
-
-    pub fn file_desc() -> &'static str {
-        &UI.tool_categories.file
-    }
-    pub fn tree_desc() -> &'static str {
-        &UI.tool_categories.tree
-    }
-    pub fn console_desc() -> &'static str {
-        &UI.tool_categories.console
-    }
-    pub fn context_desc() -> &'static str {
-        &UI.tool_categories.context
-    }
-    pub fn todo_desc() -> &'static str {
-        &UI.tool_categories.todo
-    }
-    pub fn memory_desc() -> &'static str {
-        &UI.tool_categories.memory
-    }
-    pub fn git_desc() -> &'static str {
-        &UI.tool_categories.git
-    }
-    pub fn scratchpad_desc() -> &'static str {
-        &UI.tool_categories.scratchpad
-    }
-}
-
-// =============================================================================
 // PROMPTS (loaded from yamls/prompts.yaml via config module)
 // =============================================================================
 
