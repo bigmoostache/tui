@@ -11,5 +11,3 @@ pub use cp_base::state::config;
 #[cfg(test)]
 pub use cp_base::state::message;
 
-// Module-owned types are already re-exported by cp_base::state::* above
-// (GitFileChange, TodoItem, MemoryItem, etc. from cp_base::types::*)

@@ -36,7 +36,7 @@ impl CachePool {
                         };
                         match job {
                             Ok((request, tx)) => {
-                                let context_type = request.context_type();
+                                let context_type = request.context_type.clone();
                                 if let Some(panel) = crate::modules::create_panel(&context_type)
                                     && let Some(update) = panel.refresh_cache(request)
                                 {

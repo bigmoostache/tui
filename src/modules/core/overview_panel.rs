@@ -62,7 +62,7 @@ impl Panel for OverviewPanel {
         text.extend(overview_render::render_token_usage(state, base_style));
         text.extend(overview_render::separator());
 
-        if state.git_is_repo {
+        if cp_mod_git::GitState::get(state).git_is_repo {
             text.extend(overview_render::render_git_status(state, base_style));
             text.extend(overview_render::separator());
         }

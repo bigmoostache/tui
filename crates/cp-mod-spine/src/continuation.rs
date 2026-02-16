@@ -1,5 +1,7 @@
 use cp_base::state::State;
-use cp_base::types::spine::*;
+use cp_mod_todo::TodoState;
+
+use crate::types::{ContinuationAction, NotificationType, SpineState};
 
 /// Trait for pluggable auto-continuation logic.
 ///
@@ -44,11 +46,11 @@ pub struct NotificationsContinuation;
 
 impl AutoContinuation for NotificationsContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        state.has_unprocessed_notifications()
+        SpineState::has_unprocessed_notifications(state)
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {
-        let unprocessed = state.unprocessed_notifications();
+        let unprocessed = SpineState::unprocessed_notifications(state);
 
         // If ALL unprocessed notifications are "transparent" types (UserMessage
         // or ReloadResume), no synthetic explanation is needed — just relaunch.
@@ -115,7 +117,7 @@ pub struct MaxTokensContinuation;
 
 impl AutoContinuation for MaxTokensContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        state.spine_config.max_tokens_auto_continue && state.last_stop_reason.as_deref() == Some("max_tokens")
+        SpineState::get(state).config.max_tokens_auto_continue && state.last_stop_reason.as_deref() == Some("max_tokens")
     }
 
     fn build_continuation(&self, _state: &State) -> ContinuationAction {
@@ -136,11 +138,13 @@ pub struct TodosAutomaticContinuation;
 
 impl AutoContinuation for TodosAutomaticContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        state.spine_config.continue_until_todos_done && !state.spine_config.user_stopped && state.has_incomplete_todos()
+        SpineState::get(state).config.continue_until_todos_done
+            && !SpineState::get(state).config.user_stopped
+            && TodoState::get(state).has_incomplete_todos()
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {
-        let remaining = state.incomplete_todos_summary();
+        let remaining = TodoState::get(state).incomplete_todos_summary();
 
         let msg = format!(
             "/* Auto-continuation: {} todo(s) remaining:\n{}\nPlease continue working through these tasks. */",

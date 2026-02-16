@@ -7,7 +7,7 @@ use cp_base::state::{ContextType, State};
 
 use crate::continuation::all_continuations;
 use crate::guard_rail::all_guard_rails;
-use cp_base::types::spine::{ContinuationAction, Notification, NotificationType};
+use crate::types::{ContinuationAction, Notification, NotificationType, SpineState};
 
 /// Result of a spine check — tells the caller what to do.
 #[derive(Debug)]
@@ -57,14 +57,15 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             // for this guard rail. Without this check, every main loop tick
             // (8-50ms) would create a new notification when blocked.
             let source_tag = format!("guard_rail:{}", guard.name());
-            let already_notified = state
+            let already_notified = SpineState::get(state)
                 .notifications
                 .iter()
                 .any(|n| !n.processed && n.notification_type == NotificationType::Custom && n.source == source_tag);
             if !already_notified {
-                let notif_id = format!("N{}", state.next_notification_id);
-                state.next_notification_id += 1;
-                state.notifications.push(Notification {
+                let ss = SpineState::get_mut(state);
+                let notif_id = format!("N{}", ss.next_notification_id);
+                ss.next_notification_id += 1;
+                ss.notifications.push(Notification {
                     id: notif_id,
                     notification_type: NotificationType::Custom,
                     source: source_tag,
@@ -82,9 +83,9 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     let action = cont.build_continuation(state);
 
     // Update tracking state
-    state.spine_config.auto_continuation_count += 1;
-    if state.spine_config.autonomous_start_ms.is_none() {
-        state.spine_config.autonomous_start_ms = Some(now_ms());
+    SpineState::get_mut(state).config.auto_continuation_count += 1;
+    if SpineState::get(state).config.autonomous_start_ms.is_none() {
+        SpineState::get_mut(state).config.autonomous_start_ms = Some(now_ms());
     }
 
     // No notification created — auto-continuation is under-the-hood TUI behavior,

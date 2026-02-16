@@ -1,5 +1,7 @@
 use std::process::Command;
 
+use cp_mod_prompt::PromptState;
+
 use crate::state::{ContextType, State};
 use crate::tools::{ToolResult, ToolUse};
 
@@ -59,7 +61,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let name = ctx.name.clone();
                 // Remove from loaded_skill_ids
                 if let Some(skill_id) = ctx.skill_prompt_id.clone() {
-                    state.loaded_skill_ids.retain(|s| s != &skill_id);
+                    PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
                 }
                 state.context.remove(idx);
                 closed.push(format!("{} (skill: {})", id, name));
@@ -119,6 +121,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                     state.context.remove(idx);
                     closed.push(format!("{} (tmux: {})", id, desc));
                 }
+            }
+            _ => {
+                let name = ctx.name.clone();
+                state.context.remove(idx);
+                closed.push(format!("{} ({})", id, name));
             }
         }
     }

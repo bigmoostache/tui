@@ -8,6 +8,13 @@ use cp_base::constants::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
+pub struct GrepCacheRequest {
+    pub context_id: String,
+    pub pattern: String,
+    pub path: Option<String>,
+    pub file_pattern: Option<String>,
+}
+
 pub struct GrepPanel;
 
 impl Panel for GrepPanel {
@@ -37,11 +44,14 @@ impl Panel for GrepPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let pattern = ctx.grep_pattern.as_ref()?;
-        Some(CacheRequest::Grep {
-            context_id: ctx.id.clone(),
-            pattern: pattern.clone(),
-            path: ctx.grep_path.clone(),
-            file_pattern: ctx.grep_file_pattern.clone(),
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GREP),
+            data: Box::new(GrepCacheRequest {
+                context_id: ctx.id.clone(),
+                pattern: pattern.clone(),
+                path: ctx.grep_path.clone(),
+                file_pattern: ctx.grep_file_pattern.clone(),
+            }),
         })
     }
 
@@ -69,9 +79,8 @@ impl Panel for GrepPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::Grep { context_id, pattern, path, file_pattern } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<GrepCacheRequest>().ok()?;
+        let GrepCacheRequest { context_id, pattern, path, file_pattern } = *req;
         let search_path = path.as_deref().unwrap_or(".");
         let (content, _count) = crate::tools::compute_grep_results(&pattern, search_path, file_pattern.as_deref());
         let token_count = estimate_tokens(&content);

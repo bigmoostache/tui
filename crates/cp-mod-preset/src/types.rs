@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::state::ContextType;
+use serde::{Deserialize, Serialize};
+
+use cp_base::state::ContextType;
 
 /// A named preset that captures a worker's full configuration state.
 #[derive(Debug, Clone, Serialize, Deserialize)]

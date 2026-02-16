@@ -7,4 +7,5 @@ edition = "2024"
 cp-base.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
+serde.workspace = true
 serde_json.workspace = true

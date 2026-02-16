@@ -1,6 +1,15 @@
 mod panel;
 mod tools;
 
+/// Delay after tmux send-keys in milliseconds (allows command output to appear)
+pub const TMUX_SEND_DELAY_MS: u64 = 1000;
+
+/// Background session name for tmux operations
+pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
+
+/// Fixed sleep duration in seconds for the sleep tool
+pub const SLEEP_DURATION_SECS: u64 = 1;
+
 /// Deprecation timer for tmux panels (milliseconds)
 pub(crate) const TMUX_DEPRECATION_MS: u64 = 100; // 100ms — capture-pane is a cheap kernel pipe read
 

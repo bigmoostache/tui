@@ -1,5 +1,5 @@
 use crate::storage;
-use crate::types::{PromptItem, PromptType};
+use crate::types::{PromptItem, PromptState, PromptType};
 use cp_base::constants::library;
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -34,7 +34,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    if state.agents.iter().any(|a| a.id == id) {
+    if PromptState::get(state).agents.iter().any(|a| a.id == id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Agent with ID '{}' already exists", id),
@@ -52,7 +52,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), &item);
-    state.agents.push(item);
+    PromptState::get_mut(state).agents.push(item);
 
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
@@ -76,7 +76,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let agent = match state.agents.iter_mut().find(|a| a.id == id) {
+    let agent = match PromptState::get_mut(state).agents.iter_mut().find(|a| a.id == id) {
         Some(a) => a,
         None => {
             return ToolResult {
@@ -147,7 +147,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Cannot delete built-in agents
-    if let Some(agent) = state.agents.iter().find(|a| a.id == id)
+    if let Some(agent) = PromptState::get(state).agents.iter().find(|a| a.id == id)
         && agent.is_builtin
     {
         return ToolResult {
@@ -157,7 +157,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let idx = match state.agents.iter().position(|a| a.id == id) {
+    let ps = PromptState::get_mut(state);
+    let idx = match ps.agents.iter().position(|a| a.id == id) {
         Some(i) => i,
         None => {
             return ToolResult {
@@ -168,12 +169,12 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let agent = state.agents.remove(idx);
+    let agent = ps.agents.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Agent), id);
 
     // If this was the active agent, switch to default
-    if state.active_agent_id.as_deref() == Some(id) {
-        state.active_agent_id = Some(library::default_agent_id().to_string());
+    if ps.active_agent_id.as_deref() == Some(id) {
+        ps.active_agent_id = Some(library::default_agent_id().to_string());
     }
 
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
@@ -191,7 +192,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // If id is None or empty, switch to default agent
     if id.is_none() || id.map(|s| s.is_empty()).unwrap_or(true) {
-        state.active_agent_id = Some(library::default_agent_id().to_string());
+        PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
         return ToolResult {
@@ -203,7 +204,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let id = id.unwrap();
 
-    if !state.agents.iter().any(|a| a.id == id) {
+    if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Agent '{}' not found", id),
@@ -211,11 +212,11 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    state.active_agent_id = Some(id.to_string());
+    PromptState::get_mut(state).active_agent_id = Some(id.to_string());
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    let name = state.agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
+    let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
 
     ToolResult { tool_use_id: tool.id.clone(), content: format!("Loaded agent '{}' ({})", name, id), is_error: false }
 }

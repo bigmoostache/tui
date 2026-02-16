@@ -2,6 +2,12 @@ pub(crate) mod cache_invalidation;
 mod classify;
 mod panel;
 mod tools;
+pub mod types;
+
+pub use types::{GitCacheUpdate, GitChangeType, GitFileChange, GitState};
+
+/// Timeout for git commands (seconds)
+pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
 
 /// Refresh interval for git status (milliseconds)
 pub(crate) const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
@@ -29,19 +35,28 @@ impl Module for GitModule {
         "Git version control tools and status panel"
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(GitState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(GitState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let gs = GitState::get(state);
         json!({
-            "git_show_diffs": state.git_show_diffs,
-            "git_diff_base": state.git_diff_base,
+            "git_show_diffs": gs.git_show_diffs,
+            "git_diff_base": gs.git_diff_base,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("git_show_diffs").and_then(|v| v.as_bool()) {
-            state.git_show_diffs = v;
+            GitState::get_mut(state).git_show_diffs = v;
         }
         if let Some(v) = data.get("git_diff_base").and_then(|v| v.as_str()) {
-            state.git_diff_base = Some(v.to_string());
+            GitState::get_mut(state).git_diff_base = Some(v.to_string());
         }
     }
 

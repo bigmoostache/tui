@@ -15,6 +15,7 @@ pub use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern
 
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
+use cp_mod_prompt::PromptState;
 
 /// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
 fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
@@ -60,7 +61,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input_cursor += c.len_utf8();
 
             // After typing a space or newline, check if preceding text is a /command
-            if (c == ' ' || c == '\n') && !state.commands.is_empty() {
+            if (c == ' ' || c == '\n') && !PromptState::get(state).commands.is_empty() {
                 // Find start of current "word" — scan back past the space we just inserted
                 let before_space = state.input_cursor - 1; // position of the space
                 let bytes = state.input.as_bytes();
@@ -74,19 +75,27 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     word_start -= 1;
                 }
                 let word = &state.input[word_start..before_space];
-                if let Some(cmd_name) = word.strip_prefix('/')
-                    && let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name)
-                {
-                    let content = cmd.content.clone();
-                    let label = cmd_name.to_string();
-                    let idx = state.paste_buffers.len();
-                    state.paste_buffers.push(content);
-                    state.paste_buffer_labels.push(Some(label.clone()));
-                    let sentinel = format!("\x00{}\x00", idx);
-                    // Replace /command<space> with sentinel
-                    state.input =
-                        format!("{}{}\n{}", &state.input[..word_start], sentinel, &state.input[state.input_cursor..],);
-                    state.input_cursor = word_start + sentinel.len() + 1;
+                if let Some(cmd_name) = word.strip_prefix('/') {
+                    let cmd_content = PromptState::get(state)
+                        .commands
+                        .iter()
+                        .find(|c| c.id == cmd_name)
+                        .map(|c| c.content.clone());
+                    if let Some(content) = cmd_content {
+                        let label = cmd_name.to_string();
+                        let idx = state.paste_buffers.len();
+                        state.paste_buffers.push(content);
+                        state.paste_buffer_labels.push(Some(label.clone()));
+                        let sentinel = format!("\x00{}\x00", idx);
+                        // Replace /command<space> with sentinel
+                        state.input = format!(
+                            "{}{}\n{}",
+                            &state.input[..word_start],
+                            sentinel,
+                            &state.input[state.input_cursor..],
+                        );
+                        state.input_cursor = word_start + sentinel.len() + 1;
+                    }
                 }
             }
 

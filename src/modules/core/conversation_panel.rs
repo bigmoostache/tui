@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
+use cp_mod_prompt::PromptState;
+
 use crate::actions::Action;
 use crate::core::panels::{ContextItem, Panel};
 use crate::state::{
@@ -208,7 +210,7 @@ impl ConversationPanel {
                     state.input_cursor,
                     viewport_width,
                     base_style,
-                    &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                    &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                     &state.paste_buffers,
                     &state.paste_buffer_labels,
                 );
@@ -223,7 +225,7 @@ impl ConversationPanel {
                 state.input_cursor,
                 viewport_width,
                 base_style,
-                &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                 &state.paste_buffers,
                 &state.paste_buffer_labels,
             );

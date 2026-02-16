@@ -3,6 +3,9 @@ pub mod engine;
 pub(crate) mod guard_rail;
 mod panel;
 pub(crate) mod tools;
+pub mod types;
+
+pub use types::{ContinuationAction, Notification, NotificationType, SpineConfig, SpineState};
 
 use serde_json::json;
 
@@ -13,8 +16,6 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
 use cp_base::modules::Module;
-
-use cp_base::types::spine::Notification;
 
 pub struct SpineModule;
 
@@ -29,10 +30,19 @@ impl Module for SpineModule {
         "Unified auto-continuation and stream control"
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(SpineState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(SpineState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ss = SpineState::get(state);
         // Prune old processed notifications: keep all unprocessed + latest 10 processed
-        let mut to_save: Vec<_> = state.notifications.iter().filter(|n| !n.processed).cloned().collect();
-        let mut processed: Vec<_> = state.notifications.iter().filter(|n| n.processed).cloned().collect();
+        let mut to_save: Vec<_> = ss.notifications.iter().filter(|n| !n.processed).cloned().collect();
+        let mut processed: Vec<_> = ss.notifications.iter().filter(|n| n.processed).cloned().collect();
         // Keep only the latest 10 processed (they're in chronological order)
         if processed.len() > 10 {
             processed = processed.split_off(processed.len() - 10);
@@ -43,8 +53,8 @@ impl Module for SpineModule {
 
         json!({
             "notifications": to_save,
-            "next_notification_id": state.next_notification_id,
-            "spine_config": state.spine_config,
+            "next_notification_id": ss.next_notification_id,
+            "spine_config": ss.config,
         })
     }
 
@@ -52,18 +62,18 @@ impl Module for SpineModule {
         if let Some(arr) = data.get("notifications")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.notifications = v;
+            SpineState::get_mut(state).notifications = v;
         }
         if let Some(v) = data.get("next_notification_id").and_then(|v| v.as_u64()) {
-            state.next_notification_id = v as usize;
+            SpineState::get_mut(state).next_notification_id = v as usize;
         }
         if let Some(cfg) = data.get("spine_config")
             && let Ok(v) = serde_json::from_value(cfg.clone())
         {
-            state.spine_config = v;
+            SpineState::get_mut(state).config = v;
         }
         // Prune stale processed notifications on load too
-        prune_notifications(&mut state.notifications);
+        prune_notifications(&mut SpineState::get_mut(state).notifications);
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

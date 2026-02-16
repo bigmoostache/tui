@@ -1,11 +1,13 @@
 use std::process::Command;
 
-use cp_base::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use super::GIT_CMD_TIMEOUT_SECS;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::classify::{CommandClass, classify_git, validate_git_command};
+use crate::types::GitState;
 
 /// Execute a raw git command.
 /// Read-only commands create/reuse GitResult panels.
@@ -80,7 +82,8 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             // If GITHUB_TOKEN is available, create a temporary askpass script
             // so git push/pull/fetch can authenticate via HTTPS automatically.
-            let _askpass_tempfile = if let Some(ref token) = state.github_token {
+            let github_token = std::env::var("GITHUB_TOKEN").ok();
+            let _askpass_tempfile = if let Some(ref token) = github_token {
                 let mut tmp = std::env::temp_dir();
                 tmp.push(format!("cpilot_askpass_{}", std::process::id()));
                 let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
@@ -175,54 +178,60 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update show_diffs
     if let Some(v) = show_diffs {
-        state.git_show_diffs = v;
+        GitState::get_mut(state).git_show_diffs = v;
         changes.push(format!("show_diffs={}", v));
     }
 
     // Update show_logs
     if let Some(v) = show_logs {
-        state.git_show_logs = v;
-        if v {
-            // Fetch git log content
-            let args_str = log_args.or(state.git_log_args.as_deref()).unwrap_or("-10 --oneline");
-            let args_vec: Vec<&str> = args_str.split_whitespace().collect();
+        {
+            let gs = GitState::get_mut(state);
+            gs.git_show_logs = v;
+            if v {
+                // Fetch git log content
+                let args_str = log_args.or(gs.git_log_args.as_deref()).unwrap_or("-10 --oneline");
+                let args_vec: Vec<&str> = args_str.split_whitespace().collect();
 
-            let mut cmd = Command::new("git");
-            cmd.arg("log");
-            for arg in args_vec {
-                cmd.arg(arg);
-            }
-            match cmd.output() {
-                Ok(output) if output.status.success() => {
-                    state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+                let mut cmd = Command::new("git");
+                cmd.arg("log");
+                for arg in args_vec {
+                    cmd.arg(arg);
                 }
-                _ => {
-                    state.git_log_content = Some("Failed to fetch git log".to_string());
+                match cmd.output() {
+                    Ok(output) if output.status.success() => {
+                        gs.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+                    }
+                    _ => {
+                        gs.git_log_content = Some("Failed to fetch git log".to_string());
+                    }
                 }
+            } else {
+                gs.git_log_content = None;
             }
-        } else {
-            state.git_log_content = None;
         }
         changes.push(format!("show_logs={}", v));
     }
 
     // Update log_args (even without toggling show_logs)
     if let Some(args) = log_args {
-        state.git_log_args = Some(args.to_string());
-        // Re-fetch if logs are currently shown
-        if state.git_show_logs {
-            let args_vec: Vec<&str> = args.split_whitespace().collect();
-            let mut cmd = Command::new("git");
-            cmd.arg("log");
-            for arg in args_vec {
-                cmd.arg(arg);
-            }
-            match cmd.output() {
-                Ok(output) if output.status.success() => {
-                    state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+        {
+            let gs = GitState::get_mut(state);
+            gs.git_log_args = Some(args.to_string());
+            // Re-fetch if logs are currently shown
+            if gs.git_show_logs {
+                let args_vec: Vec<&str> = args.split_whitespace().collect();
+                let mut cmd = Command::new("git");
+                cmd.arg("log");
+                for arg in args_vec {
+                    cmd.arg(arg);
                 }
-                _ => {
-                    state.git_log_content = Some("Failed to fetch git log".to_string());
+                match cmd.output() {
+                    Ok(output) if output.status.success() => {
+                        gs.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+                    }
+                    _ => {
+                        gs.git_log_content = Some("Failed to fetch git log".to_string());
+                    }
                 }
             }
         }
@@ -233,14 +242,14 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(base) = diff_base {
         if base.is_empty() || base == "none" || base == "null" {
             // Clear diff base — revert to default
-            state.git_diff_base = None;
+            GitState::get_mut(state).git_diff_base = None;
             changes.push("diff_base=<cleared>".to_string());
         } else {
             // Validate the ref
             let check = Command::new("git").args(["rev-parse", "--verify", base]).output();
             match check {
                 Ok(output) if output.status.success() => {
-                    state.git_diff_base = Some(base.to_string());
+                    GitState::get_mut(state).git_diff_base = Some(base.to_string());
                     changes.push(format!("diff_base={}", base));
                 }
                 _ => {

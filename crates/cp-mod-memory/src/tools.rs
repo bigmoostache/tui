@@ -1,6 +1,8 @@
-use cp_base::constants::MEMORY_TLDR_MAX_TOKENS;
-use cp_base::state::{ContextType, MemoryImportance, MemoryItem, State, estimate_tokens};
+use super::MEMORY_TLDR_MAX_TOKENS;
+use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
+
+use crate::types::{MemoryImportance, MemoryItem, MemoryState};
 
 fn validate_tldr(text: &str) -> Result<(), String> {
     let tokens = estimate_tokens(text);
@@ -65,10 +67,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let contents = memory_value.get("contents").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-        let id = format!("M{}", state.next_memory_id);
-        state.next_memory_id += 1;
-
-        state.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
+        let ms = MemoryState::get_mut(state);
+        let id = format!("M{}", ms.next_memory_id);
+        ms.next_memory_id += 1;
+        ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
 
         let preview =
             if content.len() > 40 { format!("{}...", &content[..content.floor_char_boundary(37)]) } else { content };
@@ -128,11 +130,12 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         // Check for deletion
         if update_value.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
-            let initial_len = state.memories.len();
-            state.memories.retain(|m| m.id != id);
+            let ms = MemoryState::get_mut(state);
+            let initial_len = ms.memories.len();
+            ms.memories.retain(|m| m.id != id);
             // Also remove from open_memory_ids
-            state.open_memory_ids.retain(|mid| mid != id);
-            if state.memories.len() < initial_len {
+            ms.open_memory_ids.retain(|mid| mid != id);
+            if ms.memories.len() < initial_len {
                 deleted.push(id.to_string());
             } else {
                 not_found.push(id.to_string());
@@ -141,7 +144,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
 
         // Find and update the memory
-        let memory = state.memories.iter_mut().find(|m| m.id == id);
+        let ms = MemoryState::get_mut(state);
+        let memory = ms.memories.iter_mut().find(|m| m.id == id);
 
         match memory {
             Some(m) => {
@@ -176,12 +180,12 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 // Handle open/close toggle
                 if let Some(open) = update_value.get("open").and_then(|v| v.as_bool()) {
                     if open {
-                        if !state.open_memory_ids.contains(&id.to_string()) {
-                            state.open_memory_ids.push(id.to_string());
+                        if !ms.open_memory_ids.contains(&id.to_string()) {
+                            ms.open_memory_ids.push(id.to_string());
                             changes.push("opened");
                         }
                     } else {
-                        state.open_memory_ids.retain(|mid| mid != id);
+                        ms.open_memory_ids.retain(|mid| mid != id);
                         changes.push("closed");
                     }
                 }
@@ -234,7 +238,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_base::constants::MEMORY_TLDR_MAX_TOKENS;
+    use super::MEMORY_TLDR_MAX_TOKENS;
 
     #[test]
     fn validate_tldr_short_ok() {

@@ -24,9 +24,6 @@ pub const API_VERSION: &str = "2023-06-01";
 /// Average characters per token for token estimation
 pub const CHARS_PER_TOKEN: f32 = 3.3;
 
-/// Maximum token length for memory tl_dr field (enforced on create/update)
-pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
-
 /// Minimum active messages in a chunk before it can be detached.
 pub const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
 
@@ -97,12 +94,6 @@ pub const RENDER_THROTTLE_MS: u64 = 36;
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub const PERF_STATS_REFRESH_MS: u64 = 500;
 
-/// Delay after tmux send-keys in milliseconds (allows command output to appear)
-pub const TMUX_SEND_DELAY_MS: u64 = 1000;
-
-/// Fixed sleep duration in seconds for the sleep tool
-pub const SLEEP_DURATION_SECS: u64 = 1;
-
 /// Maximum number of retries for API errors
 pub const MAX_API_RETRIES: u32 = 3;
 
@@ -128,15 +119,6 @@ pub const PANELS_DIR: &str = "panels";
 /// Default worker ID
 pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
-/// Presets subdirectory
-pub const PRESETS_DIR: &str = "presets";
-
-/// Logs subdirectory (chunked JSON files, global across workers)
-pub const LOGS_DIR: &str = "logs";
-
-/// Number of log entries per chunk file
-pub const LOGS_CHUNK_SIZE: usize = 1000;
-
 // =============================================================================
 // PANEL SIZE LIMITS
 // =============================================================================
@@ -147,21 +129,9 @@ pub const PANEL_MAX_LOAD_BYTES: usize = 5 * 1024 * 1024; // 5 MB
 /// Tokens per page when paginating (also serves as the soft cap — panels exceeding this get paginated)
 pub const PANEL_PAGE_TOKENS: usize = 25_000;
 
-// =============================================================================
-// TMUX
-// =============================================================================
-
-/// Background session name for tmux operations
-pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
-
 /// Maximum size for command output cached in result panels (bytes)
 pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
 
-/// Timeout for git commands (seconds)
-pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
-
-/// Timeout for gh commands (seconds)
-pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 // =============================================================================
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)

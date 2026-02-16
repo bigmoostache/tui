@@ -1,5 +1,7 @@
-use cp_base::state::{ContextType, State, TodoItem, TodoStatus};
+use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
+
+use crate::types::{TodoItem, TodoState, TodoStatus};
 
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let todos = match tool.input.get("todos").and_then(|v| v.as_array()) {
@@ -47,10 +49,11 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .map(|s| s.to_string());
 
         // Validate parent exists if specified
+        let ts = TodoState::get(state);
         if let Some(ref pid) = parent_id
-            && !state.todos.iter().any(|t| t.id == *pid)
+            && !ts.todos.iter().any(|t| t.id == *pid)
         {
-            let available: Vec<&str> = state.todos.iter().map(|t| t.id.as_str()).collect();
+            let available: Vec<&str> = ts.todos.iter().map(|t| t.id.as_str()).collect();
             let available_str = if available.is_empty() {
                 "no todos exist yet".to_string()
             } else {
@@ -66,10 +69,11 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .and_then(TodoStatus::from_str)
             .unwrap_or(TodoStatus::Pending);
 
-        let id = format!("X{}", state.next_todo_id);
-        state.next_todo_id += 1;
+        let ts = TodoState::get_mut(state);
+        let id = format!("X{}", ts.next_todo_id);
+        ts.next_todo_id += 1;
 
-        state.todos.push(TodoItem { id: id.clone(), parent_id, name: name.clone(), description, status });
+        ts.todos.push(TodoItem { id: id.clone(), parent_id, name: name.clone(), description, status });
 
         created.push(format!("{}: {}", id, name));
     }
@@ -153,7 +157,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 desc
             }
 
-            let descendants = collect_descendants(id, &state.todos);
+            let ts = TodoState::get(state);
+            let descendants = collect_descendants(id, &ts.todos);
             let orphans: Vec<&String> = descendants.iter().filter(|d| !delete_ids.contains(d.as_str())).collect();
 
             if !orphans.is_empty() {
@@ -165,9 +170,10 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 continue;
             }
 
-            let initial_len = state.todos.len();
-            state.todos.retain(|t| t.id != id);
-            if state.todos.len() < initial_len {
+            let ts = TodoState::get_mut(state);
+            let initial_len = ts.todos.len();
+            ts.todos.retain(|t| t.id != id);
+            if ts.todos.len() < initial_len {
                 deleted.push(id.to_string());
             } else {
                 not_found.push(id.to_string());
@@ -189,9 +195,10 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                         errors.push(format!("{}: cannot be its own parent", id));
                         continue;
                     }
-                    if !state.todos.iter().any(|other| other.id == pid) {
+                    let ts = TodoState::get(state);
+                    if !ts.todos.iter().any(|other| other.id == pid) {
                         let available: Vec<&str> =
-                            state.todos.iter().filter(|t| t.id != id).map(|t| t.id.as_str()).collect();
+                            ts.todos.iter().filter(|t| t.id != id).map(|t| t.id.as_str()).collect();
                         let available_str = if available.is_empty() {
                             "no other todos exist".to_string()
                         } else {
@@ -215,7 +222,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             && let Some(status) = TodoStatus::from_str(s)
             && status == TodoStatus::Done
         {
-            let undone_children: Vec<String> = state
+            let ts = TodoState::get(state);
+            let undone_children: Vec<String> = ts
                 .todos
                 .iter()
                 .filter(|c| c.parent_id.as_deref() == Some(id) && c.status != TodoStatus::Done)
@@ -228,7 +236,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
 
         // Find and update the todo
-        let todo = state.todos.iter_mut().find(|t| t.id == id);
+        let ts = TodoState::get_mut(state);
+        let todo = ts.todos.iter_mut().find(|t| t.id == id);
 
         match todo {
             Some(t) => {
@@ -275,10 +284,11 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if (status_str == Some("in_progress") || status_str == Some("~"))
             && let Some(id) = update_value.get("id").and_then(|v| v.as_str())
         {
+            let ts = TodoState::get_mut(state);
             // Walk up parent chain
-            let mut current_id = state.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
+            let mut current_id = ts.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
             while let Some(pid) = current_id {
-                if let Some(parent) = state.todos.iter_mut().find(|t| t.id == pid) {
+                if let Some(parent) = ts.todos.iter_mut().find(|t| t.id == pid) {
                     if parent.status == TodoStatus::Pending {
                         parent.status = TodoStatus::InProgress;
                         propagated.push(parent.id.clone());
@@ -365,7 +375,8 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
         });
 
     // Find the todo to move
-    let move_idx = match state.todos.iter().position(|t| t.id == id) {
+    let ts = TodoState::get(state);
+    let move_idx = match ts.todos.iter().position(|t| t.id == id) {
         Some(idx) => idx,
         None => {
             return ToolResult {
@@ -385,7 +396,7 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
                 is_error: true,
             };
         }
-        if !state.todos.iter().any(|t| t.id == aid) {
+        if !ts.todos.iter().any(|t| t.id == aid) {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Target '{}' not found", aid),
@@ -395,21 +406,22 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Remove the todo from its current position
-    let item = state.todos.remove(move_idx);
+    let ts = TodoState::get_mut(state);
+    let item = ts.todos.remove(move_idx);
 
     // Insert at new position
     let insert_idx = match after_id {
         None => 0, // move to top
         Some(aid) => {
             // Find the after_id position (may have shifted after remove)
-            match state.todos.iter().position(|t| t.id == aid) {
+            match ts.todos.iter().position(|t| t.id == aid) {
                 Some(idx) => idx + 1, // insert after it
                 None => 0,            // shouldn't happen, we validated above
             }
         }
     };
 
-    state.todos.insert(insert_idx, item);
+    ts.todos.insert(insert_idx, item);
     state.touch_panel(ContextType::new(ContextType::TODO));
 
     let position_desc = match after_id {

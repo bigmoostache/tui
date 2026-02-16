@@ -8,6 +8,12 @@ use cp_base::constants::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
+pub struct GlobCacheRequest {
+    pub context_id: String,
+    pub pattern: String,
+    pub base_path: Option<String>,
+}
+
 pub struct GlobPanel;
 
 impl Panel for GlobPanel {
@@ -37,10 +43,13 @@ impl Panel for GlobPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let pattern = ctx.glob_pattern.as_ref()?;
-        Some(CacheRequest::Glob {
-            context_id: ctx.id.clone(),
-            pattern: pattern.clone(),
-            base_path: ctx.glob_path.clone(),
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GLOB),
+            data: Box::new(GlobCacheRequest {
+                context_id: ctx.id.clone(),
+                pattern: pattern.clone(),
+                base_path: ctx.glob_path.clone(),
+            }),
         })
     }
 
@@ -68,9 +77,8 @@ impl Panel for GlobPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::Glob { context_id, pattern, base_path } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<GlobCacheRequest>().ok()?;
+        let GlobCacheRequest { context_id, pattern, base_path } = *req;
         let base = base_path.as_deref().unwrap_or(".");
         let (content, _count) = crate::tools::compute_glob_results(&pattern, base);
         let token_count = estimate_tokens(&content);

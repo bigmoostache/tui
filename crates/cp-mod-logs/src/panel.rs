@@ -2,7 +2,9 @@ use ratatui::prelude::*;
 
 use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, LogEntry, State, estimate_tokens};
+use cp_base::state::{ContextType, State, estimate_tokens};
+
+use crate::types::{LogEntry, LogsState};
 
 /// Fixed panel for timestamped log entries with tree-structured summaries.
 /// Un-deletable, always present when the logs module is active.
@@ -13,16 +15,17 @@ impl LogsPanel {
     /// Shows tree structure: top-level logs, summaries with collapse/expand,
     /// and indented children when expanded.
     pub fn format_logs_tree(state: &State) -> String {
-        if state.logs.is_empty() {
+        let ls = LogsState::get(state);
+        if ls.logs.is_empty() {
             return "No logs".to_string();
         }
 
         let mut output = String::new();
         // Only show top-level logs (no parent_id)
-        let top_level: Vec<&LogEntry> = state.logs.iter().filter(|l| l.is_top_level()).collect();
+        let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
-            format_log_entry(&mut output, log, &state.logs, &state.open_log_ids, 0);
+            format_log_entry(&mut output, log, &ls.logs, &ls.open_log_ids, 0);
         }
         output.trim_end().to_string()
     }
@@ -85,7 +88,8 @@ impl Panel for LogsPanel {
     }
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        if state.logs.is_empty() {
+        let ls = LogsState::get(state);
+        if ls.logs.is_empty() {
             return vec![Line::from(vec![Span::styled(
                 "No logs yet".to_string(),
                 Style::default().fg(theme::text_muted()).italic(),
@@ -93,10 +97,10 @@ impl Panel for LogsPanel {
         }
 
         let mut lines = Vec::new();
-        let top_level: Vec<&LogEntry> = state.logs.iter().filter(|l| l.is_top_level()).collect();
+        let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
-            render_log_entry(&mut lines, log, &state.logs, &state.open_log_ids, 0);
+            render_log_entry(&mut lines, log, &ls.logs, &ls.open_log_ids, 0);
         }
         lines
     }

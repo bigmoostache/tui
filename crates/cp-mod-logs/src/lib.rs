@@ -1,13 +1,24 @@
 mod panel;
+pub mod types;
+
+pub use types::{LogEntry, LogsState};
+
+/// Logs subdirectory (chunked JSON files, global across workers)
+pub const LOGS_DIR: &str = "logs";
+
+/// Number of log entries per chunk file
+pub const LOGS_CHUNK_SIZE: usize = 1000;
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use cp_base::constants::{LOGS_CHUNK_SIZE, LOGS_DIR, MEMORY_TLDR_MAX_TOKENS, STORE_DIR};
+use cp_base::constants::STORE_DIR;
+use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
 use cp_base::modules::Module;
 use cp_base::panels::{Panel, mark_panels_dirty, now_ms};
-use cp_base::state::{ContextType, LogEntry, MemoryImportance, MemoryItem, State, estimate_tokens};
+use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -119,6 +130,14 @@ impl Module for LogsModule {
         &["core"]
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(LogsState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(LogsState::new());
+    }
+
     fn save_module_data(&self, _state: &State) -> serde_json::Value {
         // Logs are saved via build_log_write_ops() integrated into the WriteBatch,
         // not through the module data JSON. See persistence/mod.rs build_save_batch().
@@ -129,20 +148,22 @@ impl Module for LogsModule {
         // Load logs from chunked files on disk
         let (logs, next_log_id) = load_logs_chunked();
         if !logs.is_empty() || next_log_id > 1 {
-            state.logs = logs;
-            state.next_log_id = next_log_id;
+            let ls = LogsState::get_mut(state);
+            ls.logs = logs;
+            ls.next_log_id = next_log_id;
         }
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         serde_json::json!({
-            "open_log_ids": state.open_log_ids,
+            "open_log_ids": LogsState::get(state).open_log_ids,
         })
     }
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("open_log_ids").and_then(|v| v.as_array()) {
-            state.open_log_ids = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+            LogsState::get_mut(state).open_log_ids =
+                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
         }
     }
 
@@ -260,16 +281,18 @@ impl Module for LogsModule {
 
 /// Helper: allocate a log ID and push a log entry (timestamped now)
 fn push_log(state: &mut State, content: String) {
-    let id = format!("L{}", state.next_log_id);
-    state.next_log_id += 1;
-    state.logs.push(LogEntry::new(id, content));
+    let ls = LogsState::get_mut(state);
+    let id = format!("L{}", ls.next_log_id);
+    ls.next_log_id += 1;
+    ls.logs.push(LogEntry::new(id, content));
 }
 
 /// Helper: allocate a log ID and push a log entry with an explicit timestamp
 fn push_log_with_timestamp(state: &mut State, content: String, timestamp_ms: u64) {
-    let id = format!("L{}", state.next_log_id);
-    state.next_log_id += 1;
-    state.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
+    let ls = LogsState::get_mut(state);
+    let id = format!("L{}", ls.next_log_id);
+    ls.next_log_id += 1;
+    ls.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
 }
 
 /// Helper: touch logs panel to update last_refresh_ms and recalculate token count.
@@ -360,38 +383,48 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Validate: all IDs exist and are top-level
-    for id in &log_ids {
-        match state.logs.iter().find(|l| l.id == *id) {
-            None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Log '{}' not found", id),
-                    is_error: true,
-                };
-            }
-            Some(log) => {
-                if log.parent_id.is_some() {
+    {
+        let logs = &LogsState::get(state).logs;
+        for id in &log_ids {
+            match logs.iter().find(|l| l.id == *id) {
+                None => {
                     return ToolResult {
                         tool_use_id: tool.id.clone(),
-                        content: format!("Log '{}' already has a parent — only top-level logs can be summarized", id),
+                        content: format!("Log '{}' not found", id),
                         is_error: true,
                     };
+                }
+                Some(log) => {
+                    if log.parent_id.is_some() {
+                        return ToolResult {
+                            tool_use_id: tool.id.clone(),
+                            content: format!(
+                                "Log '{}' already has a parent — only top-level logs can be summarized",
+                                id
+                            ),
+                            is_error: true,
+                        };
+                    }
                 }
             }
         }
     }
 
     // Compute timestamp = max of children timestamps
-    let max_timestamp = log_ids
-        .iter()
-        .filter_map(|id| state.logs.iter().find(|l| l.id == *id))
-        .map(|l| l.timestamp_ms)
-        .max()
-        .unwrap_or(0);
+    let max_timestamp = {
+        let logs = &LogsState::get(state).logs;
+        log_ids
+            .iter()
+            .filter_map(|id| logs.iter().find(|l| l.id == *id))
+            .map(|l| l.timestamp_ms)
+            .max()
+            .unwrap_or(0)
+    };
 
-    // Create the summary log
-    let summary_id = format!("L{}", state.next_log_id);
-    state.next_log_id += 1;
+    // Create the summary log and set parent_id on children
+    let ls = LogsState::get_mut(state);
+    let summary_id = format!("L{}", ls.next_log_id);
+    ls.next_log_id += 1;
     let summary = LogEntry {
         id: summary_id.clone(),
         timestamp_ms: max_timestamp,
@@ -399,11 +432,11 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
         parent_id: None,
         children_ids: log_ids.clone(),
     };
-    state.logs.push(summary);
+    ls.logs.push(summary);
 
     // Set parent_id on all children
     for id in &log_ids {
-        if let Some(log) = state.logs.iter_mut().find(|l| l.id == *id) {
+        if let Some(log) = ls.logs.iter_mut().find(|l| l.id == *id) {
             log.parent_id = Some(summary_id.clone());
         }
     }
@@ -441,31 +474,35 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Validate: log exists and is a summary (has children)
-    match state.logs.iter().find(|l| l.id == id) {
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Log '{}' not found", id),
-                is_error: true,
-            };
-        }
-        Some(log) => {
-            if log.children_ids.is_empty() {
+    {
+        let logs = &LogsState::get(state).logs;
+        match logs.iter().find(|l| l.id == id) {
+            None => {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Log '{}' has no children — can only toggle summaries", id),
+                    content: format!("Log '{}' not found", id),
                     is_error: true,
                 };
+            }
+            Some(log) => {
+                if log.children_ids.is_empty() {
+                    return ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: format!("Log '{}' has no children — can only toggle summaries", id),
+                        is_error: true,
+                    };
+                }
             }
         }
     }
 
+    let ls = LogsState::get_mut(state);
     if action == "expand" {
-        if !state.open_log_ids.contains(&id) {
-            state.open_log_ids.push(id.clone());
+        if !ls.open_log_ids.contains(&id) {
+            ls.open_log_ids.push(id.clone());
         }
     } else {
-        state.open_log_ids.retain(|i| i != &id);
+        ls.open_log_ids.retain(|i| i != &id);
     }
 
     touch_logs_panel(state);
@@ -589,9 +626,10 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                     _ => MemoryImportance::Medium,
                 };
 
-                let id = format!("M{}", state.next_memory_id);
-                state.next_memory_id += 1;
-                state.memories.push(MemoryItem {
+                let ms = MemoryState::get_mut(state);
+                let id = format!("M{}", ms.next_memory_id);
+                ms.next_memory_id += 1;
+                ms.memories.push(MemoryItem {
                     id,
                     tl_dr: content.to_string(),
                     contents: String::new(),

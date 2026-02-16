@@ -2,6 +2,12 @@ pub(crate) mod cache_invalidation;
 pub mod classify;
 mod panel;
 mod tools;
+pub mod types;
+
+pub use types::GithubState;
+
+/// Timeout for gh commands (seconds)
+pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
@@ -57,6 +63,14 @@ impl Module for GithubModule {
             enabled: true,
             category: "GitHub".to_string(),
         }]
+    }
+
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(GithubState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(GithubState::new());
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

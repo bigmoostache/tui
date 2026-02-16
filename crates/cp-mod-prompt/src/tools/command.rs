@@ -1,5 +1,5 @@
 use crate::storage;
-use crate::types::{PromptItem, PromptType};
+use crate::types::{PromptItem, PromptState, PromptType};
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -33,7 +33,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    if state.commands.iter().any(|c| c.id == id) {
+    if PromptState::get(state).commands.iter().any(|c| c.id == id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Command with ID '{}' already exists", id),
@@ -51,7 +51,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &item);
-    state.commands.push(item);
+    PromptState::get_mut(state).commands.push(item);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
@@ -74,7 +74,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let cmd = match state.commands.iter_mut().find(|c| c.id == id) {
+    let cmd = match PromptState::get_mut(state).commands.iter_mut().find(|c| c.id == id) {
         Some(c) => c,
         None => {
             return ToolResult {
@@ -142,7 +142,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    if let Some(cmd) = state.commands.iter().find(|c| c.id == id)
+    if let Some(cmd) = PromptState::get(state).commands.iter().find(|c| c.id == id)
         && cmd.is_builtin
     {
         return ToolResult {
@@ -152,7 +152,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let idx = match state.commands.iter().position(|c| c.id == id) {
+    let ps = PromptState::get_mut(state);
+    let idx = match ps.commands.iter().position(|c| c.id == id) {
         Some(i) => i,
         None => {
             return ToolResult {
@@ -163,7 +164,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let cmd = state.commands.remove(idx);
+    let cmd = ps.commands.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Command), id);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));

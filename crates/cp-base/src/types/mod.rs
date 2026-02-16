@@ -1,9 +1,0 @@
-pub mod git;
-pub mod logs;
-pub mod memory;
-pub mod preset;
-pub mod prompt;
-pub mod scratchpad;
-pub mod spine;
-pub mod todo;
-pub mod tree;

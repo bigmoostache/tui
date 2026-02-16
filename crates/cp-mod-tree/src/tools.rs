@@ -5,8 +5,10 @@ use std::path::{Path, PathBuf};
 use ignore::gitignore::GitignoreBuilder;
 use sha2::{Digest, Sha256};
 
-use cp_base::state::{ContextType, State, TreeFileDescription};
+use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
+
+use crate::types::{TreeFileDescription, TreeState};
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
@@ -91,12 +93,13 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         }
 
-        let is_open = state.tree_open_folders.contains(&normalized);
+        let ts = TreeState::get(state);
+        let is_open = ts.tree_open_folders.contains(&normalized);
 
         match action {
             "open" => {
                 if !is_open {
-                    state.tree_open_folders.push(normalized.clone());
+                    TreeState::get_mut(state).tree_open_folders.push(normalized.clone());
                     opened.push(normalized);
                 }
             }
@@ -107,22 +110,24 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
                     continue;
                 }
                 if is_open {
-                    state.tree_open_folders.retain(|p| p != &normalized);
+                    let ts = TreeState::get_mut(state);
+                    ts.tree_open_folders.retain(|p| p != &normalized);
                     // Also close all children
                     let prefix = format!("{}/", normalized);
-                    state.tree_open_folders.retain(|p| !p.starts_with(&prefix));
+                    ts.tree_open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 }
             }
             _ => {
                 // toggle
                 if is_open && normalized != "." {
-                    state.tree_open_folders.retain(|p| p != &normalized);
+                    let ts = TreeState::get_mut(state);
+                    ts.tree_open_folders.retain(|p| p != &normalized);
                     let prefix = format!("{}/", normalized);
-                    state.tree_open_folders.retain(|p| !p.starts_with(&prefix));
+                    ts.tree_open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 } else if !is_open {
-                    state.tree_open_folders.push(normalized.clone());
+                    TreeState::get_mut(state).tree_open_folders.push(normalized.clone());
                     opened.push(normalized);
                 }
             }
@@ -186,8 +191,8 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         // Check if delete is requested
         if desc_obj.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
-            if state.tree_descriptions.iter().any(|d| d.path == normalized) {
-                state.tree_descriptions.retain(|d| d.path != normalized);
+            if TreeState::get(state).tree_descriptions.iter().any(|d| d.path == normalized) {
+                TreeState::get_mut(state).tree_descriptions.retain(|d| d.path != normalized);
                 removed.push(normalized);
             }
             continue;
@@ -211,12 +216,13 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
         let file_hash = compute_file_hash(&path).unwrap_or_default();
 
         // Update or add
-        if let Some(existing) = state.tree_descriptions.iter_mut().find(|d| d.path == normalized) {
+        let ts = TreeState::get_mut(state);
+        if let Some(existing) = ts.tree_descriptions.iter_mut().find(|d| d.path == normalized) {
             existing.description = description;
             existing.file_hash = file_hash;
             updated.push(normalized);
         } else {
-            state.tree_descriptions.push(TreeFileDescription { path: normalized.clone(), description, file_hash });
+            ts.tree_descriptions.push(TreeFileDescription { path: normalized.clone(), description, file_hash });
             added.push(normalized);
         }
     }
@@ -260,7 +266,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    state.tree_filter = filter.to_string();
+    TreeState::get_mut(state).tree_filter = filter.to_string();
 
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);

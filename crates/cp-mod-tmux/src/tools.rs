@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use cp_base::constants::{SLEEP_DURATION_SECS, TMUX_BG_SESSION, TMUX_SEND_DELAY_MS};
+use super::{SLEEP_DURATION_SECS, TMUX_BG_SESSION, TMUX_SEND_DELAY_MS};
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};

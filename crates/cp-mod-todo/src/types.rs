@@ -1,4 +1,5 @@
-use crate::constants::icons;
+use cp_base::constants::icons;
+use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 
 /// Todo item status
@@ -46,4 +47,45 @@ pub struct TodoItem {
     /// Status: pending, in_progress, done
     #[serde(default)]
     pub status: TodoStatus,
+}
+
+/// Module-owned state for the Todo module
+#[derive(Debug)]
+pub struct TodoState {
+    pub todos: Vec<TodoItem>,
+    pub next_todo_id: usize,
+}
+
+impl Default for TodoState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TodoState {
+    pub fn new() -> Self {
+        Self { todos: vec![], next_todo_id: 1 }
+    }
+
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("TodoState not initialized")
+    }
+
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("TodoState not initialized")
+    }
+
+    /// Check if there are any pending or in-progress todos
+    pub fn has_incomplete_todos(&self) -> bool {
+        self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+    }
+
+    /// Get a summary of incomplete todos for spine auto-continuation messages
+    pub fn incomplete_todos_summary(&self) -> Vec<String> {
+        self.todos
+            .iter()
+            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
+            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
+            .collect()
+    }
 }

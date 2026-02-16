@@ -1,5 +1,5 @@
 use crate::storage;
-use crate::types::{PromptItem, PromptType};
+use crate::types::{PromptItem, PromptState, PromptType};
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -33,7 +33,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    if state.skills.iter().any(|s| s.id == id) {
+    if PromptState::get(state).skills.iter().any(|s| s.id == id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Skill with ID '{}' already exists", id),
@@ -51,7 +51,7 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &item);
-    state.skills.push(item);
+    PromptState::get_mut(state).skills.push(item);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
@@ -74,7 +74,8 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let skill = match state.skills.iter_mut().find(|s| s.id == id) {
+    let ps = PromptState::get_mut(state);
+    let skill = match ps.skills.iter_mut().find(|s| s.id == id) {
         Some(s) => s,
         None => {
             return ToolResult {
@@ -122,7 +123,8 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &skill_clone);
 
     // If loaded, update the panel's cached_content
-    if state.loaded_skill_ids.contains(&id.to_string()) {
+    let is_loaded = PromptState::get(state).loaded_skill_ids.contains(&id.to_string());
+    if is_loaded {
         let content_str = format!("[{}] {}\n\n{}", skill_clone.id, skill_clone.name, skill_clone.content);
         let tokens = estimate_tokens(&content_str);
         if let Some(ctx) = state.context.iter_mut().find(|c| c.skill_prompt_id.as_deref() == Some(id)) {
@@ -154,7 +156,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    if let Some(skill) = state.skills.iter().find(|s| s.id == id)
+    if let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == id)
         && skill.is_builtin
     {
         return ToolResult {
@@ -164,7 +166,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let idx = match state.skills.iter().position(|s| s.id == id) {
+    let ps = PromptState::get_mut(state);
+    let idx = match ps.skills.iter().position(|s| s.id == id) {
         Some(i) => i,
         None => {
             return ToolResult {
@@ -176,12 +179,12 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // If loaded, unload first
-    if state.loaded_skill_ids.contains(&id.to_string()) {
+    if ps.loaded_skill_ids.contains(&id.to_string()) {
         state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
-        state.loaded_skill_ids.retain(|s| s != id);
+        PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
     }
 
-    let skill = state.skills.remove(idx);
+    let skill = PromptState::get_mut(state).skills.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Skill), id);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
@@ -206,7 +209,8 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check skill exists
-    let skill = match state.skills.iter().find(|s| s.id == id) {
+    let ps = PromptState::get(state);
+    let skill = match ps.skills.iter().find(|s| s.id == id) {
         Some(s) => s.clone(),
         None => {
             return ToolResult {
@@ -218,7 +222,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if already loaded
-    if state.loaded_skill_ids.contains(&id.to_string()) {
+    if ps.loaded_skill_ids.contains(&id.to_string()) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Skill '{}' is already loaded", id),
@@ -266,7 +270,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     state.context.push(elem);
-    state.loaded_skill_ids.push(id.to_string());
+    PromptState::get_mut(state).loaded_skill_ids.push(id.to_string());
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
@@ -289,7 +293,7 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    if !state.loaded_skill_ids.contains(&id.to_string()) {
+    if !PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Skill '{}' is not loaded", id),
@@ -301,11 +305,16 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = state.context.iter().find(|c| c.skill_prompt_id.as_deref() == Some(id)).map(|c| c.id.clone());
 
     state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
-    state.loaded_skill_ids.retain(|s| s != id);
+    PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    let name = state.skills.iter().find(|s| s.id == id).map(|s| s.name.as_str()).unwrap_or(id);
+    let name = PromptState::get(state)
+        .skills
+        .iter()
+        .find(|s| s.id == id)
+        .map(|s| s.name.clone())
+        .unwrap_or_else(|| id.to_string());
 
     ToolResult {
         tool_use_id: tool.id.clone(),

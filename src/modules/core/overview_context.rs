@@ -1,4 +1,7 @@
-use crate::state::{ContextType, State, TodoStatus};
+use cp_mod_memory::MemoryState;
+use cp_mod_todo::{TodoState, TodoStatus};
+
+use crate::state::{ContextType, State};
 
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (overview_render.rs).
@@ -40,6 +43,7 @@ pub fn generate_context_content(state: &State) -> String {
             ContextType::CONVERSATION_HISTORY => "history",
             ContextType::SPINE => "spine",
             ContextType::LOGS => "logs",
+            other => other,
         };
 
         let details = match ctx.context_type.as_str() {
@@ -76,13 +80,15 @@ pub fn generate_context_content(state: &State) -> String {
         assistant_msgs
     ));
 
-    if !state.todos.is_empty() {
-        let done = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
-        output.push_str(&format!("Todos: {}/{} done\n", done, state.todos.len()));
+    let ts = TodoState::get(state);
+    if !ts.todos.is_empty() {
+        let done = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
+        output.push_str(&format!("Todos: {}/{} done\n", done, ts.todos.len()));
     }
 
-    if !state.memories.is_empty() {
-        output.push_str(&format!("Memories: {}\n", state.memories.len()));
+    let ms = MemoryState::get(state);
+    if !ms.memories.is_empty() {
+        output.push_str(&format!("Memories: {}\n", ms.memories.len()));
     }
 
     // Presets table for LLM
@@ -98,12 +104,13 @@ pub fn generate_context_content(state: &State) -> String {
     }
 
     // Git status for LLM (as markdown table)
-    if state.git_is_repo {
-        if let Some(branch) = &state.git_branch {
+    let gs = cp_mod_git::GitState::get(state);
+    if gs.git_is_repo {
+        if let Some(branch) = &gs.git_branch {
             output.push_str(&format!("\nGit Branch: {}\n", branch));
         }
 
-        if state.git_file_changes.is_empty() {
+        if gs.git_file_changes.is_empty() {
             output.push_str("Git Status: Working tree clean\n");
         } else {
             output.push_str("\nGit Changes:\n\n");
@@ -113,7 +120,7 @@ pub fn generate_context_content(state: &State) -> String {
             let mut total_add: i32 = 0;
             let mut total_del: i32 = 0;
 
-            for file in &state.git_file_changes {
+            for file in &gs.git_file_changes {
                 total_add += file.additions;
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;

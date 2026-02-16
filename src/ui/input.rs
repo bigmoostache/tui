@@ -3,7 +3,8 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use super::{spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
-use cp_base::types::git::GitChangeType;
+use cp_mod_git::GitChangeType;
+use cp_mod_prompt::PromptState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
@@ -20,9 +21,10 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    if state.pending_tldrs > 0 {
+    let pending_tldrs = cp_mod_tree::TreeState::get(state).pending_tldrs;
+    if pending_tldrs > 0 {
         spans.push(Span::styled(
-            format!(" {} SUMMARIZING {} ", spin, state.pending_tldrs),
+            format!(" {} SUMMARIZING {} ", spin, pending_tldrs),
             Style::default().fg(theme::bg_base()).bg(theme::warning()).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -41,7 +43,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     // If nothing active, show READY
-    if !state.is_streaming && state.pending_tldrs == 0 && loading_count == 0 {
+    if !state.is_streaming && pending_tldrs == 0 && loading_count == 0 {
         spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
@@ -76,9 +78,10 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     // Active agent card
-    if let Some(ref agent_id) = state.active_agent_id {
+    let ps = PromptState::get(state);
+    if let Some(ref agent_id) = ps.active_agent_id {
         let agent_name =
-            state.agents.iter().find(|a| &a.id == agent_id).map(|a| a.name.as_str()).unwrap_or(agent_id.as_str());
+            ps.agents.iter().find(|a| &a.id == agent_id).map(|a| a.name.as_str()).unwrap_or(agent_id.as_str());
         spans.push(Span::styled(
             format!(" 🤖 {} ", agent_name),
             Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold(),
@@ -87,9 +90,9 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     // Loaded skill cards
-    for skill_id in &state.loaded_skill_ids {
+    for skill_id in &ps.loaded_skill_ids {
         let skill_name =
-            state.skills.iter().find(|s| s.id == *skill_id).map(|s| s.name.as_str()).unwrap_or(skill_id.as_str());
+            ps.skills.iter().find(|s| s.id == *skill_id).map(|s| s.name.as_str()).unwrap_or(skill_id.as_str());
         spans.push(Span::styled(
             format!(" 📚 {} ", skill_name),
             Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
@@ -98,13 +101,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     // Git branch (if available)
-    if let Some(branch) = &state.git_branch {
+    let gs = cp_mod_git::GitState::get(state);
+    if let Some(branch) = &gs.git_branch {
         spans.push(Span::styled(format!(" {} ", branch), Style::default().fg(Color::White).bg(Color::Blue)));
         spans.push(Span::styled(" ", base_style));
     }
 
     // Git change stats (if there are any changes)
-    if !state.git_file_changes.is_empty() {
+    if !gs.git_file_changes.is_empty() {
         // Calculate line change statistics
         let mut total_additions = 0;
         let mut total_deletions = 0;
@@ -112,7 +116,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         let mut modified_count = 0;
         let mut deleted_count = 0;
 
-        for file in &state.git_file_changes {
+        for file in &gs.git_file_changes {
             total_additions += file.additions;
             total_deletions += file.deletions;
             match file.change_type {
@@ -180,12 +184,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     // Auto-continuation status card (always visible)
     {
         use crate::config::normalize_icon;
-        let (icon, bg_color) = if state.spine_config.continue_until_todos_done {
+        use cp_mod_spine::SpineState;
+        let spine_cfg = &SpineState::get(state).config;
+        let (icon, bg_color) = if spine_cfg.continue_until_todos_done {
             (normalize_icon("🔁"), theme::warning())
         } else {
             (normalize_icon("🔄"), theme::text_muted())
         };
-        let label = if state.spine_config.continue_until_todos_done { "Auto-continue" } else { "No Auto-continue" };
+        let label = if spine_cfg.continue_until_todos_done { "Auto-continue" } else { "No Auto-continue" };
         spans.push(Span::styled(
             format!(" {}{} ", icon, label),
             Style::default().fg(theme::bg_base()).bg(bg_color).bold(),

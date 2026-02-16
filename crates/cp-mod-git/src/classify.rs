@@ -1,8 +1,83 @@
 /// Command classification for git commands.
 /// Determines whether a git command is read-only (safe to cache/auto-refresh)
 /// or mutating (must execute and return output).
-// Re-export shared types from cp-base
-pub use cp_base::classify::{CommandClass, check_shell_operators, parse_shell_args};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandClass {
+    ReadOnly,
+    Mutating,
+}
+
+/// Parse a command string into arguments, respecting single and double quotes.
+/// Strips the leading command name (e.g. "git") and returns all tokens.
+pub fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_single = false;
+    let mut in_double = false;
+
+    for c in command.chars() {
+        match c {
+            '\'' if !in_double => {
+                in_single = !in_single;
+            }
+            '"' if !in_single => {
+                in_double = !in_double;
+            }
+            c if c.is_whitespace() && !in_single && !in_double => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            _ => {
+                current.push(c);
+            }
+        }
+    }
+
+    if in_single {
+        return Err("Unterminated single quote".to_string());
+    }
+    if in_double {
+        return Err("Unterminated double quote".to_string());
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    Ok(args)
+}
+
+/// Check for shell metacharacters outside of quoted strings.
+pub fn check_shell_operators(command: &str) -> Result<(), String> {
+    let mut in_single = false;
+    let mut in_double = false;
+    let chars: Vec<char> = command.chars().collect();
+    let len = chars.len();
+
+    for i in 0..len {
+        let c = chars[i];
+        match c {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            _ if in_single || in_double => {}
+            '|' | ';' | '`' | '>' | '<' => {
+                return Err(format!("Shell operator '{}' is not allowed", c));
+            }
+            '$' if i + 1 < len && chars[i + 1] == '(' => {
+                return Err("Shell operator '$(' is not allowed".to_string());
+            }
+            '&' if i + 1 < len && chars[i + 1] == '&' => {
+                return Err("Shell operator '&&' is not allowed".to_string());
+            }
+            '\n' | '\r' => {
+                return Err("Newlines are not allowed outside of quoted strings".to_string());
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
 
 /// Validate a raw command string intended for `git`.
 /// Returns parsed args on success, or an error message on failure.
@@ -44,7 +119,6 @@ pub fn classify_git(args: &[String]) -> CommandClass {
 
         // Context-dependent commands
         "branch" => {
-            // branch with no args or list flags -> RO
             if rest.is_empty()
                 || rest.iter().any(|a| {
                     matches!(*a, "-l" | "--list" | "-a" | "--all" | "-r" | "--remotes" | "-v" | "--verbose" | "-vv")
@@ -57,7 +131,6 @@ pub fn classify_git(args: &[String]) -> CommandClass {
         }
         "stash" => {
             if rest.is_empty() {
-                // bare "stash" = stash push = mutating
                 CommandClass::Mutating
             } else {
                 match rest[0] {
@@ -67,7 +140,6 @@ pub fn classify_git(args: &[String]) -> CommandClass {
             }
         }
         "tag" => {
-            // tag with no args or list flags -> RO
             if rest.is_empty() || rest.iter().any(|a| matches!(*a, "-l" | "--list")) {
                 CommandClass::ReadOnly
             } else {
@@ -150,7 +222,6 @@ pub fn classify_git(args: &[String]) -> CommandClass {
             }
         }
         "symbolic-ref" => {
-            // Query (no set action) = ReadOnly; with --short or single arg
             if rest.len() <= 1 || rest.contains(&"--short") { CommandClass::ReadOnly } else { CommandClass::Mutating }
         }
         "hash-object" => {

@@ -1,5 +1,12 @@
 mod panel;
 mod tools;
+pub mod types;
+
+pub use types::{MemoryImportance, MemoryItem, MemoryState};
+
+/// Maximum token length for memory tl_dr field (enforced on create/update)
+pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
+
 use serde_json::json;
 
 use cp_base::panels::Panel;
@@ -26,27 +33,37 @@ impl Module for MemoryModule {
         true
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(MemoryState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(MemoryState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ms = MemoryState::get(state);
         json!({
-            "memories": state.memories,
-            "next_memory_id": state.next_memory_id,
-            "open_memory_ids": state.open_memory_ids,
+            "memories": ms.memories,
+            "next_memory_id": ms.next_memory_id,
+            "open_memory_ids": ms.open_memory_ids,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let ms = MemoryState::get_mut(state);
         if let Some(arr) = data.get("memories")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.memories = v;
+            ms.memories = v;
         }
         if let Some(v) = data.get("next_memory_id").and_then(|v| v.as_u64()) {
-            state.next_memory_id = v as usize;
+            ms.next_memory_id = v as usize;
         }
         if let Some(arr) = data.get("open_memory_ids")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.open_memory_ids = v;
+            ms.open_memory_ids = v;
         }
     }
 

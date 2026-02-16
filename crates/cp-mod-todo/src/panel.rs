@@ -5,14 +5,17 @@ use cp_base::actions::Action;
 use cp_base::constants::theme;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, State, TodoItem, TodoStatus, estimate_tokens};
+use cp_base::state::{ContextType, State, estimate_tokens};
+
+use crate::types::{TodoItem, TodoState, TodoStatus};
 
 pub struct TodoPanel;
 
 impl TodoPanel {
     /// Format todos for LLM context
     fn format_todos_for_context(state: &State) -> String {
-        if state.todos.is_empty() {
+        let ts = TodoState::get(state);
+        if ts.todos.is_empty() {
             return "No todos".to_string();
         }
 
@@ -34,8 +37,8 @@ impl TodoPanel {
         }
 
         let mut output = String::new();
-        for todo in state.todos.iter().filter(|t| t.parent_id.is_none()) {
-            output.push_str(&format_todo(todo, &state.todos, 0));
+        for todo in ts.todos.iter().filter(|t| t.parent_id.is_none()) {
+            output.push_str(&format_todo(todo, &ts.todos, 0));
         }
 
         output.trim_end().to_string()
@@ -83,15 +86,16 @@ impl Panel for TodoPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line> = Vec::new();
+        let ts = TodoState::get(state);
 
-        if state.todos.is_empty() {
+        if ts.todos.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("No todos".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
             fn collect_todo_lines(
-                todos: &[cp_base::state::TodoItem],
+                todos: &[TodoItem],
                 parent_id: Option<&String>,
                 indent: usize,
                 lines: &mut Vec<(usize, String, String, TodoStatus, String)>,
@@ -103,7 +107,7 @@ impl Panel for TodoPanel {
             }
 
             let mut todo_lines: Vec<(usize, String, String, TodoStatus, String)> = Vec::new();
-            collect_todo_lines(&state.todos, None, 0, &mut todo_lines);
+            collect_todo_lines(&ts.todos, None, 0, &mut todo_lines);
 
             for (indent, id, name, status, description) in todo_lines {
                 let prefix = "  ".repeat(indent);

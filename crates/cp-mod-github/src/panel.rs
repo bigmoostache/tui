@@ -4,11 +4,14 @@ use ratatui::prelude::*;
 use cp_base::actions::Action;
 use cp_base::cache::{CacheRequest, CacheUpdate};
 use cp_base::constants::theme;
-use cp_base::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use super::GH_CMD_TIMEOUT_SECS;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+
+use crate::types::{GithubResultRequest, GithubState};
 
 pub(crate) struct GithubResultPanel;
 
@@ -23,11 +26,14 @@ impl Panel for GithubResultPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         let command = ctx.result_command.as_ref()?;
-        let token = state.github_token.as_ref()?;
-        Some(CacheRequest::GithubResult {
-            context_id: ctx.id.clone(),
-            command: command.clone(),
-            github_token: token.clone(),
+        let token = GithubState::get(state).github_token.as_ref()?;
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GITHUB_RESULT),
+            data: Box::new(GithubResultRequest {
+                context_id: ctx.id.clone(),
+                command: command.clone(),
+                github_token: token.clone(),
+            }),
         })
     }
 
@@ -58,17 +64,15 @@ impl Panel for GithubResultPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::GithubResult { context_id, command, github_token } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<GithubResultRequest>().ok()?;
 
         // Parse and execute the command with timeout
-        let args = super::classify::validate_gh_command(&command).ok()?;
+        let args = super::classify::validate_gh_command(&req.command).ok()?;
 
         let mut cmd = std::process::Command::new("gh");
         cmd.args(&args)
-            .env("GITHUB_TOKEN", &github_token)
-            .env("GH_TOKEN", &github_token)
+            .env("GITHUB_TOKEN", &req.github_token)
+            .env("GH_TOKEN", &req.github_token)
             .env("GH_PROMPT_DISABLED", "1")
             .env("NO_COLOR", "1");
         let output = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS);
@@ -85,19 +89,19 @@ impl Panel for GithubResultPanel {
                     format!("{}\n{}", stdout, stderr)
                 };
                 // Redact token if accidentally in output
-                let content = if github_token.len() >= 8 && content.contains(&github_token) {
-                    content.replace(&github_token, "[REDACTED]")
+                let content = if req.github_token.len() >= 8 && content.contains(&req.github_token) {
+                    content.replace(&req.github_token, "[REDACTED]")
                 } else {
                     content
                 };
                 let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::Content { context_id, content, token_count })
+                Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
             Err(e) => {
                 let content = format!("Error executing gh: {}", e);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::Content { context_id, content, token_count })
+                Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
         }
     }

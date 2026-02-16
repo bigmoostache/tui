@@ -126,8 +126,9 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            use cp_base::types::spine::NotificationType;
-            self.state.create_notification(
+            use cp_mod_spine::{NotificationType, SpineState};
+            SpineState::create_notification(
+                &mut self.state,
                 NotificationType::ReloadResume,
                 "reload_resume".to_string(),
                 "Resuming after TUI reload".to_string(),
@@ -323,7 +324,10 @@ impl App {
 
     fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
         while let Ok(tldr) = tldr_rx.try_recv() {
-            self.state.pending_tldrs = self.state.pending_tldrs.saturating_sub(1);
+            {
+                let ts = cp_mod_tree::TreeState::get_mut(&mut self.state);
+                ts.pending_tldrs = ts.pending_tldrs.saturating_sub(1);
+            }
             self.state.dirty = true;
             if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
                 msg.tl_dr = Some(tldr.tl_dr);
@@ -365,6 +369,7 @@ impl App {
         let mut tool_results: Vec<ToolResult> = Vec::new();
 
         // Finalize current assistant message
+        let mut needs_tldr: Option<(String, String)> = None;
         if let Some(msg) = self.state.messages.last_mut()
             && msg.role == "assistant"
         {
@@ -373,9 +378,12 @@ impl App {
             let op = build_message_op(msg);
             self.writer.send_message(op);
             if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
-                self.state.pending_tldrs += 1;
-                generate_tldr(msg.id.clone(), msg.content.clone(), tldr_tx.clone());
+                needs_tldr = Some((msg.id.clone(), msg.content.clone()));
             }
+        }
+        if let Some((id, content)) = needs_tldr {
+            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
+            generate_tldr(id, content, tldr_tx.clone());
         }
 
         // Create tool call messages
@@ -638,7 +646,7 @@ impl App {
                         }
                     });
                     if let Some((msg_id, content)) = tldr_info {
-                        self.state.pending_tldrs += 1;
+                        cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
                         generate_tldr(msg_id, content, tldr_tx.clone());
                     }
                     self.save_state_async();
@@ -667,7 +675,7 @@ impl App {
                 // uncontrollable — the user can never stop it with Esc. (#44)
                 // We set user_stopped instead of disabling continue_until_todos_done,
                 // so auto-continuation resumes when the user sends a new message.
-                self.state.spine_config.user_stopped = true;
+                cp_mod_spine::SpineState::get_mut(&mut self.state).config.user_stopped = true;
                 self.state.touch_panel(ContextType::new(ContextType::SPINE));
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
@@ -691,7 +699,7 @@ impl App {
                     }
                 });
                 if let Some((msg_id, content)) = tldr_info {
-                    self.state.pending_tldrs += 1;
+                    cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
                     generate_tldr(msg_id, content, tldr_tx.clone());
                 }
                 self.save_state_async();
@@ -722,7 +730,7 @@ impl App {
         }
 
         // Watch directories for Tree panel (only open folders)
-        for folder in &self.state.tree_open_folders {
+        for folder in &cp_mod_tree::TreeState::get(&self.state).tree_open_folders {
             if !self.watched_dir_paths.contains(folder) && watcher.watch_dir(folder).is_ok() {
                 self.watched_dir_paths.insert(folder.clone());
             }
@@ -745,7 +753,7 @@ impl App {
 
     /// Sync GhWatcher with current GithubResult panels
     fn sync_gh_watches(&self) {
-        let token = match &self.state.github_token {
+        let token = match &cp_mod_github::GithubState::get(&self.state).github_token {
             Some(t) => t.clone(),
             None => return,
         };
@@ -797,13 +805,12 @@ impl App {
                 continue;
             }
 
-            // GitStatus: match by context_type
-            if matches!(update, CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged) {
-                let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
+            // ModuleSpecific: match by context_type
+            if let CacheUpdate::ModuleSpecific { ref context_type, .. } = update {
+                let idx = state.context.iter().position(|c| c.context_type == *context_type);
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);
                 let panel = crate::core::panels::get_panel(&ctx.context_type);
-                // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
                 state.context.insert(idx, ctx);
@@ -1054,8 +1061,10 @@ impl App {
                     if self.state.messages.len() >= 2 {
                         let user_msg = &self.state.messages[self.state.messages.len() - 2];
                         if user_msg.role == "user" && user_msg.tl_dr.is_none() {
-                            self.state.pending_tldrs += 1;
-                            generate_tldr(user_msg.id.clone(), user_msg.content.clone(), tldr_tx.clone());
+                            let tldr_id = user_msg.id.clone();
+                            let tldr_content = user_msg.content.clone();
+                            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
+                            generate_tldr(tldr_id, tldr_content, tldr_tx.clone());
                         }
                     }
                     let ctx = prepare_stream_context(&mut self.state, false);
@@ -1090,7 +1099,7 @@ impl App {
 
         // Check if there's any active operation that needs spinner animation
         let has_active_spinner = self.state.is_streaming
-            || self.state.pending_tldrs > 0
+            || cp_mod_tree::TreeState::get(&self.state).pending_tldrs > 0
             || self.state.api_check_in_progress
             || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 

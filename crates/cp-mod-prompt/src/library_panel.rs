@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::types::PromptType;
+use crate::types::{PromptState, PromptType};
 use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State};
@@ -10,7 +10,7 @@ pub struct LibraryPanel;
 
 impl Panel for LibraryPanel {
     fn title(&self, state: &State) -> String {
-        if let Some((pt, id)) = &state.library_preview {
+        if let Some((pt, id)) = &PromptState::get(state).library_preview {
             format!("Library: {} ({})", id, pt)
         } else {
             "Library".to_string()
@@ -19,13 +19,14 @@ impl Panel for LibraryPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
+        let ps = PromptState::get(state);
 
         // If previewing a specific prompt, show its content
-        if let Some((pt, id)) = &state.library_preview {
+        if let Some((pt, id)) = &ps.library_preview {
             let items = match pt {
-                PromptType::Agent => &state.agents,
-                PromptType::Skill => &state.skills,
-                PromptType::Command => &state.commands,
+                PromptType::Agent => &ps.agents,
+                PromptType::Skill => &ps.skills,
+                PromptType::Command => &ps.commands,
             };
             if let Some(item) = items.iter().find(|i| &i.id == id) {
                 lines.push(Line::from(vec![
@@ -50,10 +51,10 @@ impl Panel for LibraryPanel {
         }
 
         // Current state summary
-        let active_name = state
+        let active_name = ps
             .active_agent_id
             .as_ref()
-            .and_then(|id| state.agents.iter().find(|a| &a.id == id))
+            .and_then(|id| ps.agents.iter().find(|a| &a.id == id))
             .map(|a| a.name.as_str())
             .unwrap_or("(none)");
 
@@ -63,11 +64,11 @@ impl Panel for LibraryPanel {
             Span::styled(active_name.to_string(), Style::default().fg(theme::accent()).bold()),
         ]));
 
-        if !state.loaded_skill_ids.is_empty() {
-            let skill_names: Vec<String> = state
+        if !ps.loaded_skill_ids.is_empty() {
+            let skill_names: Vec<String> = ps
                 .loaded_skill_ids
                 .iter()
-                .filter_map(|id| state.skills.iter().find(|s| &s.id == id).map(|s| s.name.clone()))
+                .filter_map(|id| ps.skills.iter().find(|s| &s.id == id).map(|s| s.name.clone()))
                 .collect();
             lines.push(Line::from(vec![
                 Span::styled(" ", base_style),
@@ -81,7 +82,7 @@ impl Panel for LibraryPanel {
         lines.push(Line::from(vec![
             Span::styled(" ", base_style),
             Span::styled("AGENTS", Style::default().fg(theme::text_muted()).bold()),
-            Span::styled(format!("  ({} available)", state.agents.len()), Style::default().fg(theme::text_muted())),
+            Span::styled(format!("  ({} available)", ps.agents.len()), Style::default().fg(theme::text_muted())),
         ]));
         lines.push(Line::from(""));
 
@@ -93,11 +94,11 @@ impl Panel for LibraryPanel {
             Cell::new("Description", Style::default()),
         ];
 
-        let agent_rows: Vec<Vec<Cell>> = state
+        let agent_rows: Vec<Vec<Cell>> = ps
             .agents
             .iter()
             .map(|agent| {
-                let is_active = state.active_agent_id.as_deref() == Some(&agent.id);
+                let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
                 let (active_str, active_color) =
                     if is_active { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
                 let (type_str, type_color) =
@@ -116,13 +117,13 @@ impl Panel for LibraryPanel {
         lines.extend(render_table(&agent_header, &agent_rows, None, 1));
 
         // ── SKILLS ──
-        if !state.skills.is_empty() {
+        if !ps.skills.is_empty() {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled(" ", base_style),
                 Span::styled("SKILLS", Style::default().fg(theme::text_muted()).bold()),
                 Span::styled(
-                    format!("  ({} available, {} loaded)", state.skills.len(), state.loaded_skill_ids.len()),
+                    format!("  ({} available, {} loaded)", ps.skills.len(), ps.loaded_skill_ids.len()),
                     Style::default().fg(theme::text_muted()),
                 ),
             ]));
@@ -136,11 +137,11 @@ impl Panel for LibraryPanel {
                 Cell::new("Description", Style::default()),
             ];
 
-            let skill_rows: Vec<Vec<Cell>> = state
+            let skill_rows: Vec<Vec<Cell>> = ps
                 .skills
                 .iter()
                 .map(|skill| {
-                    let is_loaded = state.loaded_skill_ids.contains(&skill.id);
+                    let is_loaded = ps.loaded_skill_ids.contains(&skill.id);
                     let (loaded_str, loaded_color) =
                         if is_loaded { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
                     let (type_str, type_color) =
@@ -160,13 +161,13 @@ impl Panel for LibraryPanel {
         }
 
         // ── COMMANDS ──
-        if !state.commands.is_empty() {
+        if !ps.commands.is_empty() {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled(" ", base_style),
                 Span::styled("COMMANDS", Style::default().fg(theme::text_muted()).bold()),
                 Span::styled(
-                    format!("  ({} available)", state.commands.len()),
+                    format!("  ({} available)", ps.commands.len()),
                     Style::default().fg(theme::text_muted()),
                 ),
             ]));
@@ -179,7 +180,7 @@ impl Panel for LibraryPanel {
                 Cell::new("Description", Style::default()),
             ];
 
-            let cmd_rows: Vec<Vec<Cell>> = state
+            let cmd_rows: Vec<Vec<Cell>> = ps
                 .commands
                 .iter()
                 .map(|cmd| {
@@ -215,34 +216,35 @@ impl Panel for LibraryPanel {
             return Vec::new();
         };
 
+        let ps = PromptState::get(state);
         let mut content = String::new();
 
         // Agents table
         content.push_str("Agents (system prompts):\n\n");
         content.push_str("| ID | Name | Active | Description |\n");
         content.push_str("|------|------|--------|-------------|\n");
-        for agent in &state.agents {
-            let active = if state.active_agent_id.as_deref() == Some(&agent.id) { "✓" } else { "" };
+        for agent in &ps.agents {
+            let active = if ps.active_agent_id.as_deref() == Some(&agent.id) { "✓" } else { "" };
             content.push_str(&format!("| {} | {} | {} | {} |\n", agent.id, agent.name, active, agent.description));
         }
 
         // Skills table
-        if !state.skills.is_empty() {
+        if !ps.skills.is_empty() {
             content.push_str("\nSkills (use skill_load/skill_unload):\n\n");
             content.push_str("| ID | Name | Loaded | Description |\n");
             content.push_str("|------|------|--------|-------------|\n");
-            for skill in &state.skills {
-                let loaded = if state.loaded_skill_ids.contains(&skill.id) { "✓" } else { "" };
+            for skill in &ps.skills {
+                let loaded = if ps.loaded_skill_ids.contains(&skill.id) { "✓" } else { "" };
                 content.push_str(&format!("| {} | {} | {} | {} |\n", skill.id, skill.name, loaded, skill.description));
             }
         }
 
         // Commands table
-        if !state.commands.is_empty() {
+        if !ps.commands.is_empty() {
             content.push_str("\nCommands:\n\n");
             content.push_str("| Command | Name | Description |\n");
             content.push_str("|---------|------|-------------|\n");
-            for cmd in &state.commands {
+            for cmd in &ps.commands {
                 content.push_str(&format!("| /{} | {} | {} |\n", cmd.id, cmd.name, cmd.description));
             }
         }

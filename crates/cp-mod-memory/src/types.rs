@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use cp_base::state::State;
+
 /// Memory importance level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -50,4 +52,24 @@ pub struct MemoryItem {
     /// Freeform labels for categorization
     #[serde(default)]
     pub labels: Vec<String>,
+}
+
+/// Module-owned state for the Memory module
+#[derive(Debug)]
+pub struct MemoryState {
+    pub memories: Vec<MemoryItem>,
+    pub next_memory_id: usize,
+    pub open_memory_ids: Vec<String>,
+}
+
+impl MemoryState {
+    pub fn new() -> Self {
+        Self { memories: vec![], next_memory_id: 1, open_memory_ids: vec![] }
+    }
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("MemoryState not initialized")
+    }
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("MemoryState not initialized")
+    }
 }

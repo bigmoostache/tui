@@ -42,7 +42,7 @@ pub fn ensure_default_contexts(state: &mut State) {
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
         let id = format!("P{}", pos + 1);
         let insert_pos = (pos + 1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem = modules::make_default_context_element(&id, *ct, name, *cache_deprecated);
+        let elem = modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated);
         state.context.insert(insert_pos, elem);
     }
 
@@ -53,7 +53,7 @@ pub fn ensure_default_contexts(state: &mut State) {
     // Library panels don't need UIDs (rendered from in-memory state)
     for (_, _, ct, _, _) in &defaults {
         if *ct != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == *ct) {
-            assign_panel_uid(state, *ct);
+            assign_panel_uid(state, ct.clone());
         }
     }
 }

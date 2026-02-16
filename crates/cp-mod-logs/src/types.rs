@@ -1,3 +1,4 @@
+use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -33,5 +34,30 @@ impl LogEntry {
     /// Whether this log is top-level (no parent).
     pub fn is_top_level(&self) -> bool {
         self.parent_id.is_none()
+    }
+}
+
+/// Module-owned state for the Logs module
+pub struct LogsState {
+    pub logs: Vec<LogEntry>,
+    pub next_log_id: usize,
+    pub open_log_ids: Vec<String>,
+}
+
+impl LogsState {
+    pub fn new() -> Self {
+        Self {
+            logs: vec![],
+            next_log_id: 1,
+            open_log_ids: vec![],
+        }
+    }
+
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("LogsState not initialized")
+    }
+
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("LogsState not initialized")
     }
 }

@@ -1,5 +1,8 @@
 mod panel;
 mod tools;
+pub mod types;
+
+pub use types::{TodoItem, TodoState, TodoStatus};
 
 use serde_json::json;
 
@@ -24,21 +27,31 @@ impl Module for TodoModule {
         "Task management with hierarchical todos"
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(TodoState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(TodoState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ts = TodoState::get(state);
         json!({
-            "todos": state.todos,
-            "next_todo_id": state.next_todo_id,
+            "todos": ts.todos,
+            "next_todo_id": ts.next_todo_id,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let ts = TodoState::get_mut(state);
         if let Some(arr) = data.get("todos")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.todos = v;
+            ts.todos = v;
         }
         if let Some(v) = data.get("next_todo_id").and_then(|v| v.as_u64()) {
-            state.next_todo_id = v as usize;
+            ts.next_todo_id = v as usize;
         }
     }
 

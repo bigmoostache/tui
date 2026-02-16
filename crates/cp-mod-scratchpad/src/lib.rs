@@ -1,5 +1,9 @@
 mod panel;
 mod tools;
+pub mod types;
+
+pub use types::{ScratchpadCell, ScratchpadState};
+
 use serde_json::json;
 
 use cp_base::panels::Panel;
@@ -23,21 +27,31 @@ impl Module for ScratchpadModule {
         "Temporary note-taking scratchpad cells"
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(ScratchpadState::new());
+    }
+
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(ScratchpadState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ss = ScratchpadState::get(state);
         json!({
-            "scratchpad_cells": state.scratchpad_cells,
-            "next_scratchpad_id": state.next_scratchpad_id,
+            "scratchpad_cells": ss.scratchpad_cells,
+            "next_scratchpad_id": ss.next_scratchpad_id,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let ss = ScratchpadState::get_mut(state);
         if let Some(arr) = data.get("scratchpad_cells")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.scratchpad_cells = v;
+            ss.scratchpad_cells = v;
         }
         if let Some(v) = data.get("next_scratchpad_id").and_then(|v| v.as_u64()) {
-            state.next_scratchpad_id = v as usize;
+            ss.next_scratchpad_id = v as usize;
         }
     }
 

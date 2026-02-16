@@ -1,5 +1,6 @@
 use ratatui::prelude::*;
 
+use crate::types::PromptState;
 use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
@@ -13,7 +14,7 @@ impl Panel for SkillPanel {
         if let Some(ctx) = selected
             && ctx.context_type == ContextType::new(ContextType::SKILL)
             && let Some(skill_id) = &ctx.skill_prompt_id
-            && let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id)
+            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| &s.id == skill_id)
         {
             return format!("Skill: {}", skill.name);
         }
@@ -27,7 +28,7 @@ impl Panel for SkillPanel {
         let selected = state.context.get(state.selected_context);
         if let Some(ctx) = selected
             && let Some(skill_id) = &ctx.skill_prompt_id
-            && let Some(skill) = state.skills.iter().find(|s| &s.id == skill_id)
+            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| &s.id == skill_id)
         {
             lines.push(Line::from(vec![
                 Span::styled("Skill: ", Style::default().fg(theme::text_muted())),
@@ -59,14 +60,25 @@ impl Panel for SkillPanel {
             .filter_map(|(idx, c)| c.skill_prompt_id.as_ref().map(|sid| (sid.clone(), c.id.clone(), idx)))
             .collect();
 
-        for (skill_id, _panel_id, idx) in skills {
-            if let Some(skill) = state.skills.iter().find(|s| s.id == skill_id) {
-                let content = format!("[{}] {}\n\n{}", skill.id, skill.name, skill.content);
-                let tokens = estimate_tokens(&content);
-                let ctx = &mut state.context[idx];
-                ctx.cached_content = Some(content);
-                ctx.token_count = tokens;
-            }
+        // Collect content from PromptState first to avoid borrow conflict with state.context
+        let updates: Vec<(usize, String, usize)> = {
+            let ps = PromptState::get(state);
+            skills
+                .iter()
+                .filter_map(|(skill_id, _panel_id, idx)| {
+                    ps.skills.iter().find(|s| s.id == *skill_id).map(|skill| {
+                        let content = format!("[{}] {}\n\n{}", skill.id, skill.name, skill.content);
+                        let tokens = estimate_tokens(&content);
+                        (*idx, content, tokens)
+                    })
+                })
+                .collect()
+        };
+
+        for (idx, content, tokens) in updates {
+            let ctx = &mut state.context[idx];
+            ctx.cached_content = Some(content);
+            ctx.token_count = tokens;
         }
     }
 

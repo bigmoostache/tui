@@ -21,6 +21,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use cp_mod_logs::LogsState;
+
 use crate::config::set_active_theme;
 use crate::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
 use crate::state::{ContextElement, ContextType, Message, PanelData, SharedConfig, State, WorkerState};
@@ -39,7 +41,11 @@ pub fn load_state() -> State {
         load_state_new()
     } else {
         // Fresh start - create default state
-        let state = State::default();
+        let mut state = State::default();
+        // Initialize module-owned state (TypeMap entries)
+        for module in crate::modules::all_modules() {
+            module.init_state(&mut state);
+        }
         set_active_theme(&state.active_theme);
         state
     }
@@ -51,7 +57,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     ContextElement {
         id: local_id.to_string(),
         uid: Some(panel.uid.clone()),
-        context_type: panel.panel_type,
+        context_type: panel.panel_type.clone(),
         name: panel.name.clone(),
         token_count: panel.token_count,
         file_path: panel.file_path.clone(),
@@ -106,7 +112,7 @@ fn load_state_new() -> State {
         let id = format!("P{}", pos);
         if *ct == ContextType::SYSTEM {
             // System panel is not stored in panels/ - comes from systems[]
-            context.push(crate::modules::make_default_context_element(&id, *ct, name, *cache_deprecated));
+            context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
         } else if let Some(uid) = important.get(ct)
             && let Some(panel_data) = panel::load_panel(uid)
         {
@@ -192,6 +198,11 @@ fn load_state_new() -> State {
         ..State::default()
     };
 
+    // Initialize module-owned state (TypeMap entries) before loading persisted data
+    for module in crate::modules::all_modules() {
+        module.init_state(&mut state);
+    }
+
     // Load module data from appropriate config (global → SharedConfig, worker → WorkerState)
     let null = serde_json::Value::Null;
     for module in crate::modules::all_modules() {
@@ -215,7 +226,7 @@ fn load_state_new() -> State {
 
     // Load GitHub token from environment
     dotenvy::dotenv().ok();
-    state.github_token = std::env::var("GITHUB_TOKEN").ok();
+    cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
 
     // Set the global active theme
     set_active_theme(&state.active_theme);
@@ -235,7 +246,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::constants::STATES_DIR),
         dir.join(crate::constants::PANELS_DIR),
         dir.join(crate::constants::MESSAGES_DIR),
-        dir.join(crate::constants::LOGS_DIR),
+        dir.join(cp_mod_logs::LOGS_DIR),
     ];
 
     // Build module data maps
@@ -272,8 +283,9 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     }
 
     // Chunked log files (global, shared across workers)
+    let logs_state = LogsState::get(state);
     writes.extend(
-        cp_mod_logs::build_log_write_ops(&state.logs, state.next_log_id)
+        cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
             .into_iter()
             .map(|(path, content)| WriteOp { path, content }),
     );
@@ -285,7 +297,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
             && ctx.context_type != ContextType::SYSTEM
             && ctx.context_type != ContextType::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
-            important_uids.insert(ctx.context_type, uid.clone());
+            important_uids.insert(ctx.context_type.clone(), uid.clone());
         }
     }
 
@@ -326,7 +338,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
             known_uids.insert(uid.clone());
             let panel_data = PanelData {
                 uid: uid.clone(),
-                panel_type: ctx.context_type,
+                panel_type: ctx.context_type.clone(),
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,

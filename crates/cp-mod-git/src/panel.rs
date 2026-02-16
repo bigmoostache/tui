@@ -7,14 +7,15 @@ use ratatui::prelude::*;
 use super::GIT_STATUS_REFRESH_MS;
 use cp_base::actions::Action;
 use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use cp_base::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use super::GIT_CMD_TIMEOUT_SECS;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::constants::{chars, theme};
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::{
-    ContextElement, ContextType, GitChangeType, GitFileChange, State, compute_total_pages, estimate_tokens,
-};
+use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+
+use crate::types::{GitCacheUpdate, GitChangeType, GitFileChange, GitResultRequest, GitState, GitStatusRequest};
 
 pub(crate) struct GitResultPanel;
 pub struct GitPanel;
@@ -22,18 +23,19 @@ pub struct GitPanel;
 impl GitPanel {
     /// Format git status for LLM context (as markdown table + diffs)
     fn format_git_for_context(state: &State) -> String {
-        if !state.git_is_repo {
+        let gs = GitState::get(state);
+        if !gs.git_is_repo {
             return "Not a git repository".to_string();
         }
 
         let mut output = String::new();
 
         // Branch
-        if let Some(branch) = &state.git_branch {
+        if let Some(branch) = &gs.git_branch {
             output.push_str(&format!("Branch: {}\n", branch));
         }
 
-        if state.git_file_changes.is_empty() {
+        if gs.git_file_changes.is_empty() {
             output.push_str("\nWorking tree clean\n");
         } else {
             output.push_str("\n| File | Type | + | - | Net |\n");
@@ -42,7 +44,7 @@ impl GitPanel {
             let mut total_add: i32 = 0;
             let mut total_del: i32 = 0;
 
-            for file in &state.git_file_changes {
+            for file in &gs.git_file_changes {
                 total_add += file.additions;
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
@@ -68,9 +70,9 @@ impl GitPanel {
             ));
 
             // Add diff content only if git_show_diffs is enabled
-            if state.git_show_diffs {
+            if gs.git_show_diffs {
                 output.push_str("\n## Diffs\n\n");
-                for file in &state.git_file_changes {
+                for file in &gs.git_file_changes {
                     if !file.diff_content.is_empty() {
                         output.push_str("```diff\n");
                         output.push_str(&file.diff_content);
@@ -190,61 +192,74 @@ impl Panel for GitPanel {
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         // Force full refresh if cache is explicitly deprecated (e.g., toggle_diffs)
         let current_source_hash = if ctx.cache_deprecated { None } else { ctx.source_hash.clone() };
-        Some(CacheRequest::GitStatus {
-            show_diffs: state.git_show_diffs,
-            current_source_hash,
-            diff_base: state.git_diff_base.clone(),
+        let gs = GitState::get(state);
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GIT),
+            data: Box::new(GitStatusRequest {
+                show_diffs: gs.git_show_diffs,
+                current_source_hash,
+                diff_base: gs.git_diff_base.clone(),
+            }),
         })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, state: &mut State) -> bool {
         match update {
-            CacheUpdate::GitStatus {
-                branch,
-                is_repo,
-                file_changes,
-                branches,
-                formatted_content,
-                token_count,
-                source_hash,
-            } => {
-                state.git_branch = branch;
-                state.git_branches = branches;
-                state.git_is_repo = is_repo;
-                state.git_file_changes = file_changes
-                    .into_iter()
-                    .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
-                        path,
-                        additions,
-                        deletions,
-                        change_type,
-                        diff_content,
-                    })
-                    .collect();
-                ctx.source_hash = Some(source_hash);
-                ctx.cached_content = Some(formatted_content);
-                ctx.full_token_count = token_count;
-                ctx.total_pages = compute_total_pages(token_count);
-                ctx.current_page = 0;
-                // token_count reflects current page, not full content
-                if ctx.total_pages > 1 {
-                    let page_content = paginate_content(
-                        ctx.cached_content.as_deref().unwrap_or(""),
-                        ctx.current_page,
-                        ctx.total_pages,
-                    );
-                    ctx.token_count = estimate_tokens(&page_content);
+            CacheUpdate::ModuleSpecific { data, .. } => {
+                if let Ok(update) = data.downcast::<GitCacheUpdate>() {
+                    match *update {
+                        GitCacheUpdate::Status {
+                            branch,
+                            is_repo,
+                            file_changes,
+                            branches,
+                            formatted_content,
+                            token_count,
+                            source_hash,
+                        } => {
+                            let gs = GitState::get_mut(state);
+                            gs.git_branch = branch;
+                            gs.git_branches = branches;
+                            gs.git_is_repo = is_repo;
+                            gs.git_file_changes = file_changes
+                                .into_iter()
+                                .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
+                                    path,
+                                    additions,
+                                    deletions,
+                                    change_type,
+                                    diff_content,
+                                })
+                                .collect();
+                            ctx.source_hash = Some(source_hash);
+                            ctx.cached_content = Some(formatted_content);
+                            ctx.full_token_count = token_count;
+                            ctx.total_pages = compute_total_pages(token_count);
+                            ctx.current_page = 0;
+                            // token_count reflects current page, not full content
+                            if ctx.total_pages > 1 {
+                                let page_content = paginate_content(
+                                    ctx.cached_content.as_deref().unwrap_or(""),
+                                    ctx.current_page,
+                                    ctx.total_pages,
+                                );
+                                ctx.token_count = estimate_tokens(&page_content);
+                            } else {
+                                ctx.token_count = token_count;
+                            }
+                            ctx.cache_deprecated = false;
+                            let content_ref = ctx.cached_content.clone().unwrap_or_default();
+                            update_if_changed(ctx, &content_ref);
+                            true
+                        }
+                        GitCacheUpdate::StatusUnchanged => {
+                            ctx.cache_deprecated = false;
+                            false // No actual content change
+                        }
+                    }
                 } else {
-                    ctx.token_count = token_count;
+                    false
                 }
-                ctx.cache_deprecated = false;
-                let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                update_if_changed(ctx, &content_ref);
-                true
-            }
-            CacheUpdate::GitStatusUnchanged => {
-                ctx.cache_deprecated = false;
-                false // No actual content change
             }
             _ => false,
         }
@@ -265,9 +280,10 @@ impl Panel for GitPanel {
     }
 
     fn title(&self, state: &State) -> String {
+        let gs = GitState::get(state);
         let base_title =
-            if let Some(branch) = &state.git_branch { format!("Git ({})", branch) } else { "Git".to_string() };
-        if let Some(ref diff_base) = state.git_diff_base {
+            if let Some(branch) = &gs.git_branch { format!("Git ({})", branch) } else { "Git".to_string() };
+        if let Some(ref diff_base) = gs.git_diff_base {
             format!("{} [vs {}]", base_title, diff_base)
         } else {
             base_title
@@ -297,23 +313,25 @@ impl Panel for GitPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::GitStatus { show_diffs, current_source_hash, diff_base } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<GitStatusRequest>().ok()?;
+        let GitStatusRequest { show_diffs, current_source_hash, diff_base } = *req;
 
         // Check if we're in a git repo (fast check)
         let is_repo =
             Command::new("git").args(["rev-parse", "--git-dir"]).output().map(|o| o.status.success()).unwrap_or(false);
 
         if !is_repo {
-            return Some(CacheUpdate::GitStatus {
-                branch: None,
-                is_repo: false,
-                file_changes: vec![],
-                branches: vec![],
-                formatted_content: "Not a git repository".to_string(),
-                token_count: estimate_tokens("Not a git repository"),
-                source_hash: hash_content("not_a_repo"),
+            return Some(CacheUpdate::ModuleSpecific {
+                context_type: ContextType::new(ContextType::GIT),
+                data: Box::new(GitCacheUpdate::Status {
+                    branch: None,
+                    is_repo: false,
+                    file_changes: vec![],
+                    branches: vec![],
+                    formatted_content: "Not a git repository".to_string(),
+                    token_count: estimate_tokens("Not a git repository"),
+                    source_hash: hash_content("not_a_repo"),
+                }),
             });
         }
 
@@ -338,7 +356,10 @@ impl Panel for GitPanel {
 
         // If hash unchanged, skip expensive operations
         if current_source_hash.as_ref() == Some(&new_hash) {
-            return Some(CacheUpdate::GitStatusUnchanged);
+            return Some(CacheUpdate::ModuleSpecific {
+                context_type: ContextType::new(ContextType::GIT),
+                data: Box::new(GitCacheUpdate::StatusUnchanged),
+            });
         }
 
         // Get branch name
@@ -511,19 +532,22 @@ impl Panel for GitPanel {
         let formatted_content = format_git_content_for_cache(&branch, &changes, show_diffs);
         let token_count = estimate_tokens(&formatted_content);
 
-        Some(CacheUpdate::GitStatus {
-            branch,
-            is_repo: true,
-            file_changes: changes,
-            branches,
-            formatted_content,
-            token_count,
-            source_hash: new_hash,
+        Some(CacheUpdate::ModuleSpecific {
+            context_type: ContextType::new(ContextType::GIT),
+            data: Box::new(GitCacheUpdate::Status {
+                branch,
+                is_repo: true,
+                file_changes: changes,
+                branches,
+                formatted_content,
+                token_count,
+                source_hash: new_hash,
+            }),
         })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        if !state.git_is_repo {
+        if !GitState::get(state).git_is_repo {
             return vec![];
         }
 
@@ -548,9 +572,10 @@ impl Panel for GitPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let gs = GitState::get(state);
         let mut text: Vec<Line> = Vec::new();
 
-        if !state.git_is_repo {
+        if !gs.git_is_repo {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("Not a git repository".to_string(), Style::default().fg(theme::text_muted()).italic()),
@@ -559,7 +584,7 @@ impl Panel for GitPanel {
         }
 
         // Branch name
-        if let Some(branch) = &state.git_branch {
+        if let Some(branch) = &gs.git_branch {
             let branch_color = if branch.starts_with("detached:") { theme::warning() } else { theme::accent() };
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
@@ -569,13 +594,13 @@ impl Panel for GitPanel {
         }
 
         // All branches
-        if !state.git_branches.is_empty() {
+        if !gs.git_branches.is_empty() {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("Branches:".to_string(), Style::default().fg(theme::text_secondary()).bold()),
             ]));
-            for (branch_name, is_current) in &state.git_branches {
+            for (branch_name, is_current) in &gs.git_branches {
                 let (prefix, style) = if *is_current {
                     ("* ", Style::default().fg(theme::accent()).bold())
                 } else {
@@ -591,7 +616,7 @@ impl Panel for GitPanel {
 
         text.push(Line::from(""));
 
-        if state.git_file_changes.is_empty() {
+        if gs.git_file_changes.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
@@ -600,7 +625,7 @@ impl Panel for GitPanel {
         }
 
         // Calculate column widths
-        let path_width = state.git_file_changes.iter().map(|f| f.path.len()).max().unwrap_or(4).clamp(4, 45); // Cap at 45 chars for the panel
+        let path_width = gs.git_file_changes.iter().map(|f| f.path.len()).max().unwrap_or(4).clamp(4, 45); // Cap at 45 chars for the panel
 
         // Table header
         text.push(Line::from(vec![
@@ -628,7 +653,7 @@ impl Panel for GitPanel {
         let mut total_add: i32 = 0;
         let mut total_del: i32 = 0;
 
-        for file in &state.git_file_changes {
+        for file in &gs.git_file_changes {
             total_add += file.additions;
             total_del += file.deletions;
             let net = file.additions - file.deletions;
@@ -706,11 +731,11 @@ impl Panel for GitPanel {
 
         // Summary stats
         text.push(Line::from(""));
-        let added = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Added).count();
-        let untracked = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Untracked).count();
-        let modified = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Modified).count();
-        let deleted = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Deleted).count();
-        let renamed = state.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Renamed).count();
+        let added = gs.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Added).count();
+        let untracked = gs.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Untracked).count();
+        let modified = gs.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Modified).count();
+        let deleted = gs.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Deleted).count();
+        let renamed = gs.git_file_changes.iter().filter(|f| f.change_type == GitChangeType::Renamed).count();
 
         let mut summary_parts = Vec::new();
         if added > 0 {
@@ -737,7 +762,7 @@ impl Panel for GitPanel {
         }
 
         // Git log (if enabled)
-        if state.git_show_logs {
+        if gs.git_show_logs {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
@@ -748,7 +773,7 @@ impl Panel for GitPanel {
                 Span::styled("Recent Commits:".to_string(), Style::default().fg(theme::text_secondary()).bold()),
             ]));
 
-            if let Some(log_content) = &state.git_log_content {
+            if let Some(log_content) = &gs.git_log_content {
                 for line in log_content.lines() {
                     text.push(Line::from(vec![
                         Span::styled(" ".to_string(), base_style),
@@ -759,7 +784,7 @@ impl Panel for GitPanel {
         }
 
         // Display diff content for each file
-        for file in &state.git_file_changes {
+        for file in &gs.git_file_changes {
             if file.diff_content.is_empty() {
                 continue;
             }
@@ -822,7 +847,10 @@ impl Panel for GitResultPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let command = ctx.result_command.as_ref()?;
-        Some(CacheRequest::GitResult { context_id: ctx.id.clone(), command: command.clone() })
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GIT_RESULT),
+            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.clone() }),
+        })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
@@ -852,9 +880,8 @@ impl Panel for GitResultPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::GitResult { context_id, command } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<GitResultRequest>().ok()?;
+        let GitResultRequest { context_id, command } = *req;
 
         // Parse and execute the command with timeout
         let args = super::classify::validate_git_command(&command).ok()?;

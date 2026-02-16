@@ -9,6 +9,15 @@ use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
+use crate::types::TreeState;
+
+pub struct TreeCacheRequest {
+    pub context_id: String,
+    pub tree_filter: String,
+    pub tree_open_folders: Vec<String>,
+    pub tree_descriptions: Vec<crate::types::TreeFileDescription>,
+}
+
 pub struct TreePanel;
 
 impl Panel for TreePanel {
@@ -31,11 +40,15 @@ impl Panel for TreePanel {
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
-        Some(CacheRequest::Tree {
-            context_id: ctx.id.clone(),
-            tree_filter: state.tree_filter.clone(),
-            tree_open_folders: state.tree_open_folders.clone(),
-            tree_descriptions: state.tree_descriptions.clone(),
+        let ts = TreeState::get(state);
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::TREE),
+            data: Box::new(TreeCacheRequest {
+                context_id: ctx.id.clone(),
+                tree_filter: ts.tree_filter.clone(),
+                tree_open_folders: ts.tree_open_folders.clone(),
+                tree_descriptions: ts.tree_descriptions.clone(),
+            }),
         })
     }
 
@@ -62,10 +75,8 @@ impl Panel for TreePanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::Tree { context_id, tree_filter, tree_open_folders, tree_descriptions } = request
-        else {
-            return None;
-        };
+        let req = request.data.downcast::<TreeCacheRequest>().ok()?;
+        let TreeCacheRequest { context_id, tree_filter, tree_open_folders, tree_descriptions } = *req;
         let content = crate::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::Content { context_id, content, token_count })

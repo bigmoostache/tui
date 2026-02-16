@@ -116,14 +116,8 @@ pub const PANELS_DIR: &str = "panels";
 /// Default worker ID
 pub const DEFAULT_WORKER_ID: &str = "main_worker";
 
-/// Logs subdirectory (chunked JSON files, global across workers)
-pub const LOGS_DIR: &str = "logs";
-
 /// Maximum size for command output cached in result panels (bytes)
 pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
-
-/// Timeout for gh commands (seconds)
-pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 // =============================================================================
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)

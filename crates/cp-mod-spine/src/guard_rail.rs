@@ -1,6 +1,8 @@
 use cp_base::panels::now_ms;
 use cp_base::state::State;
 
+use crate::types::SpineState;
+
 /// Trait for guard rail safety limits.
 ///
 /// Guard rails are checked BEFORE any auto-continuation fires.
@@ -44,14 +46,14 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = state.spine_config.max_output_tokens { state.total_output_tokens >= max } else { false }
+        if let Some(max) = SpineState::get(state).config.max_output_tokens { state.total_output_tokens >= max } else { false }
     }
 
     fn block_reason(&self, state: &State) -> String {
         format!(
             "Output token limit reached: {} / {} tokens",
             state.total_output_tokens,
-            state.spine_config.max_output_tokens.unwrap_or(0)
+            SpineState::get(state).config.max_output_tokens.unwrap_or(0)
         )
     }
 }
@@ -69,7 +71,7 @@ impl GuardRailStopLogic for MaxCostGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max_cost) = state.spine_config.max_cost {
+        if let Some(max_cost) = SpineState::get(state).config.max_cost {
             let current_cost = Self::calculate_cost(state);
             current_cost >= max_cost
         } else {
@@ -79,7 +81,7 @@ impl GuardRailStopLogic for MaxCostGuard {
 
     fn block_reason(&self, state: &State) -> String {
         let current_cost = Self::calculate_cost(state);
-        format!("Cost limit reached: ${:.4} / ${:.4}", current_cost, state.spine_config.max_cost.unwrap_or(0.0))
+        format!("Cost limit reached: ${:.4} / ${:.4}", current_cost, SpineState::get(state).config.max_cost.unwrap_or(0.0))
     }
 }
 
@@ -107,7 +109,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
 
     fn should_block(&self, state: &State) -> bool {
         if let (Some(max_secs), Some(start_ms)) =
-            (state.spine_config.max_duration_secs, state.spine_config.autonomous_start_ms)
+            (SpineState::get(state).config.max_duration_secs, SpineState::get(state).config.autonomous_start_ms)
         {
             let elapsed_ms = now_ms().saturating_sub(start_ms);
             let elapsed_secs = elapsed_ms / 1000;
@@ -119,8 +121,8 @@ impl GuardRailStopLogic for MaxDurationGuard {
 
     fn block_reason(&self, state: &State) -> String {
         let elapsed_secs =
-            state.spine_config.autonomous_start_ms.map(|start| now_ms().saturating_sub(start) / 1000).unwrap_or(0);
-        format!("Duration limit reached: {}s / {}s", elapsed_secs, state.spine_config.max_duration_secs.unwrap_or(0))
+            SpineState::get(state).config.autonomous_start_ms.map(|start| now_ms().saturating_sub(start) / 1000).unwrap_or(0);
+        format!("Duration limit reached: {}s / {}s", elapsed_secs, SpineState::get(state).config.max_duration_secs.unwrap_or(0))
     }
 }
 
@@ -137,14 +139,14 @@ impl GuardRailStopLogic for MaxMessagesGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = state.spine_config.max_messages { state.messages.len() >= max } else { false }
+        if let Some(max) = SpineState::get(state).config.max_messages { state.messages.len() >= max } else { false }
     }
 
     fn block_reason(&self, state: &State) -> String {
         format!(
             "Message limit reached: {} / {} messages",
             state.messages.len(),
-            state.spine_config.max_messages.unwrap_or(0)
+            SpineState::get(state).config.max_messages.unwrap_or(0)
         )
     }
 }
@@ -164,8 +166,8 @@ impl GuardRailStopLogic for MaxAutoRetriesGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = state.spine_config.max_auto_retries {
-            state.spine_config.auto_continuation_count >= max
+        if let Some(max) = SpineState::get(state).config.max_auto_retries {
+            SpineState::get(state).config.auto_continuation_count >= max
         } else {
             false
         }
@@ -174,8 +176,8 @@ impl GuardRailStopLogic for MaxAutoRetriesGuard {
     fn block_reason(&self, state: &State) -> String {
         format!(
             "Auto-retry limit reached: {} / {} continuations",
-            state.spine_config.auto_continuation_count,
-            state.spine_config.max_auto_retries.unwrap_or(0)
+            SpineState::get(state).config.auto_continuation_count,
+            SpineState::get(state).config.max_auto_retries.unwrap_or(0)
         )
     }
 }

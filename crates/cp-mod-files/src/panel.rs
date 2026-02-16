@@ -11,6 +11,12 @@ use cp_base::constants::{PANEL_MAX_LOAD_BYTES, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
+pub struct FileCacheRequest {
+    pub context_id: String,
+    pub file_path: String,
+    pub current_source_hash: Option<String>,
+}
+
 pub struct FilePanel;
 
 impl Panel for FilePanel {
@@ -34,10 +40,13 @@ impl Panel for FilePanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let path = ctx.file_path.as_ref()?;
-        Some(CacheRequest::File {
-            context_id: ctx.id.clone(),
-            file_path: path.clone(),
-            current_source_hash: ctx.source_hash.clone(),
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::FILE),
+            data: Box::new(FileCacheRequest {
+                context_id: ctx.id.clone(),
+                file_path: path.clone(),
+                current_source_hash: ctx.source_hash.clone(),
+            }),
         })
     }
 
@@ -69,9 +78,8 @@ impl Panel for FilePanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::File { context_id, file_path, current_source_hash } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<FileCacheRequest>().ok()?;
+        let FileCacheRequest { context_id, file_path, current_source_hash } = *req;
         let path = PathBuf::from(&file_path);
         if !path.exists() {
             return None;

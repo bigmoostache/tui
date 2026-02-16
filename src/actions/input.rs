@@ -1,6 +1,7 @@
 use crate::persistence::{delete_message, save_message};
-use crate::state::{ContextType, Message, PromptItem, State, estimate_tokens};
-use cp_base::types::spine::NotificationType;
+use crate::state::{ContextType, Message, State, estimate_tokens};
+use cp_mod_prompt::{PromptItem, PromptState};
+use cp_mod_spine::{NotificationType, SpineState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
@@ -23,7 +24,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     }
 
-    let content = replace_commands(&state.input, &state.commands);
+    let content = replace_commands(&state.input, &PromptState::get(state).commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
     let content = expand_paste_sentinels(&content, &state.paste_buffers);
     state.input.clear();
@@ -60,9 +61,9 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     create_user_notification(state, &user_id_str, &content_preview);
 
     // Any human input resets auto-continuation counters — human is back in the loop
-    state.spine_config.auto_continuation_count = 0;
-    state.spine_config.autonomous_start_ms = None;
-    state.spine_config.user_stopped = false;
+    SpineState::get_mut(state).config.auto_continuation_count = 0;
+    SpineState::get_mut(state).config.autonomous_start_ms = None;
+    SpineState::get_mut(state).config.user_stopped = false;
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
@@ -108,7 +109,7 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    state.create_notification(NotificationType::UserMessage, user_id.to_string(), content_preview.to_string());
+    SpineState::create_notification(state, NotificationType::UserMessage, user_id.to_string(), content_preview.to_string());
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.

@@ -2,13 +2,16 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use cp_base::constants::{PRESETS_DIR, STORE_DIR};
+use cp_base::constants::STORE_DIR;
+
+use crate::PRESETS_DIR;
 use cp_base::modules::Module;
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextElement, ContextType, State};
 use cp_base::tool_defs::ToolDefinition;
 use cp_base::tools::{ToolResult, ToolUse};
-use cp_base::types::preset::{Preset, PresetPanelConfig, PresetWorkerState};
+use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
+use cp_mod_prompt::PromptState;
 
 fn presets_path() -> std::path::PathBuf {
     Path::new(STORE_DIR).join(PRESETS_DIR)
@@ -135,10 +138,10 @@ pub(crate) fn execute_snapshot(
         description: description.to_string(),
         built_in: false,
         worker_state: PresetWorkerState {
-            active_agent_id: state.active_agent_id.clone(),
+            active_agent_id: PromptState::get(state).active_agent_id.clone(),
             active_modules,
             disabled_tools,
-            loaded_skill_ids: state.loaded_skill_ids.clone(),
+            loaded_skill_ids: PromptState::get(state).loaded_skill_ids.clone(),
             modules: module_data,
             dynamic_panels,
         },
@@ -238,9 +241,9 @@ pub(crate) fn execute_load(
 
     // 1. Set active_agent_id (only if the referenced system exists)
     if let Some(ref sys_id) = ws.active_agent_id
-        && state.agents.iter().any(|s| s.id == *sys_id)
+        && PromptState::get(state).agents.iter().any(|s| s.id == *sys_id)
     {
-        state.active_agent_id = Some(sys_id.clone());
+        PromptState::get_mut(state).active_agent_id = Some(sys_id.clone());
     }
     // If system doesn't exist, keep current active_agent_id
 
@@ -268,17 +271,11 @@ pub(crate) fn execute_load(
     state.tools = new_tools;
 
     // 4. Reset per-worker module state to defaults, then load preset data
-    // Reset todo state
-    state.todos.clear();
-    state.next_todo_id = 1;
-    // Reset scratchpad state
-    state.scratchpad_cells.clear();
-    state.next_scratchpad_id = 1;
-    // Reset git per-worker settings
-    state.git_show_diffs = true;
-    state.git_show_logs = false;
-    state.git_log_args = None;
-    state.git_log_content = None;
+    for module in &modules {
+        if !module.is_global() {
+            module.reset_state(state);
+        }
+    }
 
     // Load preset module data for non-global modules
     for module in &modules {
@@ -339,16 +336,27 @@ pub(crate) fn execute_load(
     }
 
     // 6b. Restore loaded_skill_ids (filter to skills that still exist)
-    state.loaded_skill_ids =
-        ws.loaded_skill_ids.iter().filter(|id| state.skills.iter().any(|s| &s.id == *id)).cloned().collect();
+    {
+        let ps = PromptState::get(state);
+        let valid_ids: Vec<String> =
+            ws.loaded_skill_ids.iter().filter(|id| ps.skills.iter().any(|s| &s.id == *id)).cloned().collect();
+        PromptState::get_mut(state).loaded_skill_ids = valid_ids;
+    }
 
     // 6c. Populate cached_content for restored skill panels
-    for ctx in &mut state.context {
-        if ctx.context_type == ContextType::SKILL
-            && let Some(ref skill_id) = ctx.skill_prompt_id
-            && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id)
-        {
-            ctx.cached_content = Some(skill.content.clone());
+    {
+        let skill_contents: Vec<(String, String)> = PromptState::get(state)
+            .skills
+            .iter()
+            .map(|s| (s.id.clone(), s.content.clone()))
+            .collect();
+        for ctx in &mut state.context {
+            if ctx.context_type == ContextType::SKILL
+                && let Some(ref skill_id) = ctx.skill_prompt_id
+                && let Some((_, content)) = skill_contents.iter().find(|(id, _)| id == skill_id)
+            {
+                ctx.cached_content = Some(content.clone());
+            }
         }
     }
 

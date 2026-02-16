@@ -282,6 +282,8 @@ mod tests {
     #[test]
     fn git_status_apply_cache_update() {
         let mut state = State::default();
+        // Initialize GitState
+        state.set_ext(cp_mod_git::GitState::new());
         let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
         if idx.is_none() {
             return;
@@ -290,14 +292,17 @@ mod tests {
         state.context[idx].cache_deprecated = true;
 
         let panel = get_panel(&ContextType::new(ContextType::GIT));
-        let update = CacheUpdate::GitStatus {
-            branch: Some("main".to_string()),
-            is_repo: true,
-            file_changes: vec![],
-            branches: vec![("main".to_string(), true)],
-            formatted_content: "## Git Status\nOn branch main".to_string(),
-            token_count: 10,
-            source_hash: "abc123".to_string(),
+        let update = CacheUpdate::ModuleSpecific {
+            context_type: ContextType::new(ContextType::GIT),
+            data: Box::new(cp_mod_git::GitCacheUpdate::Status {
+                branch: Some("main".to_string()),
+                is_repo: true,
+                file_changes: vec![],
+                branches: vec![("main".to_string(), true)],
+                formatted_content: "## Git Status\nOn branch main".to_string(),
+                token_count: 10,
+                source_hash: "abc123".to_string(),
+            }),
         };
 
         let mut ctx = state.context.remove(idx);
@@ -306,8 +311,9 @@ mod tests {
 
         assert!(changed);
         assert!(!state.context[idx].cache_deprecated);
-        assert_eq!(state.git_branch.as_deref(), Some("main"));
-        assert!(state.git_is_repo);
+        let gs = cp_mod_git::GitState::get(&state);
+        assert_eq!(gs.git_branch.as_deref(), Some("main"));
+        assert!(gs.git_is_repo);
         assert!(state.context[idx].source_hash.is_some());
         assert!(state.context[idx].content_hash.is_some());
     }
@@ -315,6 +321,7 @@ mod tests {
     #[test]
     fn git_status_unchanged_clears_deprecated() {
         let mut state = State::default();
+        state.set_ext(cp_mod_git::GitState::new());
         let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
         if idx.is_none() {
             return;
@@ -324,7 +331,14 @@ mod tests {
 
         let panel = get_panel(&ContextType::new(ContextType::GIT));
         let mut ctx = state.context.remove(idx);
-        let changed = panel.apply_cache_update(CacheUpdate::GitStatusUnchanged, &mut ctx, &mut state);
+        let changed = panel.apply_cache_update(
+            CacheUpdate::ModuleSpecific {
+                context_type: ContextType::new(ContextType::GIT),
+                data: Box::new(cp_mod_git::GitCacheUpdate::StatusUnchanged),
+            },
+            &mut ctx,
+            &mut state,
+        );
         state.context.insert(idx, ctx);
 
         assert!(!changed, "Unchanged should return false");

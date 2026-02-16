@@ -7,14 +7,6 @@ use super::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache
 
 use crate::llm_types::ModelInfo;
 use crate::tool_defs::ToolDefinition;
-use crate::types::git::GitFileChange;
-use crate::types::logs::LogEntry;
-use crate::types::memory::MemoryItem;
-use crate::types::prompt::{PromptItem, PromptType};
-use crate::types::scratchpad::ScratchpadCell;
-use crate::types::spine::{Notification, NotificationType, SpineConfig};
-use crate::types::todo::{TodoItem, TodoStatus};
-use crate::types::tree::{DEFAULT_TREE_FILTER, TreeFileDescription};
 
 /// Runtime state (messages loaded in memory)
 pub struct State {
@@ -39,14 +31,6 @@ pub struct State {
     pub max_scroll: f32,
     /// Estimated tokens added during current streaming session (for correction when done)
     pub streaming_estimated_tokens: usize,
-    /// Gitignore-style filter for directory tree
-    pub tree_filter: String,
-    /// Open folders in tree view (paths relative to project root)
-    pub tree_open_folders: Vec<String>,
-    /// File descriptions in tree view
-    pub tree_descriptions: Vec<TreeFileDescription>,
-    /// Number of pending TL;DR background jobs
-    pub pending_tldrs: usize,
     /// Next user message ID (U1, U2, ...)
     pub next_user_id: usize,
     /// Next assistant message ID (A1, A2, ...)
@@ -57,44 +41,6 @@ pub struct State {
     pub next_result_id: usize,
     /// Global UID counter for all shared elements (messages, panels)
     pub global_next_uid: usize,
-    /// Todo items
-    pub todos: Vec<TodoItem>,
-    /// Next todo ID (X1, X2, ...)
-    pub next_todo_id: usize,
-    /// Memory items
-    pub memories: Vec<MemoryItem>,
-    /// Next memory ID (M1, M2, ...)
-    pub next_memory_id: usize,
-    /// IDs of memories whose full contents are shown (per-worker)
-    pub open_memory_ids: Vec<String>,
-    /// Agent prompt items
-    pub agents: Vec<PromptItem>,
-    /// Active agent ID (None = default)
-    pub active_agent_id: Option<String>,
-    /// Skill prompt items
-    pub skills: Vec<PromptItem>,
-    /// IDs of skills that have open panels
-    pub loaded_skill_ids: Vec<String>,
-    /// Command prompt items
-    pub commands: Vec<PromptItem>,
-    /// Preview in P8 Library panel: (PromptType, id)
-    pub library_preview: Option<(PromptType, String)>,
-    /// Scratchpad cells
-    pub scratchpad_cells: Vec<ScratchpadCell>,
-    /// Next scratchpad cell ID (C1, C2, ...)
-    pub next_scratchpad_id: usize,
-    /// Log entries (timestamped short notes)
-    pub logs: Vec<LogEntry>,
-    /// Next log entry ID (L1, L2, ...)
-    pub next_log_id: usize,
-    /// IDs of log summaries whose children are expanded (per-worker)
-    pub open_log_ids: Vec<String>,
-    /// Spine notifications
-    pub notifications: Vec<Notification>,
-    /// Next notification ID (N1, N2, ...)
-    pub next_notification_id: usize,
-    /// Spine module configuration (per-worker)
-    pub spine_config: SpineConfig,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs
@@ -154,27 +100,6 @@ pub struct State {
     /// Result of the last API check
     pub api_check_result: Option<crate::llm_types::ApiCheckResult>,
 
-    // === Git Status (runtime-only, not persisted) ===
-    /// Current git branch name (None if not a git repo)
-    pub git_branch: Option<String>,
-    /// All local branches (name, is_current)
-    pub git_branches: Vec<(String, bool)>,
-    /// Whether we're in a git repository
-    pub git_is_repo: bool,
-    /// Per-file git changes
-    pub git_file_changes: Vec<GitFileChange>,
-    /// Whether to show full diff content in Git panel (vs summary only)
-    pub git_show_diffs: bool,
-    /// Whether to show git log in Git panel
-    pub git_show_logs: bool,
-    /// Custom git log arguments (e.g., "-5 --oneline")
-    pub git_log_args: Option<String>,
-    /// Cached git log output
-    pub git_log_content: Option<String>,
-    /// Diff base ref for P6 (e.g., "HEAD~3", "main")
-    pub git_diff_base: Option<String>,
-    /// GitHub personal access token (from GITHUB_TOKEN env)
-    pub github_token: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
@@ -206,7 +131,7 @@ pub struct State {
     // === Module extension data (TypeMap pattern) ===
     /// Module-owned state stored by TypeId. Each module registers its own state struct
     /// at startup via `Module::init_state()`. Accessed via `get_ext<T>()`/`get_ext_mut<T>()`.
-    module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    pub module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Default for State {
@@ -228,34 +153,11 @@ impl Default for State {
             scroll_accel: 1.0,
             max_scroll: 0.0,
             streaming_estimated_tokens: 0,
-            tree_filter: DEFAULT_TREE_FILTER.to_string(),
-            tree_open_folders: vec![".".to_string()],
-            tree_descriptions: vec![],
-            pending_tldrs: 0,
             next_user_id: 1,
             next_assistant_id: 1,
             next_tool_id: 1,
             next_result_id: 1,
             global_next_uid: 1,
-            todos: vec![],
-            next_todo_id: 1,
-            memories: vec![],
-            next_memory_id: 1,
-            open_memory_ids: vec![],
-            agents: vec![],
-            active_agent_id: None,
-            skills: vec![],
-            loaded_skill_ids: vec![],
-            commands: vec![],
-            library_preview: None,
-            scratchpad_cells: vec![],
-            next_scratchpad_id: 1,
-            logs: vec![],
-            next_log_id: 1,
-            open_log_ids: vec![],
-            notifications: vec![],
-            next_notification_id: 1,
-            spine_config: SpineConfig::default(),
             active_modules: std::collections::HashSet::new(),
             tools: vec![],
             dirty: true,
@@ -284,16 +186,6 @@ impl Default for State {
             context_budget: None,
             api_check_in_progress: false,
             api_check_result: None,
-            git_branch: None,
-            git_branches: vec![],
-            git_is_repo: false,
-            git_file_changes: vec![],
-            git_show_diffs: true,
-            git_show_logs: false,
-            git_log_args: None,
-            git_log_content: None,
-            git_diff_base: None,
-            github_token: None,
             api_retry_count: 0,
             reload_pending: false,
             waiting_for_panels: false,
@@ -480,97 +372,4 @@ impl State {
         self.tick_output_tokens = 0;
     }
 
-    // === Spine / Notification Helpers ===
-
-    /// Create a new notification and add it to the notification list.
-    /// Returns the notification ID.
-    pub fn create_notification(
-        &mut self,
-        notification_type: NotificationType,
-        source: String,
-        content: String,
-    ) -> String {
-        let id = format!("N{}", self.next_notification_id);
-        self.next_notification_id += 1;
-        let notification = Notification::new(id.clone(), notification_type, source, content);
-        self.notifications.push(notification);
-        self.gc_notifications(100);
-        self.touch_panel(ContextType::new(ContextType::SPINE));
-        id
-    }
-
-    /// Mark a notification as processed by ID. Returns true if found.
-    pub fn mark_notification_processed(&mut self, id: &str) -> bool {
-        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
-            n.processed = true;
-            self.touch_panel(ContextType::new(ContextType::SPINE));
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Get references to all unprocessed notifications
-    pub fn unprocessed_notifications(&self) -> Vec<&Notification> {
-        self.notifications.iter().filter(|n| !n.processed).collect()
-    }
-
-    /// Check if there are any unprocessed notifications
-    pub fn has_unprocessed_notifications(&self) -> bool {
-        self.notifications.iter().any(|n| !n.processed)
-    }
-
-    /// Garbage-collect old processed notifications to prevent unbounded growth.
-    pub fn gc_notifications(&mut self, max: usize) {
-        if self.notifications.len() <= max {
-            return;
-        }
-        let excess = self.notifications.len() - max;
-        let mut removed = 0usize;
-        self.notifications.retain(|n| {
-            if removed >= excess {
-                return true;
-            }
-            if n.processed {
-                removed += 1;
-                return false;
-            }
-            true
-        });
-        if removed > 0 {
-            self.touch_panel(ContextType::new(ContextType::SPINE));
-        }
-    }
-
-    /// Mark all "transparent" notifications (UserMessage, ReloadResume) as processed.
-    pub fn mark_user_message_notifications_processed(&mut self) {
-        let mut changed = false;
-        for n in &mut self.notifications {
-            if !n.processed
-                && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
-            {
-                n.processed = true;
-                changed = true;
-            }
-        }
-        if changed {
-            self.touch_panel(ContextType::new(ContextType::SPINE));
-        }
-    }
-
-    // === Todo helpers for spine ===
-
-    /// Check if there are any pending or in-progress todos
-    pub fn has_incomplete_todos(&self) -> bool {
-        self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
-    }
-
-    /// Get a summary of incomplete todos for spine auto-continuation messages
-    pub fn incomplete_todos_summary(&self) -> Vec<String> {
-        self.todos
-            .iter()
-            .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
-            .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
-            .collect()
-    }
 }

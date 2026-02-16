@@ -1,5 +1,9 @@
 pub mod builtin;
 pub mod tools;
+pub mod types;
+
+/// Presets subdirectory
+pub const PRESETS_DIR: &str = "presets";
 
 use std::collections::HashSet;
 

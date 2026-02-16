@@ -1,11 +1,14 @@
 use std::process::Command;
 
-use cp_base::classify::CommandClass;
-use cp_base::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use super::classify::CommandClass;
+use super::GH_CMD_TIMEOUT_SECS;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};
+
+use crate::types::GithubState;
 
 use super::classify::{classify_gh, validate_gh_command};
 
@@ -19,7 +22,7 @@ fn redact_token(output: &str, token: &str) -> String {
 /// Mutating commands execute and return output directly.
 pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check for GitHub token
-    let token = match &state.github_token {
+    let token = match &GithubState::get(state).github_token {
         Some(t) => t.clone(),
         None => {
             return ToolResult {

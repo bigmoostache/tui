@@ -5,8 +5,10 @@ use cp_base::actions::Action;
 use cp_base::constants::theme;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, MemoryImportance, State, estimate_tokens};
+use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, render_table};
+
+use crate::types::{MemoryImportance, MemoryState};
 
 pub struct MemoryPanel;
 
@@ -15,12 +17,13 @@ impl MemoryPanel {
     /// Closed memories: table with ID, tl_dr, importance, labels.
     /// Open memories: YAML-formatted complete information.
     fn format_memories_for_context(state: &State) -> String {
-        if state.memories.is_empty() {
+        let ms = MemoryState::get(state);
+        if ms.memories.is_empty() {
             return "No memories".to_string();
         }
 
         // Sort by importance (critical first)
-        let mut sorted: Vec<_> = state.memories.iter().collect();
+        let mut sorted: Vec<_> = ms.memories.iter().collect();
         sorted.sort_by_key(|m| match m.importance {
             MemoryImportance::Critical => 0,
             MemoryImportance::High => 1,
@@ -28,8 +31,8 @@ impl MemoryPanel {
             MemoryImportance::Low => 3,
         });
 
-        let closed: Vec<_> = sorted.iter().filter(|m| !state.open_memory_ids.contains(&m.id)).collect();
-        let open: Vec<_> = sorted.iter().filter(|m| state.open_memory_ids.contains(&m.id)).collect();
+        let closed: Vec<_> = sorted.iter().filter(|m| !ms.open_memory_ids.contains(&m.id)).collect();
+        let open: Vec<_> = sorted.iter().filter(|m| ms.open_memory_ids.contains(&m.id)).collect();
 
         let mut output = String::new();
 
@@ -156,8 +159,9 @@ impl Panel for MemoryPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line> = Vec::new();
+        let ms = MemoryState::get(state);
 
-        if state.memories.is_empty() {
+        if ms.memories.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ", base_style),
                 Span::styled("No memories", Style::default().fg(theme::text_muted()).italic()),
@@ -166,7 +170,7 @@ impl Panel for MemoryPanel {
         }
 
         // Sort by importance (critical first)
-        let mut sorted: Vec<_> = state.memories.iter().collect();
+        let mut sorted: Vec<_> = ms.memories.iter().collect();
         sorted.sort_by_key(|m| match m.importance {
             MemoryImportance::Critical => 0,
             MemoryImportance::High => 1,
@@ -174,8 +178,8 @@ impl Panel for MemoryPanel {
             MemoryImportance::Low => 3,
         });
 
-        let closed: Vec<_> = sorted.iter().filter(|m| !state.open_memory_ids.contains(&m.id)).collect();
-        let open: Vec<_> = sorted.iter().filter(|m| state.open_memory_ids.contains(&m.id)).collect();
+        let closed: Vec<_> = sorted.iter().filter(|m| !ms.open_memory_ids.contains(&m.id)).collect();
+        let open: Vec<_> = sorted.iter().filter(|m| ms.open_memory_ids.contains(&m.id)).collect();
 
         // Closed memories as table
         if !closed.is_empty() {

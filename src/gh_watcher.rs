@@ -16,7 +16,8 @@ use secrecy::{ExposeSecret, SecretBox};
 use sha2::{Digest, Sha256};
 
 use crate::cache::CacheUpdate;
-use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use cp_mod_github::GH_CMD_TIMEOUT_SECS;
+use crate::constants::MAX_RESULT_CONTENT_BYTES;
 use crate::core::panels::now_ms;
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::state::estimate_tokens;

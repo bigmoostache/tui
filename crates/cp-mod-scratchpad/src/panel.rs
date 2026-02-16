@@ -7,17 +7,20 @@ use cp_base::constants::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 
+use crate::types::ScratchpadState;
+
 pub struct ScratchpadPanel;
 
 impl ScratchpadPanel {
     /// Format scratchpad cells for LLM context
     fn format_cells_for_context(state: &State) -> String {
-        if state.scratchpad_cells.is_empty() {
+        let ss = ScratchpadState::get(state);
+        if ss.scratchpad_cells.is_empty() {
             return "No scratchpad cells".to_string();
         }
 
         let mut output = String::new();
-        for cell in &state.scratchpad_cells {
+        for cell in &ss.scratchpad_cells {
             output.push_str(&format!("=== [{}] {} ===\n", cell.id, cell.title));
             output.push_str(&cell.content);
             output.push_str("\n\n");
@@ -65,9 +68,10 @@ impl Panel for ScratchpadPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let ss = ScratchpadState::get(state);
         let mut text: Vec<Line> = Vec::new();
 
-        if state.scratchpad_cells.is_empty() {
+        if ss.scratchpad_cells.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("No scratchpad cells".to_string(), Style::default().fg(theme::text_muted()).italic()),
@@ -80,7 +84,7 @@ impl Panel for ScratchpadPanel {
                 ),
             ]));
         } else {
-            for cell in &state.scratchpad_cells {
+            for cell in &ss.scratchpad_cells {
                 // Cell header
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),

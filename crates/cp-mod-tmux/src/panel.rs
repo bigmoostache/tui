@@ -10,6 +10,13 @@ use cp_base::constants::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
+pub struct TmuxCacheRequest {
+    pub context_id: String,
+    pub pane_id: String,
+    pub lines: Option<usize>,
+    pub current_source_hash: Option<String>,
+}
+
 pub struct TmuxPanel;
 
 impl Panel for TmuxPanel {
@@ -54,11 +61,14 @@ impl Panel for TmuxPanel {
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let pane_id = ctx.tmux_pane_id.as_ref()?;
-        Some(CacheRequest::Tmux {
-            context_id: ctx.id.clone(),
-            pane_id: pane_id.clone(),
-            lines: ctx.tmux_lines,
-            current_source_hash: ctx.source_hash.clone(),
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::TMUX),
+            data: Box::new(TmuxCacheRequest {
+                context_id: ctx.id.clone(),
+                pane_id: pane_id.clone(),
+                lines: ctx.tmux_lines,
+                current_source_hash: ctx.source_hash.clone(),
+            }),
         })
     }
 
@@ -86,9 +96,8 @@ impl Panel for TmuxPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::Tmux { context_id, pane_id, lines, current_source_hash } = request else {
-            return None;
-        };
+        let req = request.data.downcast::<TmuxCacheRequest>().ok()?;
+        let TmuxCacheRequest { context_id, pane_id, lines, current_source_hash } = *req;
         let start_line = format!("-{}", lines.unwrap_or(50));
         let output =
             Command::new("tmux").args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id]).output().ok()?;

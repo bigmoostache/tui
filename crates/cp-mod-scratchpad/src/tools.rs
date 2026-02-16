@@ -1,5 +1,7 @@
-use cp_base::state::{ContextType, ScratchpadCell, State};
+use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
+
+use crate::types::{ScratchpadCell, ScratchpadState};
 
 /// Create a new scratchpad cell
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -25,10 +27,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let id = format!("C{}", state.next_scratchpad_id);
-    state.next_scratchpad_id += 1;
-
-    state.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
+    let ss = ScratchpadState::get_mut(state);
+    let id = format!("C{}", ss.next_scratchpad_id);
+    ss.next_scratchpad_id += 1;
+    ss.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
 
     // Update Scratchpad panel timestamp
     state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
@@ -56,7 +58,8 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let cell = state.scratchpad_cells.iter_mut().find(|c| c.id == cell_id);
+    let ss = ScratchpadState::get_mut(state);
+    let cell = ss.scratchpad_cells.iter_mut().find(|c| c.id == cell_id);
 
     match cell {
         Some(c) => {
@@ -109,8 +112,9 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // If empty array, wipe all cells
     if cell_ids.is_empty() {
-        let count = state.scratchpad_cells.len();
-        state.scratchpad_cells.clear();
+        let ss = ScratchpadState::get_mut(state);
+        let count = ss.scratchpad_cells.len();
+        ss.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
         state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
         return ToolResult {
@@ -123,9 +127,10 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Otherwise, delete specific cells
     let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
 
-    let initial_count = state.scratchpad_cells.len();
-    state.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
-    let deleted_count = initial_count - state.scratchpad_cells.len();
+    let ss = ScratchpadState::get_mut(state);
+    let initial_count = ss.scratchpad_cells.len();
+    ss.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
+    let deleted_count = initial_count - ss.scratchpad_cells.len();
 
     let mut output = format!("Deleted {} cell(s)", deleted_count);
 

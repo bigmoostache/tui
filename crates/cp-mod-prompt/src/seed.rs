@@ -1,6 +1,8 @@
 use cp_base::constants::library;
 use cp_base::state::State;
 
+use crate::types::PromptState;
+
 /// Ensure all built-in agents from library.yaml exist in state, and there's always an active agent.
 /// Also loads skills and commands from disk + built-ins.
 pub fn ensure_default_agent(state: &mut State) {
@@ -9,7 +11,8 @@ pub fn ensure_default_agent(state: &mut State) {
 
     // Merge existing state agents that aren't already in the loaded set
     // (handles user-created agents persisted in config.json during migration)
-    for existing in &state.agents {
+    let ps = PromptState::get(state);
+    for existing in &ps.agents {
         if !agents.iter().any(|a| a.id == existing.id) {
             agents.push(existing.clone());
         }
@@ -27,25 +30,27 @@ pub fn ensure_default_agent(state: &mut State) {
         },
     });
 
-    state.agents = agents;
-    state.skills = skills;
-    state.commands = commands;
+    let ps = PromptState::get_mut(state);
+    ps.agents = agents;
+    ps.skills = skills;
+    ps.commands = commands;
 
     // Ensure there's always an active agent
-    if let Some(active_id) = &state.active_agent_id {
+    if let Some(active_id) = &ps.active_agent_id {
         // Verify the active agent still exists
-        if !state.agents.iter().any(|s| s.id == *active_id) {
-            state.active_agent_id = Some(default_id.to_string());
+        if !ps.agents.iter().any(|s| s.id == *active_id) {
+            ps.active_agent_id = Some(default_id.to_string());
         }
     } else {
-        state.active_agent_id = Some(default_id.to_string());
+        ps.active_agent_id = Some(default_id.to_string());
     }
 }
 
 /// Get the active agent's content (system prompt)
 pub fn get_active_agent_content(state: &State) -> String {
-    if let Some(active_id) = &state.active_agent_id
-        && let Some(agent) = state.agents.iter().find(|s| &s.id == active_id)
+    let ps = PromptState::get(state);
+    if let Some(active_id) = &ps.active_agent_id
+        && let Some(agent) = ps.agents.iter().find(|s| &s.id == active_id)
     {
         return agent.content.clone();
     }

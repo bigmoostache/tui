@@ -28,7 +28,7 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
     // messages the LLM already saw (e.g., user sent a message during a tool
     // call pause — the message is in context, LLM responds, but without this
     // the notification would still be "unprocessed" when the stream ends).
-    state.mark_user_message_notifications_processed();
+    cp_mod_spine::SpineState::mark_user_message_notifications_processed(state);
 
     // Detach old conversation chunks before anything else
     detach_conversation_chunks(state);

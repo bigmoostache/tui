@@ -3,7 +3,9 @@ pub mod seed;
 mod skill_panel;
 pub(crate) mod storage;
 mod tools;
-pub(crate) mod types;
+pub mod types;
+
+pub use types::{PromptItem, PromptState, PromptType};
 
 use serde_json::json;
 
@@ -35,33 +37,42 @@ impl Module for PromptModule {
         true
     }
 
+    fn init_state(&self, state: &mut State) {
+        state.set_ext(PromptState::new());
+    }
+    fn reset_state(&self, state: &mut State) {
+        state.set_ext(PromptState::new());
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        let ps = PromptState::get(state);
         json!({
-            "active_agent_id": state.active_agent_id,
-            "loaded_skill_ids": state.loaded_skill_ids,
-            "library_preview": state.library_preview,
+            "active_agent_id": ps.active_agent_id,
+            "loaded_skill_ids": ps.loaded_skill_ids,
+            "library_preview": ps.library_preview,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let ps = PromptState::get_mut(state);
         if let Some(v) = data.get("active_agent_id") {
-            state.active_agent_id = v.as_str().map(String::from);
+            ps.active_agent_id = v.as_str().map(String::from);
         }
         // Backwards compatibility: try old field name
-        if state.active_agent_id.is_none()
+        if ps.active_agent_id.is_none()
             && let Some(v) = data.get("active_system_id")
         {
-            state.active_agent_id = v.as_str().map(String::from);
+            ps.active_agent_id = v.as_str().map(String::from);
         }
         if let Some(arr) = data.get("loaded_skill_ids")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            state.loaded_skill_ids = v;
+            ps.loaded_skill_ids = v;
         }
         if let Some(v) = data.get("library_preview")
             && let Ok(lp) = serde_json::from_value(v.clone())
         {
-            state.library_preview = lp;
+            ps.library_preview = lp;
         }
     }
 
