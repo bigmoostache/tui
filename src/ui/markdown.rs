@@ -281,6 +281,21 @@ pub fn render_markdown_table(
                 }
                 result.push(spans);
             }
+
+            // Add thin separator line between data rows (not after last row, not after header's separator)
+            if row_idx < rows.len() - 1 && !is_separator_row.get(row_idx + 1).copied().unwrap_or(false) {
+                let mut sep_spans: Vec<Span<'static>> = Vec::new();
+                for (col, width) in col_widths.iter().enumerate() {
+                    if col > 0 {
+                        sep_spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
+                    }
+                    sep_spans.push(Span::styled(
+                        "─".repeat(*width),
+                        Style::default().fg(theme::border()),
+                    ));
+                }
+                result.push(sep_spans);
+            }
         }
     }
 
