@@ -21,6 +21,15 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
+    // Show retry count when retrying after API errors
+    if state.api_retry_count > 0 {
+        spans.push(Span::styled(
+            format!(" RETRY {}/{} ", state.api_retry_count, crate::constants::MAX_API_RETRIES),
+            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     let pending_tldrs = cp_mod_tree::TreeState::get(state).pending_tldrs;
     if pending_tldrs > 0 {
         spans.push(Span::styled(

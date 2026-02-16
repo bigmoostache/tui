@@ -153,18 +153,59 @@ impl LlmClient for AnthropicClient {
             return Err(LlmError::Api { status, body });
         }
 
-        let reader = BufReader::new(response);
+        let mut reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
         let mut current_tool: Option<(String, String, String)> = None;
         let mut stop_reason: Option<String> = None;
+        let mut total_bytes: usize = 0;
+        let mut line_count: usize = 0;
+        let mut last_lines: Vec<String> = Vec::new();
 
-        for line in reader.lines() {
-            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
+        loop {
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => break, // EOF
+                Ok(n) => {
+                    total_bytes += n;
+                    line_count += 1;
+                }
+                Err(e) => {
+                    let tool_ctx = match &current_tool {
+                        Some((id, name, partial)) => {
+                            format!(
+                                "In-flight tool: {} (id={}), partial input: {} bytes",
+                                name,
+                                id,
+                                partial.len()
+                            )
+                        }
+                        None => "No tool in progress".to_string(),
+                    };
+                    let recent = if last_lines.is_empty() {
+                        "(no lines read)".to_string()
+                    } else {
+                        last_lines.join("\n")
+                    };
+                    return Err(LlmError::StreamRead(format!(
+                        "{}\n\
+                         Stream position: {} bytes, {} lines read\n\
+                         {}\n\
+                         Last SSE lines:\n{}",
+                        e, total_bytes, line_count, tool_ctx, recent
+                    )));
+                }
+            }
+            let line = line.trim_end_matches('\n').trim_end_matches('\r');
 
             if !line.starts_with("data: ") {
                 continue;
             }
+
+            if last_lines.len() >= 5 {
+                last_lines.remove(0);
+            }
+            last_lines.push(line.to_string());
 
             let json_str = &line[6..];
             if json_str == "[DONE]" {

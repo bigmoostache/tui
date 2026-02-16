@@ -76,7 +76,7 @@ impl Module for FilesModule {
                 category: "File".to_string(),
             },
             ToolDefinition {
-                id: "file_write".to_string(),
+                id: "Write".to_string(),
                 name: "Write File".to_string(),
                 short_desc: "Create or overwrite file".to_string(),
                 description: "Writes complete contents to a file, creating it if it doesn't exist or replacing all content if it does. Use ONLY for creating new files or completely replacing file content. For targeted edits (changing specific sections, appending, inserting), ALWAYS prefer file_edit instead — it is safer and more precise.".to_string(),
@@ -100,7 +100,7 @@ impl Module for FilesModule {
         match tool.name.as_str() {
             "file_open" => Some(self::tools::file::execute_open(tool, state)),
             "file_edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
-            "file_write" => Some(self::tools::write::execute(tool, state)),
+            "Write" => Some(self::tools::write::execute(tool, state)),
 
             _ => None,
         }

@@ -263,8 +263,27 @@ impl App {
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
+                    // Log every error to disk for debugging
+                    let attempt = self.state.api_retry_count + 1;
+                    let will_retry = attempt <= MAX_API_RETRIES;
+                    let provider = format!("{:?}", self.state.llm_provider);
+                    let model = self.state.current_model();
+                    let log_msg = format!(
+                        "Attempt {}/{} ({})\n\
+                         Provider: {} | Model: {}\n\
+                         Last request dump: .context-pilot/last_requests/\n\n\
+                         {}\n",
+                        attempt,
+                        MAX_API_RETRIES + 1,
+                        if will_retry { "will retry" } else { "giving up" },
+                        provider,
+                        model,
+                        e
+                    );
+                    crate::persistence::log_error(&log_msg);
+
                     // Check if we should retry
-                    if self.state.api_retry_count < MAX_API_RETRIES {
+                    if will_retry {
                         self.state.api_retry_count += 1;
                         self.pending_retry_error = Some(e);
                     } else {
