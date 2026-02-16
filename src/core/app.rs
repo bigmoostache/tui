@@ -713,6 +713,7 @@ impl App {
                 tool_use_id: r.tool_use_id.clone(),
                 content: r.content.clone(),
                 is_error: r.is_error,
+                tool_name: String::new(),
             })
             .collect();
         let result_msg = Message {

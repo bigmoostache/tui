@@ -74,7 +74,7 @@ pub(crate) fn render_message(
             };
 
             let prefix_width = 4;
-            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 1).max(20);
 
             // Check if a module registered a custom visualizer for this tool
             let registry = get_visualizer_registry();
@@ -152,7 +152,7 @@ pub(crate) fn render_message(
         _ => &msg.content,
     };
 
-    let prefix = format!("{}{}", role_icon, status_icon);
+    let prefix = format!("{}{} ", role_icon, status_icon);
     let prefix_width = prefix.chars().count();
     let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 
@@ -200,7 +200,7 @@ pub(crate) fn render_message(
                         }
                     }
 
-                    let table_spans = render_markdown_table(&table_lines, base_style);
+                    let table_spans = render_markdown_table(&table_lines, base_style, wrap_width);
                     for (idx, row_spans) in table_spans.into_iter().enumerate() {
                         if is_first_line && idx == 0 {
                             let mut line_spans = vec![
