@@ -59,7 +59,8 @@ impl ConversationPanel {
         std::hash::Hash::hash(&state.is_streaming, &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
-        let history_count = state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).count();
+        let history_count =
+            state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering

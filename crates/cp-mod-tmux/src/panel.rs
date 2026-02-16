@@ -26,7 +26,10 @@ impl Panel for TmuxPanel {
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         // Get current tmux pane ID
-        let pane_id = state.context.get(state.selected_context).and_then(|c| c.get_meta_str("tmux_pane_id").map(|s| s.to_string()))?;
+        let pane_id = state
+            .context
+            .get(state.selected_context)
+            .and_then(|c| c.get_meta_str("tmux_pane_id").map(|s| s.to_string()))?;
 
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 

@@ -802,11 +802,11 @@ impl App {
                 if context_type.as_str() == ContextType::GITHUB_RESULT
                     && data.is::<cp_mod_github::watcher::BranchPrUpdate>()
                 {
-                    if let CacheUpdate::ModuleSpecific { data, .. } = update {
-                        if let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>() {
-                            cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
-                            state.dirty = true;
-                        }
+                    if let CacheUpdate::ModuleSpecific { data, .. } = update
+                        && let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
+                    {
+                        cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
+                        state.dirty = true;
                     }
                     continue;
                 }

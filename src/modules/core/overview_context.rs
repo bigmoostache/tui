@@ -1,5 +1,5 @@
 use crate::modules::all_modules;
-use crate::state::{get_context_type_meta, State};
+use crate::state::{State, get_context_type_meta};
 
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (overview_render.rs).
@@ -24,15 +24,11 @@ pub fn generate_context_content(state: &State) -> String {
 
     for ctx in &sorted_contexts {
         // Look up short_name from registry, fallback to context_type string
-        let type_name = get_context_type_meta(ctx.context_type.as_str())
-            .map(|m| m.short_name)
-            .unwrap_or(ctx.context_type.as_str());
+        let type_name =
+            get_context_type_meta(ctx.context_type.as_str()).map(|m| m.short_name).unwrap_or(ctx.context_type.as_str());
 
         // Ask modules for detail string
-        let details = modules
-            .iter()
-            .find_map(|m| m.context_detail(ctx))
-            .unwrap_or_default();
+        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
         let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
         let cost = format!("${:.2}", ctx.panel_total_cost);

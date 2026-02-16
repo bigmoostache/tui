@@ -22,7 +22,8 @@ fn assign_panel_uid(state: &mut State, context_type: ContextType) {
 pub fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
     if !state.context.iter().any(|c| c.context_type == ContextType::CONVERSATION) {
-        let elem = modules::make_default_context_element("chat", ContextType::new(ContextType::CONVERSATION), "Chat", true);
+        let elem =
+            modules::make_default_context_element("chat", ContextType::new(ContextType::CONVERSATION), "Chat", true);
         state.context.insert(0, elem);
     }
 

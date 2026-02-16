@@ -46,7 +46,11 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = SpineState::get(state).config.max_output_tokens { state.total_output_tokens >= max } else { false }
+        if let Some(max) = SpineState::get(state).config.max_output_tokens {
+            state.total_output_tokens >= max
+        } else {
+            false
+        }
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -81,7 +85,11 @@ impl GuardRailStopLogic for MaxCostGuard {
 
     fn block_reason(&self, state: &State) -> String {
         let current_cost = Self::calculate_cost(state);
-        format!("Cost limit reached: ${:.4} / ${:.4}", current_cost, SpineState::get(state).config.max_cost.unwrap_or(0.0))
+        format!(
+            "Cost limit reached: ${:.4} / ${:.4}",
+            current_cost,
+            SpineState::get(state).config.max_cost.unwrap_or(0.0)
+        )
     }
 }
 
@@ -120,9 +128,16 @@ impl GuardRailStopLogic for MaxDurationGuard {
     }
 
     fn block_reason(&self, state: &State) -> String {
-        let elapsed_secs =
-            SpineState::get(state).config.autonomous_start_ms.map(|start| now_ms().saturating_sub(start) / 1000).unwrap_or(0);
-        format!("Duration limit reached: {}s / {}s", elapsed_secs, SpineState::get(state).config.max_duration_secs.unwrap_or(0))
+        let elapsed_secs = SpineState::get(state)
+            .config
+            .autonomous_start_ms
+            .map(|start| now_ms().saturating_sub(start) / 1000)
+            .unwrap_or(0);
+        format!(
+            "Duration limit reached: {}s / {}s",
+            elapsed_secs,
+            SpineState::get(state).config.max_duration_secs.unwrap_or(0)
+        )
     }
 }
 

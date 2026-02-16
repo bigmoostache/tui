@@ -110,7 +110,12 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    SpineState::create_notification(state, NotificationType::UserMessage, user_id.to_string(), content_preview.to_string());
+    SpineState::create_notification(
+        state,
+        NotificationType::UserMessage,
+        user_id.to_string(),
+        content_preview.to_string(),
+    );
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.

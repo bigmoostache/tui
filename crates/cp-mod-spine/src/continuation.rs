@@ -117,7 +117,8 @@ pub struct MaxTokensContinuation;
 
 impl AutoContinuation for MaxTokensContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        SpineState::get(state).config.max_tokens_auto_continue && state.last_stop_reason.as_deref() == Some("max_tokens")
+        SpineState::get(state).config.max_tokens_auto_continue
+            && state.last_stop_reason.as_deref() == Some("max_tokens")
     }
 
     fn build_continuation(&self, _state: &State) -> ContinuationAction {

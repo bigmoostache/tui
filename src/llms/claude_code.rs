@@ -299,10 +299,7 @@ impl LlmClient for ClaudeCodeClient {
             .as_ref()
             .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
-        let client = Client::builder()
-            .timeout(None)
-            .build()
-            .map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // Handle cleaner mode or custom system prompt
         let system_text = if let Some(ref prompt) = request.system_prompt {
@@ -651,11 +648,8 @@ impl LlmClient for ClaudeCodeClient {
                         }
                         None => "No tool in progress".to_string(),
                     };
-                    let recent = if last_lines.is_empty() {
-                        "(no lines read)".to_string()
-                    } else {
-                        last_lines.join("\n")
-                    };
+                    let recent =
+                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     let verbose = format!(
                         "{}\n\
                          Error kind: {} | Root cause: {}\n\

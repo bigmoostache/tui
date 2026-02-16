@@ -76,11 +76,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 }
                 let word = &state.input[word_start..before_space];
                 if let Some(cmd_name) = word.strip_prefix('/') {
-                    let cmd_content = PromptState::get(state)
-                        .commands
-                        .iter()
-                        .find(|c| c.id == cmd_name)
-                        .map(|c| c.content.clone());
+                    let cmd_content =
+                        PromptState::get(state).commands.iter().find(|c| c.id == cmd_name).map(|c| c.content.clone());
                     if let Some(content) = cmd_content {
                         let label = cmd_name.to_string();
                         let idx = state.paste_buffers.len();

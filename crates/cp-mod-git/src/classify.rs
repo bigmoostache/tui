@@ -222,7 +222,11 @@ pub fn classify_git(args: &[String]) -> CommandClass {
             }
         }
         "symbolic-ref" => {
-            if rest.len() <= 1 || rest.contains(&"--short") { CommandClass::ReadOnly } else { CommandClass::Mutating }
+            if rest.len() <= 1 || rest.contains(&"--short") {
+                CommandClass::ReadOnly
+            } else {
+                CommandClass::Mutating
+            }
         }
         "hash-object" => {
             if rest.contains(&"-w") {

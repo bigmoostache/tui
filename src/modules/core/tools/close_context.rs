@@ -69,10 +69,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
             None => {
                 // Default: use context_detail for description
-                let detail = modules
-                    .iter()
-                    .find_map(|m| m.context_detail(&ctx))
-                    .unwrap_or_else(|| ctx.name.clone());
+                let detail = modules.iter().find_map(|m| m.context_detail(&ctx)).unwrap_or_else(|| ctx.name.clone());
                 // Context already removed
                 closed.push(format!("{} ({})", id, detail));
             }

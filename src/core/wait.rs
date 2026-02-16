@@ -6,14 +6,12 @@
 use std::sync::mpsc::Sender;
 
 use crate::cache::{CacheUpdate, process_cache_request};
-use crate::state::{get_context_type_meta, State};
+use crate::state::{State, get_context_type_meta};
 
 /// Check if any async-wait panels have cache_deprecated = true
 pub fn has_dirty_panels(state: &State) -> bool {
     state.context.iter().any(|c| {
-        get_context_type_meta(c.context_type.as_str())
-            .map(|m| m.needs_async_wait)
-            .unwrap_or(false)
+        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
             && c.cache_deprecated
     })
 }
@@ -21,9 +19,7 @@ pub fn has_dirty_panels(state: &State) -> bool {
 /// Check if any async-wait panels have cache_deprecated = true (file-like panels that need refresh before stream)
 pub fn has_dirty_file_panels(state: &State) -> bool {
     state.context.iter().any(|c| {
-        get_context_type_meta(c.context_type.as_str())
-            .map(|m| m.needs_async_wait)
-            .unwrap_or(false)
+        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
             && c.cache_deprecated
     })
 }
@@ -33,9 +29,7 @@ pub fn has_dirty_file_panels(state: &State) -> bool {
 pub fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>) -> bool {
     let mut any_triggered = false;
     for ctx in &state.context {
-        let needs_wait = get_context_type_meta(ctx.context_type.as_str())
-            .map(|m| m.needs_async_wait)
-            .unwrap_or(false);
+        let needs_wait = get_context_type_meta(ctx.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false);
         if needs_wait && ctx.cache_deprecated && !ctx.cache_in_flight {
             let panel = crate::core::panels::get_panel(&ctx.context_type);
             if let Some(request) = panel.build_cache_request(ctx, state) {

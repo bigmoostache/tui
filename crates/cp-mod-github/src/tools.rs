@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use super::classify::CommandClass;
 use super::GH_CMD_TIMEOUT_SECS;
+use super::classify::CommandClass;
 use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
@@ -81,7 +81,12 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid += 1;
 
-                let mut elem = make_default_context_element(&panel_id, ContextType::new(ContextType::GITHUB_RESULT), command, true);
+                let mut elem = make_default_context_element(
+                    &panel_id,
+                    ContextType::new(ContextType::GITHUB_RESULT),
+                    command,
+                    true,
+                );
                 elem.uid = Some(uid);
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);

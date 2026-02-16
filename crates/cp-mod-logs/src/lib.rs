@@ -14,13 +14,13 @@ use std::fs;
 use std::path::PathBuf;
 
 use cp_base::constants::STORE_DIR;
-use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
 use cp_base::modules::Module;
 use cp_base::panels::{Panel, mark_panels_dirty, now_ms};
 use cp_base::state::{ContextType, State, estimate_tokens};
-use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
+use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
+use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};
 
 /// Directory for chunked log files
 fn logs_dir() -> PathBuf {
@@ -162,8 +162,7 @@ impl Module for LogsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("open_log_ids").and_then(|v| v.as_array()) {
-            LogsState::get_mut(state).open_log_ids =
-                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+            LogsState::get_mut(state).open_log_ids = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
         }
     }
 
@@ -426,12 +425,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Compute timestamp = max of children timestamps
     let max_timestamp = {
         let logs = &LogsState::get(state).logs;
-        log_ids
-            .iter()
-            .filter_map(|id| logs.iter().find(|l| l.id == *id))
-            .map(|l| l.timestamp_ms)
-            .max()
-            .unwrap_or(0)
+        log_ids.iter().filter_map(|id| logs.iter().find(|l| l.id == *id)).map(|l| l.timestamp_ms).max().unwrap_or(0)
     };
 
     // Create the summary log and set parent_id on children

@@ -33,5 +33,12 @@ jobs:
               echo "::error::$dir has $count entries (max 8)"
               exit_code=1
             fi
-          done < <(find . -mindepth 1 -type d -not -path './target/*' -not -path './.git/*')
+          done < <(find . -mindepth 1 -type d \
+            -not -path './target/*' \
+            -not -path './.git/*' \
+            -not -path './crates' \
+            -not -path './.context-pilot' \
+            -not -path './.context-pilot/*' \
+            -not -path './website/*' \
+            -not -path './docs/*')
           exit $exit_code

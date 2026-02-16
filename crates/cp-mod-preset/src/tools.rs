@@ -5,11 +5,11 @@ use std::path::Path;
 use cp_base::constants::STORE_DIR;
 
 use crate::PRESETS_DIR;
+use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
 use cp_base::modules::Module;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tool_defs::ToolDefinition;
 use cp_base::tools::{ToolResult, ToolUse};
-use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
 use cp_mod_prompt::PromptState;
 
 fn presets_path() -> std::path::PathBuf {
@@ -346,11 +346,8 @@ pub(crate) fn execute_load(
 
     // 6c. Populate cached_content for restored skill panels
     {
-        let skill_contents: Vec<(String, String)> = PromptState::get(state)
-            .skills
-            .iter()
-            .map(|s| (s.id.clone(), s.content.clone()))
-            .collect();
+        let skill_contents: Vec<(String, String)> =
+            PromptState::get(state).skills.iter().map(|s| (s.id.clone(), s.content.clone())).collect();
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SKILL
                 && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string())

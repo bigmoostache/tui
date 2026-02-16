@@ -166,10 +166,7 @@ impl Panel for LibraryPanel {
             lines.push(Line::from(vec![
                 Span::styled(" ", base_style),
                 Span::styled("COMMANDS", Style::default().fg(theme::text_muted()).bold()),
-                Span::styled(
-                    format!("  ({} available)", ps.commands.len()),
-                    Style::default().fg(theme::text_muted()),
-                ),
+                Span::styled(format!("  ({} available)", ps.commands.len()), Style::default().fg(theme::text_muted())),
             ]));
             lines.push(Line::from(""));
 

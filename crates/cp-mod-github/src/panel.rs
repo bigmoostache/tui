@@ -1,11 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use super::GH_CMD_TIMEOUT_SECS;
 use cp_base::actions::Action;
 use cp_base::cache::{CacheRequest, CacheUpdate};
-use cp_base::constants::theme;
-use super::GH_CMD_TIMEOUT_SECS;
 use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::constants::theme;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};

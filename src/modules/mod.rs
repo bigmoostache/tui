@@ -29,8 +29,7 @@ pub use cp_base::modules::Module;
 /// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
 pub fn init_registry() {
     let modules = all_modules();
-    let metadata: Vec<crate::state::ContextTypeMeta> =
-        modules.iter().flat_map(|m| m.context_type_metadata()).collect();
+    let metadata: Vec<crate::state::ContextTypeMeta> = modules.iter().flat_map(|m| m.context_type_metadata()).collect();
     crate::state::init_context_type_registry(metadata);
 }
 

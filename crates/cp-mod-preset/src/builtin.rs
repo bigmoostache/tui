@@ -4,9 +4,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use cp_base::constants::STORE_DIR;
 use crate::PRESETS_DIR;
 use crate::types::{Preset, PresetWorkerState};
+use cp_base::constants::STORE_DIR;
 
 /// YAML schema for presets.yaml
 #[derive(Deserialize)]

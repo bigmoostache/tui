@@ -134,8 +134,10 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let replace_all = tool.input.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
 
     // Check if file is open in context
-    let is_open =
-        state.context.iter().any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
+    let is_open = state
+        .context
+        .iter()
+        .any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
 
     if !is_open {
         return ToolResult {

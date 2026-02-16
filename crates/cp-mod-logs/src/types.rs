@@ -52,11 +52,7 @@ impl Default for LogsState {
 
 impl LogsState {
     pub fn new() -> Self {
-        Self {
-            logs: vec![],
-            next_log_id: 1,
-            open_log_ids: vec![],
-        }
+        Self { logs: vec![], next_log_id: 1, open_log_ids: vec![] }
     }
 
     pub fn get(state: &State) -> &Self {

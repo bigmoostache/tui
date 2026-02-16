@@ -8,6 +8,10 @@ use super::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache
 use crate::llm_types::ModelInfo;
 use crate::tool_defs::ToolDefinition;
 
+/// Type alias for the syntax highlighting callback function.
+/// Takes (file_path, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
+pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
+
 /// Runtime state (messages loaded in memory)
 pub struct State {
     pub context: Vec<ContextElement>,
@@ -126,7 +130,7 @@ pub struct State {
     // === Callback hooks (set by binary, used by extracted module crates) ===
     /// Syntax highlighting function (provided by binary's highlight module)
     /// Takes (file_path, content) and returns highlighted spans per line
-    pub highlight_fn: Option<fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>>,
+    pub highlight_fn: Option<HighlightFn>,
 
     // === Module extension data (TypeMap pattern) ===
     /// Module-owned state stored by TypeId. Each module registers its own state struct
@@ -371,5 +375,4 @@ impl State {
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
     }
-
 }

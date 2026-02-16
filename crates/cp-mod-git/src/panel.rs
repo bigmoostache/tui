@@ -4,10 +4,10 @@ use std::process::Command;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use super::GIT_CMD_TIMEOUT_SECS;
 use super::GIT_STATUS_REFRESH_MS;
 use cp_base::actions::Action;
 use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use super::GIT_CMD_TIMEOUT_SECS;
 use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::constants::{chars, theme};

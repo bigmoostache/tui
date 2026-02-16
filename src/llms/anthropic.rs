@@ -173,20 +173,12 @@ impl LlmClient for AnthropicClient {
                 Err(e) => {
                     let tool_ctx = match &current_tool {
                         Some((id, name, partial)) => {
-                            format!(
-                                "In-flight tool: {} (id={}), partial input: {} bytes",
-                                name,
-                                id,
-                                partial.len()
-                            )
+                            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
                         }
                         None => "No tool in progress".to_string(),
                     };
-                    let recent = if last_lines.is_empty() {
-                        "(no lines read)".to_string()
-                    } else {
-                        last_lines.join("\n")
-                    };
+                    let recent =
+                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(
                         "{}\n\
                          Stream position: {} bytes, {} lines read\n\

@@ -163,7 +163,11 @@ fn is_api_command(args: &[String]) -> bool {
 }
 
 /// Background polling loop.
-fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>, cache_tx: Sender<CacheUpdate>) {
+fn poll_loop(
+    watches: Arc<Mutex<HashMap<String, GhWatch>>>,
+    branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
+    cache_tx: Sender<CacheUpdate>,
+) {
     loop {
         thread::sleep(std::time::Duration::from_secs(GH_WATCHER_TICK_SECS));
 
@@ -397,11 +401,18 @@ fn redact_token(output: &str, token: &str) -> String {
 
 /// Poll for a PR associated with the given branch.
 /// Returns `Some((hash, pr_info))` if output changed; `pr_info` is `None` when no PR exists.
-fn poll_branch_pr(branch: &str, github_token: &str, last_hash: Option<&str>) -> Option<(String, Option<crate::types::BranchPrInfo>)> {
+fn poll_branch_pr(
+    branch: &str,
+    github_token: &str,
+    last_hash: Option<&str>,
+) -> Option<(String, Option<crate::types::BranchPrInfo>)> {
     let mut cmd = Command::new("gh");
     cmd.args([
-        "pr", "view", branch,
-        "--json", "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
+        "pr",
+        "view",
+        branch,
+        "--json",
+        "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
     ])
     .env("GITHUB_TOKEN", github_token)
     .env("GH_TOKEN", github_token)
@@ -450,16 +461,7 @@ fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
     // Parse checks status from statusCheckRollup array
     let checks_status = parse_checks_status(json_str);
 
-    Some(crate::types::BranchPrInfo {
-        number,
-        title,
-        state,
-        url,
-        additions,
-        deletions,
-        review_decision,
-        checks_status,
-    })
+    Some(crate::types::BranchPrInfo { number, title, state, url, additions, deletions, review_decision, checks_status })
 }
 
 /// Extract a string value from JSON by key (simple parser, no serde dependency)

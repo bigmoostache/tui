@@ -12,7 +12,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::TreePanel;
 use cp_base::modules::Module;
 
-pub use types::{TreeFileDescription, TreeState, DEFAULT_TREE_FILTER};
+pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
 
 pub struct TreeModule;
 
@@ -184,11 +184,7 @@ impl Module for TreeModule {
     }
 
     fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
-        TreeState::get(state)
-            .tree_open_folders
-            .iter()
-            .map(|f| cp_base::panels::WatchSpec::Dir(f.clone()))
-            .collect()
+        TreeState::get(state).tree_open_folders.iter().map(|f| cp_base::panels::WatchSpec::Dir(f.clone())).collect()
     }
 
     fn should_invalidate_on_fs_change(

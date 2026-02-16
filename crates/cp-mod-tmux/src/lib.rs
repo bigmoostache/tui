@@ -142,9 +142,7 @@ impl Module for TmuxModule {
         }
         let desc = ctx.get_meta_str("tmux_description").unwrap_or_default().to_string();
         if let Some(pane) = ctx.get_meta_str("tmux_pane_id") {
-            let _ = std::process::Command::new("tmux")
-                .args(["kill-window", "-t", pane])
-                .output();
+            let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane]).output();
         }
         Some(Ok(format!("tmux: {}", desc)))
     }
@@ -153,11 +151,7 @@ impl Module for TmuxModule {
         if ctx.context_type.as_str() == cp_base::state::ContextType::TMUX {
             let pane = ctx.get_meta_str("tmux_pane_id").unwrap_or("?");
             let desc = ctx.get_meta_str("tmux_description").unwrap_or("");
-            if desc.is_empty() {
-                Some(pane.to_string())
-            } else {
-                Some(format!("{}: {}", pane, desc))
-            }
+            if desc.is_empty() { Some(pane.to_string()) } else { Some(format!("{}: {}", pane, desc)) }
         } else {
             None
         }

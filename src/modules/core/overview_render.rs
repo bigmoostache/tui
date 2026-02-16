@@ -7,7 +7,7 @@ use cp_mod_prompt::PromptState;
 use cp_mod_todo::{TodoState, TodoStatus};
 
 use crate::modules::all_modules;
-use crate::state::{get_context_type_meta, State};
+use crate::state::{State, get_context_type_meta};
 use crate::ui::{
     chars,
     helpers::{Cell, format_number, render_table},
@@ -240,10 +240,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
                 .unwrap_or(ctx.context_type.as_str());
 
             // Ask modules for detail string
-            let details = modules
-                .iter()
-                .find_map(|m| m.context_detail(ctx))
-                .unwrap_or_default();
+            let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
             let truncated_details = if details.len() > 30 {
                 format!("{}...", &details[..details.floor_char_boundary(27)])
@@ -543,19 +540,12 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     text.push(Line::from(""));
 
     // Build category descriptions from modules
-    let cat_descs: HashMap<&str, &str> = all_modules()
-        .iter()
-        .flat_map(|m| m.tool_category_descriptions())
-        .collect();
+    let cat_descs: HashMap<&str, &str> = all_modules().iter().flat_map(|m| m.tool_category_descriptions()).collect();
 
     // Collect unique categories in order of first appearance
     let mut seen_cats = std::collections::HashSet::new();
-    let categories: Vec<String> = state
-        .tools
-        .iter()
-        .filter(|t| seen_cats.insert(t.category.clone()))
-        .map(|t| t.category.clone())
-        .collect();
+    let categories: Vec<String> =
+        state.tools.iter().filter(|t| seen_cats.insert(t.category.clone())).map(|t| t.category.clone()).collect();
 
     for category in &categories {
         let category_tools: Vec<_> = state.tools.iter().filter(|t| t.category == *category).collect();

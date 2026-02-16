@@ -24,7 +24,8 @@ impl SpinePanel {
     /// Format notifications for LLM context
     fn format_notifications_for_context(state: &State) -> String {
         let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| !n.processed).collect();
-        let recent_processed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
+        let recent_processed: Vec<_> =
+            SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
 
         let mut output = String::new();
 
@@ -47,9 +48,16 @@ impl SpinePanel {
 
         // Show spine config summary
         output.push_str("\n=== Spine Config ===\n");
-        output.push_str(&format!("max_tokens_auto_continue: {}\n", SpineState::get(state).config.max_tokens_auto_continue));
-        output.push_str(&format!("continue_until_todos_done: {}\n", SpineState::get(state).config.continue_until_todos_done));
-        output.push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
+        output.push_str(&format!(
+            "max_tokens_auto_continue: {}\n",
+            SpineState::get(state).config.max_tokens_auto_continue
+        ));
+        output.push_str(&format!(
+            "continue_until_todos_done: {}\n",
+            SpineState::get(state).config.continue_until_todos_done
+        ));
+        output
+            .push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
             output.push_str(&format!("max_auto_retries: {}\n", v));
         }
@@ -126,7 +134,8 @@ impl Panel for SpinePanel {
         lines.push(Line::from(""));
 
         // === Recent Processed ===
-        let recent_processed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
+        let recent_processed: Vec<_> =
+            SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
 
         if !recent_processed.is_empty() {
             lines.push(Line::from(vec![Span::styled(

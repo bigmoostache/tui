@@ -53,7 +53,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         .partition(|&i| state.context[i].context_type.is_fixed());
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
-    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
+    if let Some(conv_idx) =
+        state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
     {
         let is_selected = conv_idx == state.selected_context;
         let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };

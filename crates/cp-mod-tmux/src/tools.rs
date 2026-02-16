@@ -122,7 +122,8 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Find the context by context_id or pane_id
-    let ctx = state.context.iter_mut().find(|c| c.id == identifier || c.get_meta_str("tmux_pane_id") == Some(identifier));
+    let ctx =
+        state.context.iter_mut().find(|c| c.id == identifier || c.get_meta_str("tmux_pane_id") == Some(identifier));
 
     match ctx {
         Some(c) => {

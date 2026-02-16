@@ -42,10 +42,9 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     match class {
         CommandClass::ReadOnly => {
             // Search for existing GitResult panel with same command
-            let existing_idx = state
-                .context
-                .iter()
-                .position(|c| c.context_type == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command));
+            let existing_idx = state.context.iter().position(|c| {
+                c.context_type == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
+            });
 
             if let Some(idx) = existing_idx {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
@@ -62,8 +61,12 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid += 1;
 
-                let mut elem =
-                    cp_base::state::make_default_context_element(&panel_id, ContextType::new(ContextType::GIT_RESULT), command, true);
+                let mut elem = cp_base::state::make_default_context_element(
+                    &panel_id,
+                    ContextType::new(ContextType::GIT_RESULT),
+                    command,
+                    true,
+                );
                 elem.uid = Some(uid);
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);

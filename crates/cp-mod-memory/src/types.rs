@@ -29,7 +29,6 @@ impl FromStr for MemoryImportance {
 }
 
 impl MemoryImportance {
-
     pub fn as_str(&self) -> &'static str {
         match self {
             MemoryImportance::Low => "low",

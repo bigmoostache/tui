@@ -183,7 +183,10 @@ impl Module for GitModule {
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
                 let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
-                output.push_str(&format!("| {} | +{} | -{} | {} |\n", file.path, file.additions, file.deletions, net_str));
+                output.push_str(&format!(
+                    "| {} | +{} | -{} | {} |\n",
+                    file.path, file.additions, file.deletions, net_str
+                ));
             }
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
