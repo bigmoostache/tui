@@ -39,27 +39,19 @@ pub(crate) fn execute_snapshot(
     let name = match tool.input.get("name").and_then(|v| v.as_str()) {
         Some(n) => n,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'name' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
         }
     };
 
     let description = match tool.input.get("description").and_then(|v| v.as_str()) {
         Some(d) => d,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'description' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'description' parameter".to_string(), true);
         }
     };
 
     if let Err(e) = validate_name(name) {
-        return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true, ..Default::default() };
+        return ToolResult::new(tool.id.clone(), e, true);
     }
 
     let replace = tool.input.get("replace").and_then(|v| v.as_str());
@@ -75,20 +67,12 @@ pub(crate) fn execute_snapshot(
                 && let Ok(existing) = serde_json::from_str::<Preset>(&contents)
                 && existing.built_in
             {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Cannot replace built-in preset '{}'", replace_name),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Cannot replace built-in preset '{}'", replace_name), true);
             }
             let _ = fs::remove_file(&replace_path);
         }
     } else if file_path.exists() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name), true);
     }
 
     // Capture worker state
@@ -149,40 +133,24 @@ pub(crate) fn execute_snapshot(
     // Ensure directory exists
     let dir = presets_path();
     if let Err(e) = fs::create_dir_all(&dir) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to create presets directory: {}", e),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Failed to create presets directory: {}", e), true);
     }
 
     // Write preset file
     match serde_json::to_string_pretty(&preset) {
         Ok(json) => {
             if let Err(e) = fs::write(&file_path, json) {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to write preset file: {}", e),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Failed to write preset file: {}", e), true);
             }
         }
         Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to serialize preset: {}", e),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Failed to serialize preset: {}", e), true);
         }
     }
 
     let panel_count = preset.worker_state.dynamic_panels.len();
     let module_count = preset.worker_state.active_modules.len();
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count), false)
 }
 
 pub(crate) fn execute_load(
@@ -195,11 +163,7 @@ pub(crate) fn execute_load(
     let name = match tool.input.get("name").and_then(|v| v.as_str()) {
         Some(n) => n,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'name' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
         }
     };
 
@@ -213,7 +177,7 @@ pub(crate) fn execute_load(
         } else {
             format!("Preset '{}' not found. Available presets: {}", name, available.join(", "))
         };
-        return ToolResult { tool_use_id: tool.id.clone(), content: msg, is_error: true, ..Default::default() };
+        return ToolResult { tool_use_id: tool.id.clone(), content: msg, true);
     }
 
     let preset: Preset = match fs::read_to_string(&file_path) {
@@ -222,17 +186,11 @@ pub(crate) fn execute_load(
             Err(e) => {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Failed to parse preset '{}': {}", name, e),
-                    is_error: true,
-                };
+                    content: format!("Failed to parse preset '{}': {}", name, e), true);
             }
         },
         Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to read preset '{}': {}", name, e),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Failed to read preset '{}': {}", name, e), true);
         }
     };
 
@@ -368,14 +326,10 @@ pub(crate) fn execute_load(
 
     let module_count = state.active_modules.len();
     let panel_count = ws.dynamic_panels.len();
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!(
+    ToolResult::new(tool.id.clone(), format!(
             "Loaded preset '{}': {} — {} modules, {} dynamic panels restored",
             name, preset.description, module_count, panel_count
-        ),
-        is_error: false,
-    }
+        ), false)
 }
 
 /// List all available preset names

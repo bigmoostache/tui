@@ -382,20 +382,12 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let entries = match tool.input.get("entries").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'entries' array".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
         }
     };
 
     if entries.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'entries' array".to_string(),
-            is_error: true, ..Default::default()
-        };
+        return ToolResult::new(tool.id.clone(), "Empty 'entries' array".to_string(), true);
     }
 
     let mut count = 0;
@@ -412,7 +404,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         touch_logs_panel(state);
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Created {} log(s)", count), is_error: false, ..Default::default() }
+    ToolResult::new(tool.id.clone(), format!("Created {} log(s)", count), false)
 }
 
 fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -420,11 +412,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     let log_ids: Vec<String> = match tool.input.get("log_ids").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'log_ids' array".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'log_ids' array".to_string(), true);
         }
     };
 
@@ -432,21 +420,13 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     let content = match tool.input.get("content").and_then(|v| v.as_str()) {
         Some(c) if !c.is_empty() => c.to_string(),
         _ => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'content' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'content' parameter".to_string(), true);
         }
     };
 
     // Guardrail: minimum 10 entries
     if log_ids.len() < 10 {
-        return ToolResult {
-            tool_use_id: tool.id.clone(), ..Default::default()
-            content: format!("Must summarize at least 10 logs, got {}", log_ids.len()),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Must summarize at least 10 logs, got {}", log_ids.len()), true);
     }
 
     // Validate: all IDs exist and are top-level
@@ -455,22 +435,14 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
         for id in &log_ids {
             match logs.iter().find(|l| l.id == *id) {
                 None => {
-                    return ToolResult {
-                        tool_use_id: tool.id.clone(), ..Default::default()
-                        content: format!("Log '{}' not found", id),
-                        is_error: true,
-                    };
+                    return ToolResult::new(tool.id.clone(), format!("Log '{}' not found", id), true);
                 }
                 Some(log) => {
                     if log.parent_id.is_some() {
-                        return ToolResult {
-                            tool_use_id: tool.id.clone(),
-                            content: format!(, ..Default::default()
+                        return ToolResult::new(tool.id.clone(), format!(
                                 "Log '{}' already has a parent — only top-level logs can be summarized",
                                 id
-                            ),
-                            is_error: true,
-                        };
+                            ), true);
                     }
                 }
             }
@@ -505,9 +477,7 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     touch_logs_panel(state);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(), ..Default::default()
-        content: format!("Created summary {} with {} children", summary_id, log_ids.len()),
+    ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()),
         is_error: false,
     }
 }
@@ -516,22 +486,14 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'id' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
         }
     };
 
     let action = match tool.input.get("action").and_then(|v| v.as_str()) {
         Some(a) if a == "expand" || a == "collapse" => a.to_string(),
         _ => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(), true);
         }
     };
 
@@ -540,17 +502,11 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         let logs = &LogsState::get(state).logs;
         match logs.iter().find(|l| l.id == id) {
             None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(), ..Default::default()
-                    content: format!("Log '{}' not found", id),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Log '{}' not found", id), true);
             }
             Some(log) => {
                 if log.children_ids.is_empty() {
-                    return ToolResult {
-                        tool_use_id: tool.id.clone(), ..Default::default()
-                        content: format!("Log '{}' has no children — can only toggle summaries", id),
+                    return ToolResult::new(tool.id.clone(), format!("Log '{}' has no children — can only toggle summaries", id),
                         is_error: true,
                     };
                 }
@@ -569,9 +525,7 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     touch_logs_panel(state);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(), ..Default::default()
-        content: format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
+    ToolResult::new(tool.id.clone(), format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
         is_error: false,
     }
 }
@@ -581,11 +535,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'id' parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
         }
     };
 
@@ -593,22 +543,14 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     let panel_idx = state.context.iter().position(|c| c.id == panel_id);
     match panel_idx {
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(), ..Default::default()
-                content: format!("Panel '{}' not found", panel_id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Panel '{}' not found", panel_id), true);
         }
         Some(idx) => {
             if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!(, ..Default::default()
+                return ToolResult::new(tool.id.clone(), format!(
                         "Panel '{}' is not a conversation history panel (type: {:?})",
                         panel_id, state.context[idx].context_type
-                    ),
-                    is_error: true,
-                };
+                    ), true);
             }
         }
     }
@@ -629,11 +571,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     });
 
     if !has_logs {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Cannot close conversation history without at least one log entry. Provide 'logs' with meaningful entries to preserve context before closing.".to_string(),
-            is_error: true, ..Default::default()
-        };
+        return ToolResult::new(tool.id.clone(), "Cannot close conversation history without at least one log entry. Provide 'logs' with meaningful entries to preserve context before closing.".to_string(), true);
     }
 
     let mut output_parts = Vec::new();
@@ -669,14 +607,10 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                 // Validate tl_dr length
                 let tokens = estimate_tokens(content);
                 if tokens > MEMORY_TLDR_MAX_TOKENS {
-                    return ToolResult {
-                        tool_use_id: tool.id.clone(),
-                        content: format!(, ..Default::default()
+                    return ToolResult::new(tool.id.clone(), format!(
                             "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
                             tokens, MEMORY_TLDR_MAX_TOKENS
-                        ),
-                        is_error: true,
-                    };
+                        ), true);
                 }
 
                 let importance = mem_obj.get("importance").and_then(|v| v.as_str()).unwrap_or("medium");
@@ -713,5 +647,5 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
     state.context.retain(|c| c.id != panel_id);
     output_parts.push(format!("Closed {} ({})", panel_id, panel_name));
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), is_error: false, ..Default::default() }
+    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), false)
 }

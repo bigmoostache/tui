@@ -20,20 +20,12 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let memories = match tool.input.get("memories").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'memories' array parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_string(), true);
         }
     };
 
     if memories.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'memories' array".to_string(),
-            is_error: true, ..Default::default()
-        };
+        return ToolResult::new(tool.id.clone(), "Empty 'memories' array".to_string(), true);
     }
 
     let mut created: Vec<String> = Vec::new();
@@ -91,27 +83,19 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty(), ..Default::default() }
+    ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
 pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let updates = match tool.input.get("updates").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'updates' array parameter".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
         }
     };
 
     if updates.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'updates' array".to_string(),
-            is_error: true, ..Default::default()
-        };
+        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_string(), true);
     }
 
     let mut updated: Vec<String> = Vec::new();
@@ -232,7 +216,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: updated.is_empty() && deleted.is_empty(), ..Default::default() }
+    ToolResult::new(tool.id.clone(), output, updated.is_empty() && deleted.is_empty())
 }
 
 #[cfg(test)]

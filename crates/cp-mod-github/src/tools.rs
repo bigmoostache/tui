@@ -25,22 +25,14 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let token = match &GithubState::get(state).github_token {
         Some(t) => t.clone(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(), true);
         }
     };
 
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: 'command' parameter is required".to_string(),
-                is_error: true, ..Default::default()
-            };
+            return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
         }
     };
 
@@ -48,11 +40,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let args = match validate_gh_command(command) {
         Ok(a) => a,
         Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(), ..Default::default()
-                content: format!("Validation error: {}", e),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Validation error: {}", e), true);
         }
     };
 
@@ -70,11 +58,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
                 state.context[idx].cache_deprecated = true;
                 let panel_id = state.context[idx].id.clone();
-                ToolResult {
-                    tool_use_id: tool.id.clone(), ..Default::default()
-                    content: format!("Panel updated: {}", panel_id),
-                    is_error: false,
-                }
+                ToolResult::new(tool.id.clone(), format!("Panel updated: {}", panel_id), false)
             } else {
                 // Create new GithubResult panel
                 let panel_id = state.next_available_context_id();
@@ -91,11 +75,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
-                ToolResult {
-                    tool_use_id: tool.id.clone(), ..Default::default()
-                    content: format!("Panel created: {}", panel_id),
-                    is_error: false,
-                }
+                ToolResult::new(tool.id.clone(), format!("Panel created: {}", panel_id), false)
             }
         }
         CommandClass::Mutating => {
@@ -138,11 +118,9 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     let is_error = !output.status.success();
                     let combined = redact_token(&combined, &token);
                     let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
-                    ToolResult {
-                        tool_use_id: tool.id.clone(),
-                        content: if combined.is_empty() {
+                    ToolResult::new(tool.id.clone(), if combined.is_empty() {
                             if is_error {
-                                "Command failed with no output".to_string(), ..Default::default()
+                                "Command failed with no output".to_string()
                             } else {
                                 "Command completed successfully".to_string()
                             }
@@ -158,7 +136,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     } else {
                         format!("Error running gh: {}", e)
                     };
-                    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, ..Default::default() }
+                    ToolResult::new(tool.id.clone(), content, true)
                 }
             }
         }
