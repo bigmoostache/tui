@@ -66,7 +66,7 @@ pub(crate) fn render_message(
 
             let mut is_first = true;
             let mut in_diff_block = false;
-            
+
             for line in result.content.lines() {
                 // Detect diff block markers
                 if line.trim() == "```diff" {
@@ -77,7 +77,7 @@ pub(crate) fn render_message(
                     in_diff_block = false;
                     continue;
                 }
-                
+
                 if line.is_empty() {
                     lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                     continue;
