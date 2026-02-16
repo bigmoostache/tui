@@ -66,7 +66,7 @@
 
             <h2 id="what">What is Context Pilot?</h2>
             <p>Context Pilot is an <strong>AI-native terminal IDE</strong> built in Rust. It gives you full, transparent control over what your AI assistant sees — every file, diff, search result, and note is a <strong>context panel</strong> with a visible token count.</p>
-            <p>Unlike tools that hide context management behind abstractions, Context Pilot makes it the primary interface. You see exactly what the AI sees. You decide what stays and what goes.</p>
+            <p>Unlike tools that hide context management behind abstractions, Context Pilot makes it the primary interface. You see exactly what the AI sees, in real-time. You decide what stays and what goes. No guessing, no surprises.</p>
 
             <div class="info-box tip">
                 <div class="info-label">Key Insight</div>
@@ -104,25 +104,25 @@ export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
             <h2 id="quickstart">Quickstart</h2>
 
             <h3>Launch</h3>
-            <pre><code># Navigate to your project
+            <pre><code># Navigate to your project directory
 cd your-project
 
 # Launch inside tmux (required for console features)
 tmux new-session context-pilot
 
-# Or if already in tmux
+# Or if already in a tmux session
 context-pilot</code></pre>
 
             <h3>Your first interaction</h3>
-            <p>When Context Pilot starts, you'll see the sidebar on the left listing <strong>context panels</strong> (P0–P10 are built-in), and the main conversation area on the right. Just start typing and press <kbd>Enter</kbd> to send.</p>
-            <p>The AI can see everything listed in the sidebar. It can open files, run commands, search code — all through <strong>tools</strong> that create new context panels.</p>
+            <p>When Context Pilot starts, you'll see the sidebar on the left listing <strong>context panels</strong> (P0–P10 are built-in fixed panels), and the main conversation area on the right. Just start typing and press <kbd>Enter</kbd> to send your message.</p>
+            <p>The AI can see everything listed in the sidebar. It has access to 48 tools that can open files, run commands, search code, create todos, and more — all of which create or update context panels.</p>
 
             <h3>Essential workflow</h3>
             <ol>
-                <li><strong>Ask the AI to explore</strong> — it will open files, grep for patterns, check git status</li>
-                <li><strong>Watch context grow</strong> — new panels appear in the sidebar with token counts</li>
-                <li><strong>Close what you don't need</strong> — select a panel and press <kbd>d</kbd> to close it</li>
-                <li><strong>Stay under budget</strong> — the token bar shows usage against your budget</li>
+                <li><strong>Ask the AI to explore</strong> — e.g., "explore this codebase and tell me what you find"</li>
+                <li><strong>Watch context grow</strong> — new panels appear in the sidebar with live token counts</li>
+                <li><strong>Close what you don't need</strong> — select a panel with arrow keys and press <kbd>d</kbd> to close it, or let the AI close panels with the <code>context_close</code> tool</li>
+                <li><strong>Stay under budget</strong> — the token bar at the bottom shows real-time usage against your configured budget</li>
             </ol>
 
             <h2 id="concepts">Core Concepts</h2>

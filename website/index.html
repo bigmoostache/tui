@@ -50,8 +50,8 @@
             </h1>
             <p class="hero-subtitle">
                 Context Pilot is a terminal-native AI coding environment built in Rust. 
-                Unlike other tools, <strong>you</strong> decide exactly what context your AI receives — 
-                files, git diffs, todos, memories, and more — all through an elegant TUI.
+                Unlike other tools where context is a black box, <strong>you</strong> decide exactly what context your AI receives — 
+                files, git diffs, todos, memories, and more — all through an elegant TUI with real-time token tracking.
             </p>
             <div class="hero-actions">
                 <a href="#getting-started" class="btn btn-primary">Get Started</a>
@@ -148,7 +148,7 @@
                 <div class="feature-card fade-in">
                     <div class="feature-icon">🤖</div>
                     <h3>Multi-Provider</h3>
-                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok, Groq, and any OpenAI-compatible API. Switch providers mid-conversation.</p>
+                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok (xAI), and Groq. Switch providers and models mid-conversation with a single keystroke.</p>
                 </div>
                 <div class="feature-card fade-in">
                     <div class="feature-icon">🧠</div>
@@ -443,9 +443,9 @@ tmux new-session context-pilot</code></pre>
             <div class="requirements">
                 <h3>Requirements</h3>
                 <ul>
-                    <li>Rust toolchain (for building from source)</li>
-                    <li>tmux (for console integration)</li>
-                    <li>An API key from a supported provider (Anthropic, OpenAI, etc.)</li>
+                    <li><strong>Rust 1.83+</strong> — Install via <a href="https://rustup.rs" style="color: inherit; text-decoration: underline;">rustup.rs</a></li>
+                    <li><strong>tmux</strong> — Required for console integration (<code>apt install tmux</code> or <code>brew install tmux</code>)</li>
+                    <li><strong>API key</strong> — From Anthropic, OpenAI, DeepSeek, Grok (xAI), or Groq</li>
                 </ul>
             </div>
         </div>
