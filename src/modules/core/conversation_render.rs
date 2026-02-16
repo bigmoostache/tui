@@ -74,7 +74,7 @@ pub(crate) fn render_message(
             };
 
             let prefix_width = 4;
-            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 1).max(20);
 
             // Check if a module registered a custom visualizer for this tool
             let registry = get_visualizer_registry();

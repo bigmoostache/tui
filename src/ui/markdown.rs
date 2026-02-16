@@ -146,7 +146,11 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
-/// Render a markdown table with aligned columns
+/// Render a markdown table with aligned columns.
+///
+/// Strategy: compute fixed column widths → for each row, wrap cell text to fit
+/// → render each display line as a sequence of fixed-width cells separated by │.
+/// Vertical separators are always at the same character positions.
 pub fn render_markdown_table(
     lines: &[&str],
     _base_style: Style,
@@ -262,21 +266,28 @@ pub fn render_markdown_table(
                         .map(|s| s.as_str())
                         .unwrap_or("");
 
+                    // Build a single fixed-width span for this cell.
+                    // Content + padding always equals exactly `width` display chars.
+                    // This guarantees │ separators are at fixed positions.
                     let display_width = markdown_display_width(cell_text);
-                    let padding_needed = width.saturating_sub(display_width);
+                    let padding = " ".repeat(width.saturating_sub(display_width));
 
                     if is_header {
+                        // Header: single styled span with content + padding baked in
                         spans.push(Span::styled(
-                            cell_text.to_string(),
+                            format!("{}{}", cell_text, padding),
                             Style::default().fg(theme::accent()).bold(),
                         ));
+                    } else if cell_text.is_empty() {
+                        // Empty cell: just spaces
+                        spans.push(Span::styled(" ".repeat(*width), Style::default()));
                     } else {
+                        // Data cell: render markdown, then add padding as a plain span
                         let cell_spans = parse_inline_markdown(cell_text);
                         spans.extend(cell_spans);
-                    }
-
-                    if padding_needed > 0 {
-                        spans.push(Span::styled(" ".repeat(padding_needed), Style::default()));
+                        if !padding.is_empty() {
+                            spans.push(Span::styled(padding, Style::default()));
+                        }
                     }
                 }
                 result.push(spans);
