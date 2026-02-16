@@ -5,16 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Context Pilot — AI-Native Terminal IDE</title>
     <meta name="description" content="Context Pilot is an AI-native terminal IDE that gives you full control over what your AI sees. Built with Rust and ratatui for blazing-fast performance.">
+    <link rel="canonical" href="https://bigmoostache.github.io/context-pilot/">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Context Pilot — AI-Native Terminal IDE">
+    <meta property="og:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://bigmoostache.github.io/context-pilot/">
+    <meta property="og:site_name" content="Context Pilot">
+    <meta property="og:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Context Pilot - AI-Native Terminal IDE with visible context management">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Context Pilot — AI-Native Terminal IDE">
+    <meta name="twitter:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <meta name="twitter:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
+    <meta name="twitter:image:alt" content="Context Pilot - AI-Native Terminal IDE">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="author" content="Context Pilot">
+    <meta name="keywords" content="AI coding, terminal IDE, Rust, ratatui, AI assistant, context management, TUI, developer tools">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="color-scheme" content="dark light">
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Context Pilot",
+      "description": "AI-native terminal IDE that gives you full control over what your AI sees",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Context Pilot",
+        "url": "https://github.com/bigmoostache/context-pilot"
+      }
+    }
+    </script>
+    
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <meta property="og:title" content="Context Pilot — AI-Native Terminal IDE">
-    <meta property="og:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+    
     <!-- Header -->
     <header class="header">
         <nav class="nav container">
@@ -22,7 +69,7 @@
                 <span class="logo-icon">⎈</span>
                 <span class="logo-text">Context Pilot</span>
             </a>
-            <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.nav-links').classList.toggle('nav-open')">
+            <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.classList.toggle('active'); this.setAttribute('aria-expanded', this.classList.contains('active')); document.querySelector('.nav-links').classList.toggle('nav-open')">
                 <span></span><span></span><span></span>
             </button>
             <div class="nav-links">
@@ -32,6 +79,22 @@
                 <a href="#modules">Modules</a>
                 <a href="docs/index.html">Docs</a>
                 <a href="#getting-started">Get Started</a>
+                <button class="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle theme">
+                    <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
                 <a href="https://github.com/bigmoostache/context-pilot" class="nav-github">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     GitHub
@@ -41,7 +104,7 @@
     </header>
 
     <!-- Hero -->
-    <section class="hero">
+    <section id="main-content" class="hero">
         <div class="container">
             <div class="hero-badge">AI-Native Terminal IDE</div>
             <h1 class="hero-title">
@@ -621,6 +684,38 @@ tmux new-session context-pilot</code></pre>
         // Start after a small delay
         setTimeout(tick, 800);
         render();
+    })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+    (function() {
+        const themeToggle = document.querySelector('.theme-toggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or default to system preference
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+        
+        // Apply the theme
+        html.setAttribute('data-theme', currentTheme);
+        
+        // Toggle theme
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+            }
+        });
     })();
     </script>
 </body>
