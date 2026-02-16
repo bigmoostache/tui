@@ -33,6 +33,19 @@ const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 /// Snapshot of a due watch for polling (context_id, args, token, is_api, etag, last_hash)
 type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>);
 
+/// Update sent when branch PR info changes
+pub struct BranchPrUpdate {
+    pub pr_info: Option<crate::types::BranchPrInfo>,
+}
+
+/// State for background polling of the current branch's PR
+struct BranchPrWatch {
+    branch: String,
+    github_token: Arc<SecretBox<String>>,
+    last_poll_ms: u64,
+    last_output_hash: Option<String>,
+}
+
 /// Per-panel watch state
 struct GhWatch {
     context_id: String,
@@ -54,6 +67,7 @@ struct GhWatch {
 /// Background watcher that polls GithubResult panels for changes.
 pub struct GhWatcher {
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
+    branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
     _thread: JoinHandle<()>,
 }
 
@@ -61,13 +75,15 @@ impl GhWatcher {
     /// Create a new GhWatcher with a background polling thread.
     pub fn new(cache_tx: Sender<CacheUpdate>) -> Self {
         let watches: Arc<Mutex<HashMap<String, GhWatch>>> = Arc::new(Mutex::new(HashMap::new()));
+        let branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>> = Arc::new(Mutex::new(None));
         let watches_clone = Arc::clone(&watches);
+        let branch_pr_clone = Arc::clone(&branch_pr_watch);
 
         let thread = thread::spawn(move || {
-            poll_loop(watches_clone, cache_tx);
+            poll_loop(watches_clone, branch_pr_clone, cache_tx);
         });
 
-        Self { watches, _thread: thread }
+        Self { watches, branch_pr_watch, _thread: thread }
     }
 
     /// Reconcile the watch list with current GithubResult panels.
@@ -109,6 +125,35 @@ impl GhWatcher {
             );
         }
     }
+
+    /// Update the branch PR watch with the current branch and token.
+    /// Call this whenever the git branch or github token changes.
+    pub fn sync_branch_pr(&self, branch: Option<&str>, github_token: Option<&str>) {
+        let mut watch = self.branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+        match (branch, github_token) {
+            (Some(branch), Some(token)) => {
+                if let Some(ref mut w) = *watch {
+                    if w.branch != branch {
+                        // Branch changed — reset polling state
+                        w.branch = branch.to_string();
+                        w.last_poll_ms = 0;
+                        w.last_output_hash = None;
+                        w.github_token = Arc::new(SecretBox::new(Box::new(token.to_string())));
+                    }
+                } else {
+                    *watch = Some(BranchPrWatch {
+                        branch: branch.to_string(),
+                        github_token: Arc::new(SecretBox::new(Box::new(token.to_string()))),
+                        last_poll_ms: 0,
+                        last_output_hash: None,
+                    });
+                }
+            }
+            _ => {
+                *watch = None;
+            }
+        }
+    }
 }
 
 /// Classify whether args represent a `gh api` command eligible for ETag polling.
@@ -118,11 +163,51 @@ fn is_api_command(args: &[String]) -> bool {
 }
 
 /// Background polling loop.
-fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<CacheUpdate>) {
+fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>, cache_tx: Sender<CacheUpdate>) {
     loop {
         thread::sleep(std::time::Duration::from_secs(GH_WATCHER_TICK_SECS));
 
         let current_ms = now_ms();
+
+        // === Poll branch PR ===
+        {
+            let snapshot = {
+                let watch = branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+                watch.as_ref().and_then(|w| {
+                    if current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000 {
+                        Some((w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
+                    } else {
+                        None
+                    }
+                })
+            };
+
+            if let Some((branch, token, last_hash)) = snapshot {
+                let token_str = token.expose_secret();
+                let result = poll_branch_pr(&branch, token_str, last_hash.as_deref());
+
+                // Update last_poll_ms and hash
+                {
+                    let mut watch = branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(ref mut w) = *watch {
+                        w.last_poll_ms = now_ms();
+                        if let Some((ref new_hash, _)) = result {
+                            w.last_output_hash = Some(new_hash.clone());
+                        }
+                    }
+                }
+
+                // Send update if content changed
+                if let Some((_, pr_info)) = result {
+                    let _ = cache_tx.send(CacheUpdate::ModuleSpecific {
+                        context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
+                        data: Box::new(BranchPrUpdate { pr_info }),
+                    });
+                }
+            }
+        }
+
+        // === Poll panel watches ===
 
         // Snapshot only watches that are due for polling
         let due: Vec<DueWatch> = {
@@ -308,6 +393,139 @@ fn sha256_hex(input: &str) -> String {
 
 fn redact_token(output: &str, token: &str) -> String {
     if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
+}
+
+/// Poll for a PR associated with the given branch.
+/// Returns `Some((hash, pr_info))` if output changed; `pr_info` is `None` when no PR exists.
+fn poll_branch_pr(branch: &str, github_token: &str, last_hash: Option<&str>) -> Option<(String, Option<crate::types::BranchPrInfo>)> {
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "pr", "view", branch,
+        "--json", "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
+    ])
+    .env("GITHUB_TOKEN", github_token)
+    .env("GH_TOKEN", github_token)
+    .env("GH_PROMPT_DISABLED", "1")
+    .env("NO_COLOR", "1");
+
+    let output = match run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) {
+        Ok(o) => o,
+        Err(_) => return None,
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // No PR for this branch
+    if !output.status.success() || stderr.contains("no pull requests found") || stdout.trim().is_empty() {
+        let hash = sha256_hex("no_pr");
+        if last_hash == Some(hash.as_str()) {
+            return None; // unchanged
+        }
+        return Some((hash, None));
+    }
+
+    let content = stdout.to_string();
+    let new_hash = sha256_hex(&content);
+    if last_hash == Some(new_hash.as_str()) {
+        return None; // unchanged
+    }
+
+    // Parse JSON response
+    let pr_info = parse_pr_json(&content);
+    Some((new_hash, pr_info))
+}
+
+/// Parse the JSON from `gh pr view --json ...`
+fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
+    // Minimal JSON parsing — we only need a few fields
+    let number = extract_json_u64(json_str, "number")?;
+    let title = extract_json_string(json_str, "title")?;
+    let state = extract_json_string(json_str, "state").unwrap_or_else(|| "OPEN".to_string());
+    let url = extract_json_string(json_str, "url").unwrap_or_default();
+    let additions = extract_json_u64(json_str, "additions");
+    let deletions = extract_json_u64(json_str, "deletions");
+    let review_decision = extract_json_string(json_str, "reviewDecision");
+
+    // Parse checks status from statusCheckRollup array
+    let checks_status = parse_checks_status(json_str);
+
+    Some(crate::types::BranchPrInfo {
+        number,
+        title,
+        state,
+        url,
+        additions,
+        deletions,
+        review_decision,
+        checks_status,
+    })
+}
+
+/// Extract a string value from JSON by key (simple parser, no serde dependency)
+fn extract_json_string(json: &str, key: &str) -> Option<String> {
+    let pattern = format!("\"{}\":\"", key);
+    if let Some(start) = json.find(&pattern) {
+        let value_start = start + pattern.len();
+        let rest = &json[value_start..];
+        // Find closing quote, handling escaped quotes
+        let mut end = 0;
+        let mut escaped = false;
+        for ch in rest.chars() {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                break;
+            }
+            end += ch.len_utf8();
+        }
+        return Some(rest[..end].to_string());
+    }
+    // Try without quotes for null values: "key":null
+    None
+}
+
+/// Extract a u64 value from JSON by key
+fn extract_json_u64(json: &str, key: &str) -> Option<u64> {
+    let pattern = format!("\"{}\":", key);
+    if let Some(start) = json.find(&pattern) {
+        let value_start = start + pattern.len();
+        let rest = json[value_start..].trim_start();
+        let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        return num_str.parse().ok();
+    }
+    None
+}
+
+/// Parse the overall checks status from statusCheckRollup
+fn parse_checks_status(json: &str) -> Option<String> {
+    if !json.contains("statusCheckRollup") {
+        return None;
+    }
+    // Count conclusion values
+    let success = json.matches("\"conclusion\":\"SUCCESS\"").count()
+        + json.matches("\"conclusion\":\"NEUTRAL\"").count()
+        + json.matches("\"conclusion\":\"SKIPPED\"").count();
+    let failure = json.matches("\"conclusion\":\"FAILURE\"").count()
+        + json.matches("\"conclusion\":\"TIMED_OUT\"").count()
+        + json.matches("\"conclusion\":\"CANCELLED\"").count();
+    let pending = json.matches("\"conclusion\":\"\"").count()
+        + json.matches("\"conclusion\":null").count()
+        + json.matches("\"status\":\"IN_PROGRESS\"").count()
+        + json.matches("\"status\":\"QUEUED\"").count()
+        + json.matches("\"status\":\"PENDING\"").count();
+
+    if failure > 0 {
+        Some("failing".to_string())
+    } else if pending > 0 {
+        Some("pending".to_string())
+    } else if success > 0 {
+        Some("passing".to_string())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

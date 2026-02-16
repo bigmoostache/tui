@@ -752,6 +752,10 @@ impl App {
             .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);
+
+        // Sync branch PR watch — poll for PRs on the current git branch
+        let branch = cp_mod_git::GitState::get(&self.state).git_branch.as_deref();
+        self.gh_watcher.sync_branch_pr(branch, Some(&token));
     }
 
     /// Schedule initial cache refreshes for fixed context elements only.
@@ -793,7 +797,20 @@ impl App {
             }
 
             // ModuleSpecific: match by context_type
-            if let CacheUpdate::ModuleSpecific { ref context_type, .. } = update {
+            if let CacheUpdate::ModuleSpecific { ref context_type, ref data, .. } = update {
+                // Special case: BranchPrUpdate targets GithubState, not a panel
+                if context_type.as_str() == ContextType::GITHUB_RESULT
+                    && data.is::<cp_mod_github::watcher::BranchPrUpdate>()
+                {
+                    if let CacheUpdate::ModuleSpecific { data, .. } = update {
+                        if let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>() {
+                            cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
+                            state.dirty = true;
+                        }
+                    }
+                    continue;
+                }
+
                 let idx = state.context.iter().position(|c| c.context_type == *context_type);
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);

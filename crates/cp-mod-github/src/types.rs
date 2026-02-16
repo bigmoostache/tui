@@ -1,7 +1,22 @@
 use cp_base::state::State;
 
+/// Info about a PR associated with the current branch
+#[derive(Debug, Clone)]
+pub struct BranchPrInfo {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+    pub url: String,
+    pub additions: Option<u64>,
+    pub deletions: Option<u64>,
+    pub review_decision: Option<String>,
+    pub checks_status: Option<String>,
+}
+
 pub struct GithubState {
     pub github_token: Option<String>,
+    /// PR info for the current git branch (if any)
+    pub branch_pr: Option<BranchPrInfo>,
 }
 
 impl Default for GithubState {
@@ -12,7 +27,7 @@ impl Default for GithubState {
 
 impl GithubState {
     pub fn new() -> Self {
-        Self { github_token: None }
+        Self { github_token: None, branch_pr: None }
     }
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("GithubState not initialized")
