@@ -78,7 +78,11 @@ fn markdown_display_width(text: &str) -> usize {
 }
 
 /// Render a markdown table with aligned columns
-pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span<'static>>> {
+pub fn render_markdown_table(
+    lines: &[&str],
+    _base_style: Style,
+    max_width: usize,
+) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
@@ -111,6 +115,40 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
         }
     }
 
+    // Constrain columns to fit within max_width
+    // Each column separator " │ " takes 3 chars, so separators = (num_cols - 1) * 3
+    let separator_width = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
+    let total_content_width: usize = col_widths.iter().sum();
+    let total_width = total_content_width + separator_width;
+
+    if total_width > max_width && max_width > separator_width {
+        let available = max_width - separator_width;
+        // Shrink columns proportionally
+        let mut new_widths: Vec<usize> = col_widths
+            .iter()
+            .map(|&w| {
+                let proportional = (w as f64 / total_content_width as f64 * available as f64) as usize;
+                proportional.max(3) // minimum 3 chars per column
+            })
+            .collect();
+        // Distribute any remaining space to the widest columns
+        let used: usize = new_widths.iter().sum();
+        if used < available {
+            let mut remaining = available - used;
+            // Sort column indices by original width (descending) to give extra space to wider columns
+            let mut col_indices: Vec<usize> = (0..num_cols).collect();
+            col_indices.sort_by(|&a, &b| col_widths[b].cmp(&col_widths[a]));
+            for &idx in &col_indices {
+                if remaining == 0 {
+                    break;
+                }
+                new_widths[idx] += 1;
+                remaining -= 1;
+            }
+        }
+        col_widths = new_widths;
+    }
+
     // Render each row with aligned columns
     let mut result: Vec<Vec<Span<'static>>> = Vec::new();
 
@@ -137,14 +175,39 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
 
                 let cell = row.get(col).map(|s| s.as_str()).unwrap_or("");
                 let display_width = markdown_display_width(cell);
-                let padding_needed = width.saturating_sub(display_width);
+
+                // Truncate cell content if it exceeds column width
+                let truncated_cell = if display_width > *width && *width > 2 {
+                    let mut truncated = String::new();
+                    let mut w = 0;
+                    let target = width - 1; // leave room for ellipsis
+                    for ch in cell.chars() {
+                        if w >= target {
+                            break;
+                        }
+                        truncated.push(ch);
+                        w += 1;
+                    }
+                    truncated.push('…');
+                    truncated
+                } else {
+                    cell.to_string()
+                };
+
+                let truncated_display_width = if display_width > *width && *width > 2 {
+                    *width
+                } else {
+                    display_width
+                };
+                let padding_needed = width.saturating_sub(truncated_display_width);
 
                 if is_header {
-                    // Headers: bold, no inline markdown parsing
-                    spans.push(Span::styled(cell.to_string(), Style::default().fg(theme::accent()).bold()));
+                    spans.push(Span::styled(
+                        truncated_cell,
+                        Style::default().fg(theme::accent()).bold(),
+                    ));
                 } else {
-                    // Data cells: parse inline markdown
-                    let cell_spans = parse_inline_markdown(cell);
+                    let cell_spans = parse_inline_markdown(&truncated_cell);
                     spans.extend(cell_spans);
                 }
 

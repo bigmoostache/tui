@@ -200,7 +200,7 @@ pub(crate) fn render_message(
                         }
                     }
 
-                    let table_spans = render_markdown_table(&table_lines, base_style);
+                    let table_spans = render_markdown_table(&table_lines, base_style, wrap_width);
                     for (idx, row_spans) in table_spans.into_iter().enumerate() {
                         if is_first_line && idx == 0 {
                             let mut line_spans = vec![
