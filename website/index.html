@@ -57,8 +57,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2" crossorigin>
-    <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOVgaY.woff2" crossorigin>
 </head>
 <body>
     <!-- Skip to main content for accessibility -->
@@ -71,7 +69,7 @@
                 <span class="logo-icon">⎈</span>
                 <span class="logo-text">Context Pilot</span>
             </a>
-            <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.classList.toggle('active'); this.setAttribute('aria-expanded', this.classList.contains('active')); document.querySelector('.nav-links').classList.toggle('nav-open')">
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
                 <span></span><span></span><span></span>
             </button>
             <div class="nav-links">
@@ -575,6 +573,23 @@ tmux new-session context-pilot</code></pre>
             block.style.position = 'relative';
             block.appendChild(btn);
         });
+    })();
+    </script>
+
+    <!-- Navigation Toggle Script -->
+    <script>
+    (function() {
+        const navToggle = document.getElementById('nav-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        
+        if (navToggle && navLinks) {
+            navToggle.addEventListener('click', () => {
+                const isOpen = navToggle.classList.contains('active');
+                navToggle.classList.toggle('active');
+                navToggle.setAttribute('aria-expanded', !isOpen);
+                navLinks.classList.toggle('nav-open');
+            });
+        }
     })();
     </script>
 
