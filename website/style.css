@@ -742,6 +742,9 @@ select:focus-visible {
     overflow-x: auto;
     max-width: 900px;
     margin: 0 auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .comparison-table {
@@ -755,6 +758,13 @@ select:focus-visible {
     padding: 0.75rem 1rem;
     text-align: center;
     border-bottom: 1px solid var(--border);
+}
+
+.comparison-table thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 10;
 }
 
 .comparison-table th {
@@ -1079,6 +1089,33 @@ select:focus-visible {
 }
 
 /* ===== Responsive ===== */
+/* Tablet landscape / smaller desktop */
+@media (max-width: 1024px) {
+    .container {
+        max-width: 960px;
+        padding: 0 1.5rem;
+    }
+
+    .hero-title {
+        font-size: 2.8rem;
+    }
+
+    .section-title {
+        font-size: 2rem;
+    }
+
+    .feature-grid,
+    .module-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+
+    .comparison-table {
+        font-size: 0.85rem;
+    }
+}
+
+/* Tablet portrait */
 @media (max-width: 768px) {
     .hero {
         padding: 8rem 0 4rem;
@@ -1095,6 +1132,26 @@ select:focus-visible {
 
     .terminal-content {
         font-size: 0.7rem;
+    }
+
+    .comparison-table-wrap {
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .comp-feature {
+        position: sticky;
+        left: 0;
+        background: var(--bg-card);
+        z-index: 5;
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
     }
 
     .feature-grid,
@@ -1123,6 +1180,26 @@ select:focus-visible {
     }
 }
 
+/* Large phone / small tablet */
+@media (max-width: 640px) {
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+
+    .btn {
+        padding: 0.65rem 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    .feature-grid,
+    .module-grid,
+    .preset-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+/* Small phone */
 @media (max-width: 480px) {
     .container {
         padding: 0 1rem;
