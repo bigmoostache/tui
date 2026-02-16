@@ -632,15 +632,47 @@ impl LlmClient for ClaudeCodeClient {
                     line_count += 1;
                 }
                 Err(e) => {
-                    return Err(diagnose_stream_error(
+                    // Walk the error source chain to find the real cause.
+                    // reqwest wraps errors: io::Error(Other) → "error decoding response body" → real cause
+                    // Known causes:
+                    //   TimedOut → model took too long generating output (fix: Client::builder().timeout(None))
+                    //   ConnectionReset → server killed the connection
+                    //   UnexpectedEof → chunked transfer ended prematurely
+                    let error_kind = format!("{:?}", e.kind());
+                    let mut root_cause = String::new();
+                    let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
+                    while let Some(s) = source {
+                        root_cause = format!("{}", s);
+                        source = std::error::Error::source(s);
+                    }
+                    let tool_ctx = match &current_tool {
+                        Some((id, name, partial)) => {
+                            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
+                        }
+                        None => "No tool in progress".to_string(),
+                    };
+                    let recent = if last_lines.is_empty() {
+                        "(no lines read)".to_string()
+                    } else {
+                        last_lines.join("\n")
+                    };
+                    let verbose = format!(
+                        "{}\n\
+                         Error kind: {} | Root cause: {}\n\
+                         Stream position: {} bytes, {} lines read\n\
+                         {}\n\
+                         Response headers:\n{}\n\
+                         Last SSE lines:\n{}",
                         e,
-                        &current_tool,
+                        error_kind,
+                        if root_cause.is_empty() { "(none)".to_string() } else { root_cause },
                         total_bytes,
                         line_count,
-                        &last_lines,
-                        &resp_headers,
-                        &mut reader,
-                    ));
+                        tool_ctx,
+                        resp_headers,
+                        recent
+                    );
+                    return Err(LlmError::StreamRead(verbose));
                 }
             }
             let line = line.trim_end_matches('\n').trim_end_matches('\r');
