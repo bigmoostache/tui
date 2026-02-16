@@ -65,28 +65,24 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
 
 fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
-    if let Some(form) = state.get_ext::<cp_base::question_form::PendingQuestionForm>() {
-        if !form.resolved {
-            // Split: content panel on top, question form at bottom
-            let form_height = calculate_question_form_height(form);
-            let layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(3),                  // Content panel (shrinks)
-                    Constraint::Length(form_height),      // Question form
-                ])
-                .split(area);
+    if let Some(form) = state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+        && !form.resolved
+    {
+        // Split: content panel on top, question form at bottom
+        let form_height = calculate_question_form_height(form);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(3),              // Content panel (shrinks)
+                Constraint::Length(form_height), // Question form
+            ])
+            .split(area);
 
-            render_content_panel(frame, state, layout[0]);
-            // Indent form by 1 col to avoid overlapping sidebar border
-            let form_area = Rect {
-                x: layout[1].x + 1,
-                width: layout[1].width.saturating_sub(1),
-                ..layout[1]
-            };
-            render_question_form(frame, state, form_area);
-            return;
-        }
+        render_content_panel(frame, state, layout[0]);
+        // Indent form by 1 col to avoid overlapping sidebar border
+        let form_area = Rect { x: layout[1].x + 1, width: layout[1].width.saturating_sub(1), ..layout[1] };
+        render_question_form(frame, state, form_area);
+        return;
     }
 
     // Normal rendering — no separate input box, panels handle their own
@@ -139,22 +135,13 @@ fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
     // Progress indicator
-    let progress = if form.questions.len() > 1 {
-        format!(" ({}/{}) ", q_idx + 1, form.questions.len())
-    } else {
-        String::new()
-    };
+    let progress =
+        if form.questions.len() > 1 { format!(" ({}/{}) ", q_idx + 1, form.questions.len()) } else { String::new() };
 
     // Question text
     lines.push(Line::from(vec![
-        Span::styled(
-            format!(" {} ", q.header),
-            Style::default().fg(theme::bg_base()).bg(theme::accent()).bold(),
-        ),
-        Span::styled(
-            format!(" {}", q.question),
-            Style::default().fg(theme::text()).bold(),
-        ),
+        Span::styled(format!(" {} ", q.header), Style::default().fg(theme::bg_base()).bg(theme::accent()).bold()),
+        Span::styled(format!(" {}", q.question), Style::default().fg(theme::text()).bold()),
     ]));
     lines.push(Line::from(""));
 
@@ -270,9 +257,7 @@ fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
         .style(Style::default().bg(theme::bg_surface()))
         .title(Span::styled(title, Style::default().fg(theme::accent()).bold()));
 
-    let paragraph = Paragraph::new(lines)
-        .block(block)
-        .wrap(ratatui::widgets::Wrap { trim: false });
+    let paragraph = Paragraph::new(lines).block(block).wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, area);
 }
 

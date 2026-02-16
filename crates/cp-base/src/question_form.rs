@@ -1,8 +1,8 @@
-/// Types for the AskUserQuestion tool (#39).
-///
-/// The AI calls the tool with 1-4 questions. Each question has 2-4 options
-/// plus an auto-appended "Other" free-text option. The form replaces the
-/// input field until the user submits answers or presses Esc.
+//! Types for the AskUserQuestion tool (#39).
+//!
+//! The AI calls the tool with 1-4 questions. Each question has 2-4 options
+//! plus an auto-appended "Other" free-text option. The form replaces the
+//! input field until the user submits answers or presses Esc.
 
 /// A single option the user can choose.
 #[derive(Debug, Clone)]
@@ -33,14 +33,15 @@ pub struct QuestionAnswer {
     pub typing_other: bool,
 }
 
+impl Default for QuestionAnswer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuestionAnswer {
     pub fn new() -> Self {
-        Self {
-            cursor: 0,
-            selected: Vec::new(),
-            other_text: String::new(),
-            typing_other: false,
-        }
+        Self { cursor: 0, selected: Vec::new(), other_text: String::new(), typing_other: false }
     }
 }
 
@@ -64,14 +65,7 @@ pub struct PendingQuestionForm {
 impl PendingQuestionForm {
     pub fn new(tool_use_id: String, questions: Vec<Question>) -> Self {
         let answers = questions.iter().map(|_| QuestionAnswer::new()).collect();
-        Self {
-            tool_use_id,
-            questions,
-            current_question: 0,
-            answers,
-            resolved: false,
-            result_json: None,
-        }
+        Self { tool_use_id, questions, current_question: 0, answers, resolved: false, result_json: None }
     }
 
     /// Total number of options for the current question (including "Other")
@@ -176,11 +170,8 @@ impl PendingQuestionForm {
         for (i, q) in self.questions.iter().enumerate() {
             let ans = &self.answers[i];
 
-            let selected: Vec<String> = ans
-                .selected
-                .iter()
-                .filter_map(|&idx| q.options.get(idx).map(|o| o.label.clone()))
-                .collect();
+            let selected: Vec<String> =
+                ans.selected.iter().filter_map(|&idx| q.options.get(idx).map(|o| o.label.clone())).collect();
 
             let other = if ans.typing_other && !ans.other_text.is_empty() {
                 format!(r#""{}""#, ans.other_text.replace('"', "\\\""))
@@ -191,11 +182,7 @@ impl PendingQuestionForm {
             answers_json.push(format!(
                 r#"{{"header":"{}","selected":[{}],"other_text":{}}}"#,
                 q.header.replace('"', "\\\""),
-                selected
-                    .iter()
-                    .map(|s| format!(r#""{}""#, s.replace('"', "\\\"")))
-                    .collect::<Vec<_>>()
-                    .join(","),
+                selected.iter().map(|s| format!(r#""{}""#, s.replace('"', "\\\""))).collect::<Vec<_>>().join(","),
                 other
             ));
         }

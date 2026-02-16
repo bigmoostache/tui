@@ -164,22 +164,22 @@ impl App {
                 }
 
                 // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::question_form::PendingQuestionForm>() {
-                    if !form.resolved {
-                        self.handle_question_form_event(&evt);
-                        self.state.dirty = true;
+                if let Some(form) = self.state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+                    && !form.resolved
+                {
+                    self.handle_question_form_event(&evt);
+                    self.state.dirty = true;
 
-                        // Render immediately
-                        if self.state.dirty {
-                            terminal.draw(|frame| {
-                                ui::render(frame, &mut self.state);
-                                self.command_palette.render(frame, &self.state);
-                            })?;
-                            self.state.dirty = false;
-                            self.last_render_ms = current_ms;
-                        }
-                        continue;
+                    // Render immediately
+                    if self.state.dirty {
+                        terminal.draw(|frame| {
+                            ui::render(frame, &mut self.state);
+                            self.command_palette.render(frame, &self.state);
+                        })?;
+                        self.state.dirty = false;
+                        self.last_render_ms = current_ms;
                     }
+                    continue;
                 }
 
                 let Some(action) = handle_event(&evt, &self.state) else {
@@ -674,11 +674,8 @@ impl App {
         }
 
         // Check if form is resolved
-        let resolved = self
-            .state
-            .get_ext::<cp_base::question_form::PendingQuestionForm>()
-            .map(|f| f.resolved)
-            .unwrap_or(false);
+        let resolved =
+            self.state.get_ext::<cp_base::question_form::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
 
         if !resolved {
             return;
@@ -692,9 +689,8 @@ impl App {
             .and_then(|v| v.downcast::<cp_base::question_form::PendingQuestionForm>().ok())
             .expect("form must exist since we just checked resolved=true");
 
-        let result_json = form.result_json.unwrap_or_else(|| {
-            r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string()
-        });
+        let result_json =
+            form.result_json.unwrap_or_else(|| r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string());
 
         // Replace placeholder in pending tool results
         let mut tool_results = self.pending_question_tool_results.take().unwrap();

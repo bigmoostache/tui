@@ -104,12 +104,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             options.push(QuestionOption { label, description });
         }
 
-        questions.push(Question {
-            question,
-            header,
-            options,
-            multi_select,
-        });
+        questions.push(Question { question, header, options, multi_select });
     }
 
     // Store the pending form in state
@@ -117,9 +112,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.set_ext(form);
 
     // Return a placeholder — the real result is injected by app.rs when user responds
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: "__QUESTION_PENDING__".to_string(),
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: "__QUESTION_PENDING__".to_string(), is_error: false }
 }
