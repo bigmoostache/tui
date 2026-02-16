@@ -1101,38 +1101,6 @@ function showSoundEffect(text, x, y, color) {
     setTimeout(() => effect.remove(), 600);
 }
 
-// Enhanced XP giving with particles
-function giveXP(amount) {
-    state.userXP += amount;
-    
-    // Create particle at random position near center
-    const x = window.innerWidth / 2 + (Math.random() - 0.5) * 100;
-    const y = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
-    createXPParticle(amount, x, y);
-    
-    // Update combo
-    updateCombo();
-    
-    // Check for level up
-    const xpNeeded = getXPForNextLevel();
-    if (state.userXP >= xpNeeded) {
-        state.userLevel++;
-        state.userXP -= xpNeeded;
-        unlockAchievement('level_up');
-        showLevelUpScreen();
-    }
-    
-    // Update high score
-    const totalScore = state.userLevel * 1000 + state.userXP;
-    if (totalScore > state.highScore) {
-        state.highScore = totalScore;
-        localStorage.setItem('contextPilotHighScore', state.highScore);
-        updateHighScore();
-    }
-    
-    updateXPDisplay();
-}
-
 // Combo System
 function updateCombo() {
     const now = Date.now();
