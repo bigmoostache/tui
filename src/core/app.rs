@@ -68,6 +68,8 @@ pub struct App {
     /// for timer-based panels (Tmux, Git, GitResult, GithubResult, Glob, Grep).
     /// Separate from ContextElement.last_refresh_ms which tracks actual content changes.
     last_poll_ms: std::collections::HashMap<String, u64>,
+    /// Pending tool results when a question form is blocking (ask_user_question)
+    pending_question_tool_results: Option<Vec<ToolResult>>,
 }
 
 impl App {
@@ -100,6 +102,7 @@ impl App {
             deferred_sleep_needs_tmux_refresh: false,
             writer: PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
+            pending_question_tool_results: None,
         }
     }
 
@@ -160,6 +163,25 @@ impl App {
                     continue;
                 }
 
+                // Handle question form events if form is active (mutates state directly)
+                if let Some(form) = self.state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+                    && !form.resolved
+                {
+                    self.handle_question_form_event(&evt);
+                    self.state.dirty = true;
+
+                    // Render immediately
+                    if self.state.dirty {
+                        terminal.draw(|frame| {
+                            ui::render(frame, &mut self.state);
+                            self.command_palette.render(frame, &self.state);
+                        })?;
+                        self.state.dirty = false;
+                        self.last_render_ms = current_ms;
+                    }
+                    continue;
+                }
+
                 let Some(action) = handle_event(&evt, &self.state) else {
                     // User quit — flush all pending writes and save final state synchronously
                     self.writer.flush();
@@ -197,6 +219,8 @@ impl App {
             self.check_waiting_for_panels(&tx);
             // Check if deferred sleep timer has expired (non-blocking)
             self.check_deferred_sleep(&tx);
+            // Check if a question form has been resolved by the user
+            self.check_question_form(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
@@ -378,6 +402,10 @@ impl App {
         if self.state.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
+        // Don't process tools while a question form is pending user response
+        if self.state.get_ext::<cp_base::question_form::PendingQuestionForm>().is_some() {
+            return;
+        }
         let _guard = crate::profile!("app::tool_exec");
 
         self.state.dirty = true;
@@ -433,6 +461,18 @@ impl App {
 
             let result = execute_tool(tool, &mut self.state);
             tool_results.push(result);
+        }
+
+        // Check if any tool triggered a question form (blocking)
+        let has_pending_question = tool_results.iter().any(|r| r.content == "__QUESTION_PENDING__");
+        if has_pending_question {
+            // Don't create result message or continue streaming yet.
+            // The form is active — when user submits/dismisses, check_question_form()
+            // will replace the placeholder and resume the pipeline.
+            // Store the pending tool results for later resolution.
+            self.pending_question_tool_results = Some(tool_results);
+            self.save_state_async();
+            return;
         }
 
         // Create tool result message
@@ -624,6 +664,128 @@ impl App {
         }
     }
 
+    /// Non-blocking check: if the user has resolved a pending question form,
+    /// replace the __QUESTION_PENDING__ placeholder with the real answer and
+    /// resume the tool pipeline (create result message + continue streaming).
+    fn check_question_form(&mut self, tx: &Sender<StreamEvent>) {
+        // Only check if we have pending tool results waiting on a question
+        if self.pending_question_tool_results.is_none() {
+            return;
+        }
+
+        // Check if form is resolved
+        let resolved =
+            self.state.get_ext::<cp_base::question_form::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
+
+        if !resolved {
+            return;
+        }
+
+        // Extract the resolved form and remove it from state
+        let form = self
+            .state
+            .module_data
+            .remove(&std::any::TypeId::of::<cp_base::question_form::PendingQuestionForm>())
+            .and_then(|v| v.downcast::<cp_base::question_form::PendingQuestionForm>().ok())
+            .expect("form must exist since we just checked resolved=true");
+
+        let result_json =
+            form.result_json.unwrap_or_else(|| r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string());
+
+        // Replace placeholder in pending tool results
+        let mut tool_results = self.pending_question_tool_results.take().unwrap();
+        for tr in &mut tool_results {
+            if tr.content == "__QUESTION_PENDING__" {
+                tr.content = result_json.clone();
+            }
+        }
+
+        // Now resume the normal pipeline: create result message and continue streaming
+        let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
+        let tool_result_records: Vec<ToolResultRecord> = tool_results
+            .iter()
+            .map(|r| ToolResultRecord {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+                is_error: r.is_error,
+            })
+            .collect();
+        let result_msg = Message {
+            id: result_id,
+            uid: Some(result_uid),
+            role: "user".to_string(),
+            message_type: MessageType::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: tool_result_records,
+            input_tokens: 0,
+            timestamp_ms: crate::core::panels::now_ms(),
+        };
+        self.save_message_async(&result_msg);
+        self.state.messages.push(result_msg);
+
+        // Check if reload was requested
+        if self.state.reload_pending {
+            perform_reload(&mut self.state);
+        }
+
+        // Create new assistant message for continued streaming
+        let assistant_id = format!("A{}", self.state.next_assistant_id);
+        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        self.state.next_assistant_id += 1;
+        self.state.global_next_uid += 1;
+        let new_assistant_msg = Message {
+            id: assistant_id,
+            uid: Some(assistant_uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::TextMessage,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::core::panels::now_ms(),
+        };
+        self.state.messages.push(new_assistant_msg);
+
+        self.state.streaming_estimated_tokens = 0;
+
+        // Accumulate token stats from intermediate stream
+        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens += cache_hit_tokens;
+            self.state.stream_cache_miss_tokens += cache_miss_tokens;
+            self.state.stream_output_tokens += output_tokens;
+            self.state.cache_hit_tokens += cache_hit_tokens;
+            self.state.cache_miss_tokens += cache_miss_tokens;
+            self.state.total_output_tokens += output_tokens;
+        }
+
+        self.save_state_async();
+        self.state.dirty = true;
+
+        // Continue streaming
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        if super::wait::has_dirty_file_panels(&self.state) {
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            self.continue_streaming(tx);
+        }
+    }
+
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming {
             return;
@@ -632,6 +794,10 @@ impl App {
         // pending_done is still Some from the intermediate stream, and
         // continue_streaming will clear it when the deferred state resolves.
         if self.state.waiting_for_panels || self.deferred_tool_sleeping {
+            return;
+        }
+        // Don't finalize while a question form is pending user response
+        if self.pending_question_tool_results.is_some() {
             return;
         }
 
@@ -1084,6 +1250,67 @@ impl App {
     /// Preferred over `save_message()` in the main event loop.
     fn save_message_async(&self, msg: &Message) {
         self.writer.send_message(build_message_op(msg));
+    }
+
+    /// Handle keyboard events when a question form is active.
+    /// Mutates the PendingQuestionForm directly in state.
+    fn handle_question_form_event(&mut self, event: &event::Event) {
+        use crossterm::event::{KeyCode, KeyModifiers};
+        let event::Event::Key(key) = event else { return };
+
+        let form = match self.state.get_ext_mut::<cp_base::question_form::PendingQuestionForm>() {
+            Some(f) => f,
+            None => return,
+        };
+
+        // Check if currently typing in "Other" field
+        let typing_other = form.answers[form.current_question].typing_other;
+
+        match key.code {
+            KeyCode::Esc => {
+                form.dismiss();
+            }
+            KeyCode::Up if !typing_other => {
+                form.cursor_up();
+            }
+            KeyCode::Down if !typing_other => {
+                form.cursor_down();
+            }
+            KeyCode::Left => {
+                form.prev_question();
+            }
+            KeyCode::Right => {
+                form.next_question();
+            }
+            KeyCode::Enter => {
+                form.handle_enter();
+            }
+            KeyCode::Char(' ') if !typing_other && form.is_multi_select() => {
+                form.toggle_selection();
+            }
+            KeyCode::Char(' ') if !typing_other => {
+                // Single-select: space selects and advances
+                form.toggle_selection();
+            }
+            // When on "Other": arrow keys navigate away, typing goes to text field
+            KeyCode::Up if typing_other => {
+                form.cursor_up();
+            }
+            KeyCode::Down if typing_other => {
+                form.cursor_down();
+            }
+            KeyCode::Backspace if typing_other => {
+                form.backspace();
+            }
+            KeyCode::Char(c) if typing_other => {
+                // Don't capture ctrl+key combos
+                if !key.modifiers.contains(KeyModifiers::CONTROL) {
+                    form.type_char(c);
+                }
+            }
+            // Non-typing-other: any char that's not space does nothing
+            _ => {}
+        }
     }
 
     /// Handle keyboard events when command palette is open

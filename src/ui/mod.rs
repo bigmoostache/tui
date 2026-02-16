@@ -64,7 +64,28 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
-    // No separate input box - panels handle their own input display
+    // Check if question form is active — render it at bottom of content area
+    if let Some(form) = state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+        && !form.resolved
+    {
+        // Split: content panel on top, question form at bottom
+        let form_height = calculate_question_form_height(form);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(3),              // Content panel (shrinks)
+                Constraint::Length(form_height), // Question form
+            ])
+            .split(area);
+
+        render_content_panel(frame, state, layout[0]);
+        // Indent form by 1 col to avoid overlapping sidebar border
+        let form_area = Rect { x: layout[1].x + 1, width: layout[1].width.saturating_sub(1), ..layout[1] };
+        render_question_form(frame, state, form_area);
+        return;
+    }
+
+    // Normal rendering — no separate input box, panels handle their own
     render_content_panel(frame, state, area);
 }
 
@@ -85,6 +106,159 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
     } else {
         panels::render_panel_default(panel.as_ref(), frame, state, area);
     }
+}
+
+/// Calculate the height needed for the question form
+fn calculate_question_form_height(form: &cp_base::question_form::PendingQuestionForm) -> u16 {
+    let q = &form.questions[form.current_question];
+    // Header line + question text + blank + options (including Other) + blank + nav hint
+    let option_lines = q.options.len() as u16 + 1; // +1 for "Other"
+    let header_lines = 2u16; // header + question text
+    let chrome = 4u16; // borders (2) + spacing + nav hint
+    (header_lines + option_lines * 2 + chrome).min(20) // each option: label + description
+}
+
+/// Render the question form at the bottom of the screen
+fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
+    use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+
+    let form = match state.get_ext::<cp_base::question_form::PendingQuestionForm>() {
+        Some(f) => f,
+        None => return,
+    };
+
+    let q_idx = form.current_question;
+    let q = &form.questions[q_idx];
+    let ans = &form.answers[q_idx];
+    let other_idx = q.options.len();
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Progress indicator
+    let progress =
+        if form.questions.len() > 1 { format!(" ({}/{}) ", q_idx + 1, form.questions.len()) } else { String::new() };
+
+    // Question text
+    lines.push(Line::from(vec![
+        Span::styled(format!(" {} ", q.header), Style::default().fg(theme::bg_base()).bg(theme::accent()).bold()),
+        Span::styled(format!(" {}", q.question), Style::default().fg(theme::text()).bold()),
+    ]));
+    lines.push(Line::from(""));
+
+    // Options
+    for (i, opt) in q.options.iter().enumerate() {
+        let is_cursor = ans.cursor == i;
+        let is_selected = ans.selected.contains(&i);
+
+        let indicator = if is_selected && q.multi_select {
+            "[x]"
+        } else if is_selected {
+            "(●)"
+        } else if q.multi_select {
+            "[ ]"
+        } else {
+            "( )"
+        };
+
+        let cursor_marker = if is_cursor { ">" } else { " " };
+
+        let label_style = if is_cursor {
+            Style::default().fg(theme::accent()).bold()
+        } else if is_selected {
+            Style::default().fg(theme::success()).bold()
+        } else {
+            Style::default().fg(theme::text())
+        };
+
+        let desc_style = if is_cursor {
+            Style::default().fg(theme::text_secondary())
+        } else {
+            Style::default().fg(theme::text_muted())
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
+            Span::styled(format!("{} ", indicator), label_style),
+            Span::styled(opt.label.clone(), label_style),
+            Span::styled(format!("  {}", opt.description), desc_style),
+        ]));
+    }
+
+    // "Other" option
+    {
+        let is_cursor = ans.cursor == other_idx;
+        let is_typing = ans.typing_other;
+
+        let cursor_marker = if is_cursor { ">" } else { " " };
+        let indicator = if is_typing { "(●)" } else { "( )" };
+
+        let label_style = if is_cursor {
+            Style::default().fg(theme::accent()).bold()
+        } else if is_typing {
+            Style::default().fg(theme::success()).bold()
+        } else {
+            Style::default().fg(theme::text())
+        };
+
+        if is_typing {
+            lines.push(Line::from(vec![
+                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
+                Span::styled(format!("{} ", indicator), label_style),
+                Span::styled("Other: ", label_style),
+                Span::styled(
+                    format!("{}▏", ans.other_text),
+                    Style::default().fg(theme::text()).bg(theme::bg_elevated()),
+                ),
+            ]));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
+                Span::styled(format!("{} ", indicator), label_style),
+                Span::styled("Other", label_style),
+                Span::styled("  Type your own answer", Style::default().fg(theme::text_muted())),
+            ]));
+        }
+    }
+
+    // Navigation hint
+    lines.push(Line::from(""));
+    let hint_spans = if q.multi_select {
+        vec![
+            Span::styled(" ↑↓", Style::default().fg(theme::accent())),
+            Span::styled(" navigate  ", Style::default().fg(theme::text_muted())),
+            Span::styled("←→", Style::default().fg(theme::accent())),
+            Span::styled(" questions  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Space", Style::default().fg(theme::accent())),
+            Span::styled(" toggle  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Enter", Style::default().fg(theme::accent())),
+            Span::styled(" confirm  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Esc", Style::default().fg(theme::accent())),
+            Span::styled(" dismiss", Style::default().fg(theme::text_muted())),
+        ]
+    } else {
+        vec![
+            Span::styled(" ↑↓", Style::default().fg(theme::accent())),
+            Span::styled(" navigate  ", Style::default().fg(theme::text_muted())),
+            Span::styled("←→", Style::default().fg(theme::accent())),
+            Span::styled(" questions  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Enter", Style::default().fg(theme::accent())),
+            Span::styled(" select & next  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Esc", Style::default().fg(theme::accent())),
+            Span::styled(" dismiss", Style::default().fg(theme::text_muted())),
+        ]
+    };
+    lines.push(Line::from(hint_spans));
+
+    let title = format!(" Question{} ", progress);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme::accent()))
+        .style(Style::default().bg(theme::bg_surface()))
+        .title(Span::styled(title, Style::default().fg(theme::accent()).bold()));
+
+    let paragraph = Paragraph::new(lines).block(block).wrap(ratatui::widgets::Wrap { trim: false });
+    frame.render_widget(paragraph, area);
 }
 
 fn render_perf_overlay(frame: &mut Frame, area: Rect) {
