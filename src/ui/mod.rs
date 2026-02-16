@@ -264,7 +264,9 @@ fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
         .style(Style::default().bg(theme::bg_surface()))
         .title(Span::styled(title, Style::default().fg(theme::accent()).bold()));
 
-    let paragraph = Paragraph::new(lines).block(block);
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, area);
 }
 

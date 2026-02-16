@@ -800,6 +800,10 @@ impl App {
         if self.state.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
+        // Don't finalize while a question form is pending user response
+        if self.pending_question_tool_results.is_some() {
+            return;
+        }
 
         if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) =
             self.pending_done
