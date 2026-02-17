@@ -32,7 +32,7 @@ const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=t
 const OAUTH_BETA_HEADER: &str = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05";
 
 /// Billing header that must be included in system prompt
-const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.37.fbe; cc_entrypoint=cli; cch=e5401;";
+const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.44.fbe; cc_entrypoint=cli; cch=e5401;";
 
 /// System reminder injected into first user message for Claude Code validation
 const SYSTEM_REMINDER: &str =
@@ -184,7 +184,7 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
         "request_headers": {
             "anthropic-beta": OAUTH_BETA_HEADER,
             "anthropic-version": API_VERSION,
-            "user-agent": "claude-cli/2.1.37 (external, cli)",
+            "user-agent": "claude-cli/2.1.44 (external, cli)",
             "x-app": "cli",
         },
         "request_body": api_request,
@@ -583,7 +583,7 @@ impl LlmClient for ClaudeCodeClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
@@ -808,7 +808,7 @@ impl LlmClient for ClaudeCodeClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
@@ -851,7 +851,7 @@ impl LlmClient for ClaudeCodeClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
@@ -887,7 +887,7 @@ impl LlmClient for ClaudeCodeClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
@@ -960,7 +960,7 @@ mod tests {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
@@ -1027,7 +1027,7 @@ mod tests {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
