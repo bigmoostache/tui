@@ -9,6 +9,9 @@ use crate::state::persistence::build_message_op;
 use crate::state::{ContextType, Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
 use crate::infra::tools::{execute_tool, perform_reload};
 
+use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_console::types::ConsoleState;
+
 use crate::app::App;
 
 impl App {
@@ -93,6 +96,15 @@ impl App {
             // will replace the placeholder and resume the pipeline.
             // Store the pending tool results for later resolution.
             self.pending_question_tool_results = Some(tool_results);
+            self.save_state_async();
+            return;
+        }
+
+        // Check if any tool triggered a console blocking wait
+        let has_console_wait =
+            tool_results.iter().any(|r| r.content == CONSOLE_WAIT_BLOCKING_SENTINEL);
+        if has_console_wait {
+            self.pending_console_wait_tool_results = Some(tool_results);
             self.save_state_async();
             return;
         }
@@ -381,6 +393,145 @@ impl App {
         self.state.dirty = true;
 
         // Continue streaming
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        if super::wait::has_dirty_file_panels(&self.state) {
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: poll console waiters for satisfied conditions.
+    /// - Blocking path: replace `__CONSOLE_WAIT_BLOCKING__` sentinel and resume pipeline.
+    /// - Async path: drain completed_async and create spine notifications.
+    pub(super) fn check_console_waiters(&mut self, tx: &Sender<StreamEvent>) {
+        // Always poll — this checks both blocking and async waiters
+        let satisfied_blocking = ConsoleState::check_waiters(&mut self.state);
+
+        // --- Async completions → spine notifications ---
+        let completed: Vec<cp_mod_console::CompletedWait> = {
+            let cs = ConsoleState::get_mut(&mut self.state);
+            cs.completed_async.drain(..).collect()
+        };
+        if !completed.is_empty() {
+            use cp_mod_spine::{NotificationType, SpineState};
+            for cw in completed {
+                let content = cp_mod_console::types::format_wait_result(
+                    &cw.session_name,
+                    cw.exit_code,
+                    &cw.panel_id,
+                    &cw.last_lines,
+                );
+                SpineState::create_notification(
+                    &mut self.state,
+                    NotificationType::Custom,
+                    "console".to_string(),
+                    content,
+                );
+            }
+            self.save_state_async();
+        }
+
+        // --- Blocking sentinel replacement ---
+        if self.pending_console_wait_tool_results.is_none() || satisfied_blocking.is_empty() {
+            return;
+        }
+
+        let mut tool_results = self.pending_console_wait_tool_results.take().unwrap();
+
+        // Replace sentinels with real results
+        for tr in &mut tool_results {
+            if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
+                if let Some((_, result)) = satisfied_blocking.iter().find(|(id, _)| *id == tr.tool_use_id) {
+                    tr.content = result.clone();
+                }
+            }
+        }
+
+        // Check if any sentinels remain unresolved (multiple blocking waits in one batch)
+        let still_pending = tool_results.iter().any(|r| r.content == CONSOLE_WAIT_BLOCKING_SENTINEL);
+        if still_pending {
+            self.pending_console_wait_tool_results = Some(tool_results);
+            return;
+        }
+
+        // All resolved — resume normal pipeline: create result message + continue streaming
+        let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
+        let tool_result_records: Vec<ToolResultRecord> = tool_results
+            .iter()
+            .map(|r| ToolResultRecord {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+                is_error: r.is_error,
+                tool_name: r.tool_name.clone(),
+            })
+            .collect();
+        let result_msg = Message {
+            id: result_id,
+            uid: Some(result_uid),
+            role: "user".to_string(),
+            message_type: MessageType::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: tool_result_records,
+            input_tokens: 0,
+            timestamp_ms: crate::app::panels::now_ms(),
+        };
+        self.save_message_async(&result_msg);
+        self.state.messages.push(result_msg);
+
+        if self.state.reload_pending {
+            perform_reload(&mut self.state);
+        }
+
+        // Create new assistant message for continued streaming
+        let assistant_id = format!("A{}", self.state.next_assistant_id);
+        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        self.state.next_assistant_id += 1;
+        self.state.global_next_uid += 1;
+        let new_assistant_msg = Message {
+            id: assistant_id,
+            uid: Some(assistant_uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::TextMessage,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::app::panels::now_ms(),
+        };
+        self.state.messages.push(new_assistant_msg);
+
+        self.state.streaming_estimated_tokens = 0;
+
+        // Accumulate token stats from intermediate stream
+        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens += cache_hit_tokens;
+            self.state.stream_cache_miss_tokens += cache_miss_tokens;
+            self.state.stream_output_tokens += output_tokens;
+            self.state.cache_hit_tokens += cache_hit_tokens;
+            self.state.cache_miss_tokens += cache_miss_tokens;
+            self.state.total_output_tokens += output_tokens;
+        }
+
+        self.save_state_async();
+        self.state.dirty = true;
+
         super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if super::wait::has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;

@@ -65,6 +65,8 @@ pub struct App {
     last_poll_ms: std::collections::HashMap<String, u64>,
     /// Pending tool results when a question form is blocking (ask_user_question)
     pending_question_tool_results: Option<Vec<ToolResult>>,
+    /// Pending tool results when a console blocking wait is active
+    pending_console_wait_tool_results: Option<Vec<ToolResult>>,
 }
 
 impl App {
@@ -98,6 +100,7 @@ impl App {
             writer: PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
             pending_question_tool_results: None,
+            pending_console_wait_tool_results: None,
         }
     }
 

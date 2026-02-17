@@ -169,6 +169,10 @@ impl App {
         if self.pending_question_tool_results.is_some() {
             return;
         }
+        // Don't finalize while a console blocking wait is pending
+        if self.pending_console_wait_tool_results.is_some() {
+            return;
+        }
 
         if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) =
             self.pending_done

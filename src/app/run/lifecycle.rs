@@ -135,6 +135,8 @@ impl App {
             self.check_deferred_sleep(&tx);
             // Check if a question form has been resolved by the user
             self.check_question_form(&tx);
+            // Check console waiters (blocking sentinel replacement + async → spine notifications)
+            self.check_console_waiters(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
