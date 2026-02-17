@@ -69,6 +69,8 @@ pub enum LlmProvider {
     Anthropic,
     #[serde(alias = "claudecode")]
     ClaudeCode,
+    #[serde(alias = "claudecodeapikey")]
+    ClaudeCodeApiKey,
     Grok,
     Groq,
     DeepSeek,

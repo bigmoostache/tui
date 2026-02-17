@@ -8,16 +8,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let changes = match tool.input.get("changes").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'changes' parameter (expected array)".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
         }
     };
 
     if changes.is_empty() {
-        return ToolResult { tool_use_id: tool.id.clone(), content: "No changes provided".to_string(), is_error: true };
+        return ToolResult::new(tool.id.clone(), "No changes provided".to_string(), true);
     }
 
     let mut successes: Vec<String> = Vec::new();
@@ -93,28 +89,16 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let failure_count = failures.len();
 
     if failure_count == 0 {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Tool changes: {}/{} applied ({})", success_count, total_changes, successes.join("; ")),
-            is_error: false,
-        }
+        ToolResult::new(tool.id.clone(), format!("Tool changes: {}/{} applied ({})", success_count, total_changes, successes.join("; ")), false)
     } else if success_count == 0 {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to apply changes: {}", failures.join("; ")),
-            is_error: true,
-        }
+        ToolResult::new(tool.id.clone(), format!("Failed to apply changes: {}", failures.join("; ")), true)
     } else {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!(
+        ToolResult::new(tool.id.clone(), format!(
                 "Partial success: {}/{} applied. Successes: {}. Failures: {}",
                 success_count,
                 total_changes,
                 successes.join("; "),
                 failures.join("; ")
-            ),
-            is_error: false,
-        }
+            ), false)
     }
 }

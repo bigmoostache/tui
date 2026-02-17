@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Context Pilot — Terminal Initialization Sequence</title>
-    <meta name="description" content="Context Pilot: AI-Native Terminal IDE. Experience the power of TUI-first AI coding.">
+    <title>Context Pilot — AI-Native Terminal IDE</title>
+    <meta name="description" content="Context Pilot is an AI-native terminal IDE that gives you full control over what your AI sees. Built with Rust and ratatui for blazing-fast performance.">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta property="og:title" content="Context Pilot — AI-Native Terminal IDE">
+    <meta property="og:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
     <!-- Header -->
@@ -46,8 +50,8 @@
             </h1>
             <p class="hero-subtitle">
                 Context Pilot is a terminal-native AI coding environment built in Rust. 
-                Unlike other tools where context is a black box, <strong>you</strong> decide exactly what context your AI receives — 
-                files, git diffs, todos, memories, and more — all through an elegant TUI with real-time token tracking.
+                Unlike other tools, <strong>you</strong> decide exactly what context your AI receives — 
+                files, git diffs, todos, memories, and more — all through an elegant TUI.
             </p>
             <div class="hero-actions">
                 <a href="#getting-started" class="btn btn-primary">Get Started</a>
@@ -144,7 +148,7 @@
                 <div class="feature-card fade-in">
                     <div class="feature-icon">🤖</div>
                     <h3>Multi-Provider</h3>
-                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok (xAI), and Groq. Switch providers and models mid-conversation with a single keystroke.</p>
+                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok, Groq, and any OpenAI-compatible API. Switch providers mid-conversation.</p>
                 </div>
                 <div class="feature-card fade-in">
                     <div class="feature-icon">🧠</div>
@@ -396,80 +400,41 @@
             <h2 class="section-title">Getting Started</h2>
             <p class="section-subtitle">Up and running in minutes.</p>
             
-            <!-- Main Terminal Content -->
-            <div class="terminal-wrapper" id="terminal-wrapper">
-                <!-- Boot Sequence (shown first) -->
-                <div id="boot-sequence" class="boot-sequence">
-                    <pre id="boot-text"></pre>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Clone & Build</h3>
+                        <div class="code-block">
+                            <pre><code>git clone https://github.com/bigmoostache/context-pilot.git
+cd context-pilot
+cargo build --release</code></pre>
+                        </div>
+                    </div>
                 </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Configure API Key</h3>
+                        <div class="code-block">
+                            <pre><code># Create .env in your project directory
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
 
-                <!-- Main Interface (shown after boot) -->
-                <div id="main-interface" class="main-interface hidden">
-                    <!-- Header Bar -->
-                    <div class="header-bar">
-                        <span class="logo">⎈ CONTEXT-PILOT v2.0.1</span>
-                        <span class="status-bar">
-                            <span id="user-xp">XP: 0</span>
-                            <span id="user-level">LEVEL: 1</span>
-                            <span class="blink">●</span>
-                        </span>
-                    </div>
-
-                    <!-- Main Content Area with Sidebar -->
-                    <div class="main-content">
-                        <!-- Sidebar Panel List -->
-                        <div class="sidebar">
-                            <div class="panel-header">═ PANELS ═</div>
-                            <div class="panel-list" id="panel-list">
-                                <div class="panel-item active" data-panel="welcome">
-                                    <span class="panel-id">P1</span> WELCOME
-                                </div>
-                                <div class="panel-item locked" data-panel="features">
-                                    <span class="panel-id">P2</span> FEATURES <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="modules">
-                                    <span class="panel-id">P3</span> MODULES <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="demo">
-                                    <span class="panel-id">P4</span> DEMO <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="install">
-                                    <span class="panel-id">P5</span> INSTALL <span class="lock">🔒</span>
-                                </div>
-                            </div>
-                            <div class="panel-footer">
-                                <div class="achievement-count">🏆 <span id="achievement-count">0</span>/10</div>
-                            </div>
-                        </div>
-
-                        <!-- Main Panel Content -->
-                        <div class="panel-content">
-                            <div class="content-display" id="content-display">
-                                <!-- Content will be dynamically inserted here -->
-                            </div>
-
-                            <!-- Terminal Input at Bottom -->
-                            <div class="terminal-input-area">
-                                <div class="input-prompt">
-                                    <span class="prompt-symbol">❯</span>
-                                    <input type="text" id="command-input" class="command-input" autocomplete="off" spellcheck="false" placeholder="Type 'help' for commands...">
-                                </div>
-                                <div class="hint-bar" id="hint-bar">
-                                    💡 TIP: Type commands to navigate • Try: <span class="cmd-hint">help</span>, <span class="cmd-hint">next</span>, <span class="cmd-hint">demo</span>
-                                </div>
-                            </div>
+# Or export directly
+export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
                         </div>
                     </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Launch</h3>
+                        <div class="code-block">
+                            <pre><code># Navigate to any project directory
+cd your-project
 
-                    <!-- Achievement Notification -->
-                    <div class="achievement-popup hidden" id="achievement-popup">
-                        <div class="achievement-content">
-                            <div class="achievement-icon">🏆</div>
-                            <div class="achievement-text">
-                                <div class="achievement-title">ACHIEVEMENT UNLOCKED!</div>
-                                <div class="achievement-name" id="achievement-name"></div>
-                                <div class="achievement-xp">+<span id="achievement-xp">100</span> XP</div>
-                            </div>
+# Launch Context Pilot (requires tmux)
+tmux new-session context-pilot</code></pre>
                         </div>
                     </div>
                 </div>
@@ -478,9 +443,9 @@
             <div class="requirements">
                 <h3>Requirements</h3>
                 <ul>
-                    <li><strong>Rust 1.83+</strong> — Install via <a href="https://rustup.rs" style="color: inherit; text-decoration: underline;">rustup.rs</a></li>
-                    <li><strong>tmux</strong> — Required for console integration (<code>apt install tmux</code> or <code>brew install tmux</code>)</li>
-                    <li><strong>API key</strong> — From Anthropic, OpenAI, DeepSeek, Grok (xAI), or Groq</li>
+                    <li>Rust toolchain (for building from source)</li>
+                    <li>tmux (for console integration)</li>
+                    <li>An API key from a supported provider (Anthropic, OpenAI, etc.)</li>
                 </ul>
             </div>
         </div>
@@ -506,8 +471,157 @@
                 <p>Built with 🦀 Rust + ratatui. Open source forever.</p>
             </div>
         </div>
-    </div>
+    </footer>
+    <!-- Copy Buttons -->
+    <script>
+    (function() {
+        document.querySelectorAll('.code-block').forEach(block => {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'Copy';
+            btn.addEventListener('click', () => {
+                const code = block.querySelector('code').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    btn.textContent = 'Copied!';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'Copy';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                });
+            });
+            block.style.position = 'relative';
+            block.appendChild(btn);
+        });
+    })();
+    </script>
 
-    <script src="script.js"></script>
+    <!-- Scroll Animations -->
+    <script>
+    (function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('visible');
+                    observer.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    })();
+    </script>
+
+    <!-- Terminal Animation -->
+    <script>
+    (function() {
+        const el = document.getElementById('terminal-anim');
+        if (!el) return;
+
+        const C = (cls, text) => `<span class="${cls}">${text}</span>`;
+        const dim = t => C('t-dim', t);
+        const cyan = t => C('t-cyan', t);
+        const green = t => C('t-green', t);
+        const yellow = t => C('t-yellow', t);
+
+        // Scene 1: Panel list appears line by line
+        const panels = [
+            dim('┌─ Context Panels ──────────────────────────────────┐'),
+            `${cyan('P1')} ${green('Chat')}         ${dim('│')} 250 tokens   ${dim('│')} Conversation`,
+            `${cyan('P2')} ${green('Tree')}         ${dim('│')} 1,884 tokens ${dim('│')} Directory structure`,
+            `${cyan('P3')} ${green('Todos')}        ${dim('│')} 316 tokens   ${dim('│')} Task tracking`,
+            `${cyan('P4')} ${green('Memories')}     ${dim('│')} 279 tokens   ${dim('│')} Persistent notes`,
+            `${cyan('P5')} ${green('Overview')}     ${dim('│')} 1,104 tokens ${dim('│')} Context usage`,
+            `${cyan('P6')} ${green('Git')}          ${dim('│')} 11 tokens    ${dim('│')} Status &amp; diffs`,
+            dim('└────────────────────────────────────────────────────┘'),
+            dim('  Context: 5,092 / 200,000 tokens (2.5%)'),
+        ];
+
+        // Scene 2: User types a message
+        const userMsg = 'refactor the auth module to use async traits';
+
+        // Scene 3: AI response streams
+        const aiLines = [
+            `${dim('───────────────────────────────────────────────────')}`,
+            `${green('⚙')} Opening ${cyan('src/auth/mod.rs')}...`,
+            `${green('⚙')} Opening ${cyan('src/auth/provider.rs')}...`,
+            `${green('✓')} Replaced ${yellow('3')} sync trait methods with async fn`,
+            `${green('✓')} Updated ${yellow('12')} call sites across ${yellow('4')} files`,
+            `${green('✓')} All tests passing`,
+        ];
+
+        let lines = [];
+        let phase = 0;
+        let idx = 0;
+        let charIdx = 0;
+        let typingLine = '';
+
+        function render() {
+            let out = lines.join('\n');
+            if (typingLine) {
+                out += (lines.length ? '\n' : '') + typingLine;
+            }
+            // Always show cursor
+            out += (lines.length || typingLine ? '\n' : '') + `${yellow('❯')} ${C('t-blink', '█')}`;
+            el.innerHTML = out;
+        }
+
+        function tick() {
+            if (phase === 0) {
+                // Phase 0: panels appear one by one
+                if (idx < panels.length) {
+                    lines.push(panels[idx]);
+                    idx++;
+                    render();
+                    setTimeout(tick, 80);
+                } else {
+                    phase = 1;
+                    idx = 0;
+                    charIdx = 0;
+                    render();
+                    setTimeout(tick, 600);
+                }
+            } else if (phase === 1) {
+                // Phase 1: user types message
+                if (charIdx < userMsg.length) {
+                    charIdx++;
+                    // Replace cursor line with typing
+                    const typed = userMsg.slice(0, charIdx);
+                    el.innerHTML = lines.join('\n') + '\n' + `${yellow('❯')} ${typed}${C('t-blink', '█')}`;
+                    setTimeout(tick, 35 + Math.random() * 40);
+                } else {
+                    // "Submit" — add the user line to lines
+                    lines.push(`${yellow('❯')} ${userMsg}`);
+                    phase = 2;
+                    idx = 0;
+                    render();
+                    setTimeout(tick, 400);
+                }
+            } else if (phase === 2) {
+                // Phase 2: AI response streams in
+                if (idx < aiLines.length) {
+                    lines.push(aiLines[idx]);
+                    idx++;
+                    render();
+                    setTimeout(tick, 300 + Math.random() * 200);
+                } else {
+                    // Done — pause then restart
+                    setTimeout(() => {
+                        lines = [];
+                        phase = 0;
+                        idx = 0;
+                        charIdx = 0;
+                        typingLine = '';
+                        render();
+                        setTimeout(tick, 500);
+                    }, 4000);
+                }
+            }
+        }
+
+        // Start after a small delay
+        setTimeout(tick, 800);
+        render();
+    })();
+    </script>
 </body>
 </html>

@@ -4,6 +4,7 @@
 
 pub mod anthropic;
 pub mod claude_code;
+pub mod claude_code_api_key;
 pub mod deepseek;
 pub mod error;
 pub mod grok;
@@ -55,6 +56,7 @@ pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
     match provider {
         LlmProvider::Anthropic => Box::new(anthropic::AnthropicClient::new()),
         LlmProvider::ClaudeCode => Box::new(claude_code::ClaudeCodeClient::new()),
+        LlmProvider::ClaudeCodeApiKey => Box::new(claude_code_api_key::ClaudeCodeApiKeyClient::new()),
         LlmProvider::Grok => Box::new(grok::GrokClient::new()),
         LlmProvider::Groq => Box::new(groq::GroqClient::new()),
         LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),

@@ -360,6 +360,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
+        Action::ResetSessionCosts => {
+            state.cache_hit_tokens = 0;
+            state.cache_miss_tokens = 0;
+            state.total_output_tokens = 0;
+            state.guard_rail_blocked = None;
+            ActionResult::Save
+        }
         Action::TogglePerfMonitor => {
             state.perf_enabled = crate::perf::PERF.toggle();
             state.dirty = true;

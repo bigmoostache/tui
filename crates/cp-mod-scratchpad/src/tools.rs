@@ -8,22 +8,14 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let title = match tool.input.get("cell_title").and_then(|v| v.as_str()) {
         Some(t) => t.to_string(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'cell_title' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_title' parameter".to_string(), true);
         }
     };
 
     let contents = match tool.input.get("cell_contents").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'cell_contents' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_contents' parameter".to_string(), true);
         }
     };
 
@@ -38,11 +30,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let preview =
         if contents.len() > 50 { format!("{}...", &contents[..contents.floor_char_boundary(47)]) } else { contents };
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created cell {} '{}': {}", id, title, preview),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created cell {} '{}': {}", id, title, preview), false)
 }
 
 /// Edit an existing scratchpad cell
@@ -50,11 +38,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cell_id = match tool.input.get("cell_id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'cell_id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_string(), true);
         }
     };
 
@@ -76,23 +60,15 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("No changes specified for cell {}", cell_id),
-                    is_error: true,
-                }
+                ToolResult::new(tool.id.clone(), format!("No changes specified for cell {}", cell_id), true)
             } else {
                 // Update Scratchpad panel timestamp
                 state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
-                ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Updated cell {}: {}", cell_id, changes.join(", ")),
-                    is_error: false,
-                }
+                ToolResult::new(tool.id.clone(), format!("Updated cell {}: {}", cell_id, changes.join(", ")), false)
             }
         }
         None => {
-            ToolResult { tool_use_id: tool.id.clone(), content: format!("Cell not found: {}", cell_id), is_error: true }
+            ToolResult::new(tool.id.clone(), format!("Cell not found: {}", cell_id), true)
         }
     }
 }
@@ -102,11 +78,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cell_ids = match tool.input.get("cell_ids").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'cell_ids' array parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_string(), true);
         }
     };
 
@@ -117,11 +89,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         ss.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
         state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Wiped all {} scratchpad cell(s)", count),
-            is_error: false,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Wiped all {} scratchpad cell(s)", count), false);
     }
 
     // Otherwise, delete specific cells
@@ -144,5 +112,5 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: deleted_count == 0 }
+    ToolResult::new(tool.id.clone(), output, deleted_count == 0)
 }

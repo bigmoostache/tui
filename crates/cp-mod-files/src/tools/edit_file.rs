@@ -98,11 +98,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: file_path".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
         }
     };
 
@@ -110,11 +106,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let old_string = match tool.input.get("old_string").and_then(|v| v.as_str()) {
         Some(s) => s,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: old_string".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_string(), true);
         }
     };
 
@@ -122,11 +114,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let new_string = match tool.input.get("new_string").and_then(|v| v.as_str()) {
         Some(s) => s,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: new_string".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
         }
     };
 
@@ -140,11 +128,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         .any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
 
     if !is_open {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is not open in context. Use file_open first.", path_str),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("File '{}' is not open in context. Use file_open first.", path_str), true);
     }
 
     let path = Path::new(path_str);
@@ -153,11 +137,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut content = match fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to read file: {}", e),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Failed to read file: {}", e), true);
         }
     };
 
@@ -189,20 +169,12 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             old_string.to_string()
         };
 
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("No match found for \"{}\"{}", needle_preview, hint),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("No match found for \"{}\"{}", needle_preview, hint), true);
     }
 
     // Write file
     if let Err(e) = fs::write(path, &content) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to write file: {}", e),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Failed to write file: {}", e), true);
     }
 
     // Update the context element's token count
@@ -249,7 +221,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     result_msg.push_str("```");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
+    ToolResult::new(tool.id.clone(), result_msg, false)
 }
 
 #[cfg(test)]

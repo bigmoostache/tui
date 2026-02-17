@@ -232,6 +232,18 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "unicode-width",
+]
+
+[[package]]
+name = "cp-mod-console"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -322,6 +334,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-prompt",
+ "ratatui",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2680,6 +2693,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cp-base",
+ "cp-mod-console",
  "cp-mod-files",
  "cp-mod-git",
  "cp-mod-github",

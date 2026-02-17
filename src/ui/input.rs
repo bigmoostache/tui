@@ -51,8 +51,15 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    // If nothing active, show READY
-    if !state.is_streaming && pending_tldrs == 0 && loading_count == 0 {
+    // Show guard rail block reason if present
+    if let Some(ref reason) = state.guard_rail_blocked {
+        spans.push(Span::styled(
+            format!(" BLOCKED: {} ", reason),
+            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+    } else if !state.is_streaming && pending_tldrs == 0 && loading_count == 0 {
+        // If nothing active, show READY
         spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
@@ -61,6 +68,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let (provider_name, model_name) = match state.llm_provider {
         LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
         LlmProvider::ClaudeCode => ("OAuth", state.anthropic_model.display_name()),
+        LlmProvider::ClaudeCodeApiKey => ("APIKey", state.anthropic_model.display_name()),
         LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
         LlmProvider::Groq => ("Groq", state.groq_model.display_name()),
         LlmProvider::DeepSeek => ("DeepSeek", state.deepseek_model.display_name()),

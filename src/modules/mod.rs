@@ -18,6 +18,7 @@ pub use cp_mod_preset::PresetModule;
 pub use cp_mod_prompt::PromptModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
+pub use cp_mod_console::ConsoleModule;
 pub use cp_mod_tmux::TmuxModule;
 pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
@@ -77,6 +78,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(GlobModule),
         Box::new(GrepModule),
         Box::new(TmuxModule),
+        Box::new(ConsoleModule),
         Box::new(TodoModule),
         Box::new(MemoryModule),
         Box::new(ScratchpadModule),
@@ -118,13 +120,20 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
 
     for module in all_modules() {
         if active_modules.contains(module.id())
-            && let Some(result) = module.execute_tool(tool, state)
+            && let Some(mut result) = module.execute_tool(tool, state)
         {
+            // Ensure tool_name is set for visualization dispatch
+            result.tool_name = tool.name.clone();
             return result;
         }
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Unknown tool: {}", tool.name), is_error: true }
+    ToolResult { 
+        tool_use_id: tool.id.clone(), 
+        content: format!("Unknown tool: {}", tool.name), 
+        is_error: true,
+        tool_name: tool.name.clone(),
+    }
 }
 
 /// Create a panel for the given context type by asking all modules.
@@ -211,6 +220,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'changes' parameter (expected array)".to_string(),
                 is_error: true,
+                tool_name: tool.name.clone(),
             };
         }
     };
@@ -310,6 +320,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: tool.id.clone(),
         content: result_parts.join("\n"),
         is_error: !failures.is_empty() && successes.is_empty(),
+        tool_name: tool.name.clone(),
     }
 }
 

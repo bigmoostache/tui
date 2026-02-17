@@ -3,6 +3,11 @@
 
 CONFIG_FILE=".context-pilot/config.json"
 
+# Load environment variables from .env
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
 while true; do
     # Run the TUI
     cargo run --release -- "$@"

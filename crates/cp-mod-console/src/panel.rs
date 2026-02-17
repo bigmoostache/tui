@@ -1,0 +1,161 @@
+use ratatui::prelude::*;
+
+use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
+use cp_base::constants::{chars, theme};
+use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
+use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+
+use crate::types::ConsoleState;
+
+/// Cache request payload: pre-read ring buffer data on the main thread.
+struct ConsoleCacheRequest {
+    context_id: String,
+    buffer_content: String,
+    total_written: u64,
+    current_source_hash: Option<String>,
+}
+
+pub struct ConsolePanel;
+
+impl Panel for ConsolePanel {
+    fn needs_cache(&self) -> bool {
+        true
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(200)
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+        let session_name = ctx.get_meta_str("console_name")?;
+        let cs = ConsoleState::get(state);
+        let handle = cs.sessions.get(session_name)?;
+        let (buffer_content, total_written) = handle.buffer.read_all();
+
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::CONSOLE),
+            data: Box::new(ConsoleCacheRequest {
+                context_id: ctx.id.clone(),
+                buffer_content,
+                total_written,
+                current_source_hash: ctx.source_hash.clone(),
+            }),
+        })
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let req = request.data.downcast::<ConsoleCacheRequest>().ok()?;
+        let ConsoleCacheRequest { context_id, buffer_content, total_written, current_source_hash } = *req;
+
+        // Use total_written as a cheap change-detection proxy
+        let new_hash = format!("{}_{}", total_written, hash_content(&buffer_content));
+        if current_source_hash.as_ref() == Some(&new_hash) {
+            return Some(CacheUpdate::Unchanged { context_id });
+        }
+
+        let token_count = estimate_tokens(&buffer_content);
+        Some(CacheUpdate::Content { context_id, content: buffer_content, token_count })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, state: &mut State) -> bool {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
+            return false;
+        };
+        let total_written_hash = format!("{}_{}", content.len(), hash_content(&content));
+        ctx.source_hash = Some(total_written_hash);
+        ctx.cached_content = Some(content.clone());
+        ctx.token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
+        ctx.cache_deprecated = false;
+        update_if_changed(ctx, &content);
+
+        // Also update status metadata from session handle
+        if let Some(session_name) = ctx.get_meta_str("console_name").map(|s| s.to_string()) {
+            let cs = ConsoleState::get(state);
+            if let Some(handle) = cs.sessions.get(&session_name) {
+                let status_label = handle.get_status().label();
+                ctx.set_meta("console_status", &status_label);
+            }
+        }
+        true
+    }
+
+    fn title(&self, state: &State) -> String {
+        if let Some(ctx) = state.context.get(state.selected_context) {
+            let desc = ctx
+                .get_meta_str("console_description")
+                .or_else(|| ctx.get_meta_str("console_command"))
+                .unwrap_or("?");
+            let status = ctx.get_meta_str("console_status").unwrap_or("?");
+            format!("console: {} ({})", desc, status)
+        } else {
+            "Console".to_string()
+        }
+    }
+
+    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let (content, command, status) = if let Some(ctx) = state.context.get(state.selected_context) {
+            let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
+                if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
+            });
+            let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();
+            let st = ctx.get_meta_str("console_status").unwrap_or("?").to_string();
+            (content, cmd, st)
+        } else {
+            (String::new(), String::new(), String::new())
+        };
+
+        let mut lines: Vec<Line> = Vec::new();
+
+        // Header: $ command [status]
+        let status_color = if status.starts_with("running") {
+            theme::accent()
+        } else if status.starts_with("exited(0)") {
+            theme::success()
+        } else {
+            theme::error()
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(" $ ".to_string(), Style::default().fg(theme::accent_dim())),
+            Span::styled(command, Style::default().fg(theme::text())),
+            Span::styled(format!("  [{}]", status), Style::default().fg(status_color)),
+        ]));
+
+        // Divider
+        lines.push(Line::from(vec![Span::styled(
+            format!(" {}", chars::HORIZONTAL.repeat(40)),
+            Style::default().fg(theme::border()),
+        )]));
+
+        // Output lines
+        for line in content.lines() {
+            lines.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(line.to_string(), Style::default().fg(theme::text())),
+            ]));
+        }
+
+        lines
+    }
+
+    fn context(&self, state: &State) -> Vec<ContextItem> {
+        state
+            .context
+            .iter()
+            .filter(|c| c.context_type == ContextType::CONSOLE)
+            .filter_map(|c| {
+                let desc = c
+                    .get_meta_str("console_description")
+                    .or_else(|| c.get_meta_str("console_command"))
+                    .unwrap_or("?");
+                let content = c.cached_content.as_ref()?;
+                let output = paginate_content(content, c.current_page, c.total_pages);
+                let status = c.get_meta_str("console_status").unwrap_or("?");
+                let header = format!("Console: {} ({})", desc, status);
+                Some(ContextItem::new(&c.id, header, output, c.last_refresh_ms))
+            })
+            .collect()
+    }
+}

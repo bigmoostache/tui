@@ -40,17 +40,13 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         match check {
             Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
             _ => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Pane '{}' not found. Check tmux pane IDs.", pid),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Pane '{}' not found. Check tmux pane IDs.", pid), true);
             }
         }
     } else {
         // No pane_id provided — create a new one in the background session
         if let Err(e) = ensure_bg_session() {
-            return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true };
+            return ToolResult::new(tool.id.clone(), e, true);
         }
 
         let output =
@@ -59,29 +55,17 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         match output {
             Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
             Ok(out) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to create tmux pane: {}", String::from_utf8_lossy(&out.stderr)),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Failed to create tmux pane: {}", String::from_utf8_lossy(&out.stderr)), true);
             }
             Err(e) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to run tmux command: {}", e),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Failed to run tmux command: {}", e), true);
             }
         }
     };
 
     // Check if this pane is already being monitored
     if state.context.iter().any(|c| c.get_meta_str("tmux_pane_id") == Some(&pane_id)) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Pane {} is already being monitored", pane_id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Pane {} is already being monitored", pane_id), true);
     }
 
     // Generate context ID (fills gaps) and UID
@@ -98,11 +82,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
     elem.set_meta("tmux_description", &description);
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created tmux {} pane {} ({})", context_id, pane_id, description),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created tmux {} pane {} ({})", context_id, pane_id, description), false)
 }
 
 /// Execute edit_tmux_config tool
@@ -113,11 +93,7 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
     let identifier = match identifier {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'pane_id' or 'context_id' parameter".to_string(), true);
         }
     };
 
@@ -140,21 +116,13 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult { tool_use_id: tool.id.clone(), content: "No changes specified".to_string(), is_error: true }
+                ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true)
             } else {
                 let pane_id = c.get_meta_str("tmux_pane_id").unwrap_or(identifier);
-                ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Updated pane {}: {}", pane_id, changes.join(", ")),
-                    is_error: false,
-                }
+                ToolResult::new(tool.id.clone(), format!("Updated pane {}: {}", pane_id, changes.join(", ")), false)
             }
         }
-        None => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier),
-            is_error: true,
-        },
+        None => ToolResult::new(tool.id.clone(), format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier), true),
     }
 }
 
@@ -184,45 +152,29 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     let identifier = match identifier {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'pane_id' or 'context_id' parameter".to_string(), true);
         }
     };
 
     let pane_id = match resolve_pane_id(identifier, state) {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier), true);
         }
     };
 
     let keys = match tool.input.get("keys").and_then(|v| v.as_str()) {
         Some(k) => k,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'keys' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'keys' parameter".to_string(), true);
         }
     };
 
     // Reject bare "Enter" since it's sent automatically
     if keys.eq_ignore_ascii_case("enter") {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content:
-                "console_send_keys already sends Enter automatically after your keys — no need to send it separately."
-                    .to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(),
+            "console_send_keys already sends Enter automatically after your keys — no need to send it separately."
+                .to_string(), true);
     }
 
     // Reject git/gh commands — use the dedicated git_execute and gh_execute tools instead.
@@ -233,13 +185,8 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             segment.starts_with("git ") || segment == "git" || segment.starts_with("gh ") || segment == "gh"
         });
     if has_git_gh {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content:
-                "Use the git_execute or gh_execute tools instead of running git/gh commands through console_send_keys."
-                    .to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Use the git_execute or gh_execute tools instead of running git/gh commands through console_send_keys."
+                    .to_string(), true);
     }
 
     // Send keys to the pane (always followed by Enter)
@@ -269,22 +216,10 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             let panel_msg = context_id.map(|id| format!(". Content up to date in panel {}", id)).unwrap_or_default();
 
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Sent keys to pane {}: {}{}", pane_id, keys, panel_msg),
-                is_error: false,
-            }
+            ToolResult::new(tool.id.clone(), format!("Sent keys to pane {}: {}{}", pane_id, keys, panel_msg), false)
         }
-        Ok(out) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to send keys: {}", String::from_utf8_lossy(&out.stderr)),
-            is_error: true,
-        },
-        Err(e) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to run tmux command: {}", e),
-            is_error: true,
-        },
+        Ok(out) => ToolResult::new(tool.id.clone(), format!("Failed to send keys: {}", String::from_utf8_lossy(&out.stderr)), true),
+        Err(e) => ToolResult::new(tool.id.clone(), format!("Failed to run tmux command: {}", e), true),
     }
 }
 
@@ -296,9 +231,5 @@ pub fn execute_sleep(tool: &ToolUse, state: &mut State) -> ToolResult {
     let new_deadline = now_ms() + sleep_ms;
     state.tool_sleep_until_ms = state.tool_sleep_until_ms.max(new_deadline);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Slept for {} second(s)", SLEEP_DURATION_SECS),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Slept for {} second(s)", SLEEP_DURATION_SECS), false)
 }
