@@ -106,6 +106,8 @@ pub struct State {
 
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
+    /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
+    pub guard_rail_blocked: Option<String>,
     /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
     pub reload_pending: bool,
     /// Waiting for file panels to load before continuing stream
@@ -191,6 +193,7 @@ impl Default for State {
             api_check_in_progress: false,
             api_check_result: None,
             api_retry_count: 0,
+            guard_rail_blocked: None,
             reload_pending: false,
             waiting_for_panels: false,
             previous_panel_hash_list: vec![],

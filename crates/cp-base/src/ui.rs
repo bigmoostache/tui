@@ -4,6 +4,7 @@
 //! can render tables without depending on the main binary.
 
 use ratatui::prelude::*;
+use unicode_width::UnicodeWidthStr;
 
 use crate::constants::theme;
 
@@ -31,6 +32,16 @@ impl Cell {
     }
 }
 
+/// Pad a string to a target display width using spaces, respecting alignment.
+fn pad_to_width(text: &str, target: usize, align: Align) -> String {
+    let w = UnicodeWidthStr::width(text);
+    let deficit = target.saturating_sub(w);
+    match align {
+        Align::Left => format!("{}{}", text, " ".repeat(deficit)),
+        Align::Right => format!("{}{}", " ".repeat(deficit), text),
+    }
+}
+
 /// Render a table with Unicode box-drawing separators.
 ///
 /// - `header`: column headers (bold, accent-colored)
@@ -42,21 +53,21 @@ impl Cell {
 pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Cell]>, indent: usize) -> Vec<Line<'a>> {
     let num_cols = header.len();
 
-    // Compute column widths from header + all rows + footer
-    let mut col_widths: Vec<usize> = header.iter().map(|c| c.text.chars().count()).collect();
+    // Compute column widths from header + all rows + footer using display width
+    let mut col_widths: Vec<usize> = header.iter().map(|c| UnicodeWidthStr::width(c.text.as_str())).collect();
     col_widths.resize(num_cols, 0);
 
     for row in rows {
         for (col, cell) in row.iter().enumerate() {
             if col < num_cols {
-                col_widths[col] = col_widths[col].max(cell.text.chars().count());
+                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
             }
         }
     }
     if let Some(f) = footer {
         for (col, cell) in f.iter().enumerate() {
             if col < num_cols {
-                col_widths[col] = col_widths[col].max(cell.text.chars().count());
+                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
             }
         }
     }
@@ -82,10 +93,7 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
                 spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
             }
             if let Some(cell) = cells.get(col) {
-                let padded = match cell.align {
-                    Align::Right => format!("{:>width$}", cell.text, width = *col_w),
-                    Align::Left => format!("{:<width$}", cell.text, width = *col_w),
-                };
+                let padded = pad_to_width(&cell.text, *col_w, cell.align);
                 let style = if bold { cell.style.bold() } else { cell.style };
                 spans.push(Span::styled(padded, style));
             } else {
@@ -103,10 +111,7 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
                 spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
             }
             let w = col_widths[col];
-            let padded = match hdr.align {
-                Align::Right => format!("{:>width$}", hdr.text, width = w),
-                Align::Left => format!("{:<width$}", hdr.text, width = w),
-            };
+            let padded = pad_to_width(&hdr.text, w, hdr.align);
             spans.push(Span::styled(padded, Style::default().fg(theme::accent()).bold()));
         }
         lines.push(Line::from(spans));

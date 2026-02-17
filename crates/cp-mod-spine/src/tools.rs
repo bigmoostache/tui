@@ -61,6 +61,16 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
+    if let Some(v) = tool.input.get("max_stream_cost") {
+        if v.is_null() {
+            SpineState::get_mut(state).config.max_stream_cost = None;
+            changes.push("max_stream_cost = disabled".to_string());
+        } else if let Some(n) = v.as_f64() {
+            SpineState::get_mut(state).config.max_stream_cost = Some(n);
+            changes.push(format!("max_stream_cost = ${:.2}", n));
+        }
+    }
+
     if let Some(v) = tool.input.get("max_duration_secs") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_duration_secs = None;

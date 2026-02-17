@@ -1177,13 +1177,15 @@ impl App {
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
-            SpineDecision::Blocked(_reason) => {
+            SpineDecision::Blocked(reason) => {
                 // Guard rail blocked — notification already created by engine
+                self.state.guard_rail_blocked = Some(reason);
                 self.state.dirty = true;
                 self.save_state_async();
             }
             SpineDecision::Continue(action) => {
                 // Auto-continuation fired — apply it and start streaming
+                self.state.guard_rail_blocked = None;
                 let should_stream = apply_continuation(&mut self.state, action);
                 if should_stream {
                     self.typewriter.reset();

@@ -17,3 +17,13 @@ panel:
   footer_msg_line: "  - {role}: {iso_time} ({time_delta})"
   footer_msg_header: "Last message datetimes:"
   footer_ack: "Panel display complete. Proceeding with conversation."
+
+# Context threshold notification - sent to spine when context usage crosses the intermediary cleaning threshold
+context_threshold_notification: |
+  Context usage has crossed the cleaning threshold ({usage_pct}% of budget, {used_tokens}/{budget_tokens} tokens).
+  You should proactively manage your context to stay under the threshold:
+  - Close file panels you no longer need (context_close)
+  - Close grep/glob results that have served their purpose
+  - Summarize logs if there are many top-level entries (log_summarize)
+  - Close conversation history panels after extracting key information
+  Review your open panels and close any that are no longer essential.

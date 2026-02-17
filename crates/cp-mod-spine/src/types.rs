@@ -76,9 +76,12 @@ pub struct SpineConfig {
     /// Max total output tokens before blocking auto-continuation
     #[serde(default)]
     pub max_output_tokens: Option<usize>,
-    /// Max cost in USD before blocking auto-continuation
+    /// Max session cost in USD before blocking auto-continuation
     #[serde(default)]
     pub max_cost: Option<f64>,
+    /// Max stream cost in USD before blocking auto-continuation
+    #[serde(default)]
+    pub max_stream_cost: Option<f64>,
     /// Max duration in seconds of autonomous operation before blocking
     #[serde(default)]
     pub max_duration_secs: Option<u64>,
@@ -114,6 +117,7 @@ impl Default for SpineConfig {
             continue_until_todos_done: false,
             max_output_tokens: None,
             max_cost: None,
+            max_stream_cost: None,
             max_duration_secs: None,
             max_messages: None,
             max_auto_retries: None,

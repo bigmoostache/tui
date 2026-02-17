@@ -13,6 +13,8 @@ pub struct PromptsConfig {
     pub tldr_prompt: String,
     pub tldr_min_tokens: usize,
     pub panel: PanelPrompts,
+    #[serde(default)]
+    pub context_threshold_notification: String,
 }
 
 #[derive(Debug, Deserialize)]

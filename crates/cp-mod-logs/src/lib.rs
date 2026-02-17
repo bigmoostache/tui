@@ -190,10 +190,10 @@ impl Module for LogsModule {
                 id: "log_summarize".to_string(),
                 name: "Summarize Logs".to_string(),
                 short_desc: "Summarize multiple logs into a parent log".to_string(),
-                description: "Summarizes multiple top-level log entries into a single parent summary log. The original logs become children hidden under the summary. Only top-level logs (no parent) can be summarized. Minimum 10 entries required.".to_string(),
+                description: "Summarizes multiple top-level log entries into a single parent summary log. The original logs become children hidden under the summary. Only top-level logs (no parent) can be summarized. Minimum 4 entries required.".to_string(),
                 params: vec![
                     ToolParam::new("log_ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Array of log IDs to summarize (e.g., ['L27', 'L28', 'L29']). Minimum 10 entries. All must be top-level (no parent).")
+                        .desc("Array of log IDs to summarize (e.g., ['L27', 'L28', 'L29']). Minimum 4 entries. All must be top-level (no parent).")
                         .required(),
                     ToolParam::new("content", ParamType::String)
                         .desc("Summary text for the new parent log entry")
@@ -424,9 +424,9 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    // Guardrail: minimum 10 entries
-    if log_ids.len() < 10 {
-        return ToolResult::new(tool.id.clone(), format!("Must summarize at least 10 logs, got {}", log_ids.len()), true);
+    // Guardrail: minimum 4 entries
+    if log_ids.len() < 4 {
+        return ToolResult::new(tool.id.clone(), format!("Must summarize at least 4 logs, got {}", log_ids.len()), true);
     }
 
     // Validate: all IDs exist and are top-level
