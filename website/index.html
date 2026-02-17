@@ -3,14 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Context Pilot — Terminal Initialization Sequence</title>
-    <meta name="description" content="Context Pilot: AI-Native Terminal IDE. Experience the power of TUI-first AI coding.">
+    <title>Context Pilot — AI-Native Terminal IDE</title>
+    <meta name="description" content="Context Pilot is an AI-native terminal IDE that gives you full control over what your AI sees. Built with Rust and ratatui for blazing-fast performance.">
+    <link rel="canonical" href="https://bigmoostache.github.io/context-pilot/">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Context Pilot — AI-Native Terminal IDE">
+    <meta property="og:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://bigmoostache.github.io/context-pilot/">
+    <meta property="og:site_name" content="Context Pilot">
+    <meta property="og:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Context Pilot - AI-Native Terminal IDE with visible context management">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Context Pilot — AI-Native Terminal IDE">
+    <meta name="twitter:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <meta name="twitter:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
+    <meta name="twitter:image:alt" content="Context Pilot - AI-Native Terminal IDE">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="author" content="Context Pilot">
+    <meta name="keywords" content="AI coding, terminal IDE, Rust, ratatui, AI assistant, context management, TUI, developer tools">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="color-scheme" content="dark light">
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Context Pilot",
+      "description": "AI-native terminal IDE that gives you full control over what your AI sees",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Context Pilot",
+        "url": "https://github.com/bigmoostache/context-pilot"
+      }
+    }
+    </script>
+    
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+    
     <!-- Header -->
     <header class="header">
         <nav class="nav container">
@@ -18,7 +69,7 @@
                 <span class="logo-icon">⎈</span>
                 <span class="logo-text">Context Pilot</span>
             </a>
-            <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.nav-links').classList.toggle('nav-open')">
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
                 <span></span><span></span><span></span>
             </button>
             <div class="nav-links">
@@ -28,6 +79,22 @@
                 <a href="#modules">Modules</a>
                 <a href="docs/index.html">Docs</a>
                 <a href="#getting-started">Get Started</a>
+                <button class="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle theme">
+                    <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
                 <a href="https://github.com/bigmoostache/context-pilot" class="nav-github">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     GitHub
@@ -37,7 +104,7 @@
     </header>
 
     <!-- Hero -->
-    <section class="hero">
+    <section id="main-content" class="hero">
         <div class="container">
             <div class="hero-badge">AI-Native Terminal IDE</div>
             <h1 class="hero-title">
@@ -59,6 +126,15 @@
                     <span class="terminal-dot yellow"></span>
                     <span class="terminal-dot green"></span>
                     <span class="terminal-title">context-pilot</span>
+                    <button class="terminal-pause" id="terminal-pause" aria-label="Pause animation" title="Pause/Resume animation">
+                        <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                        <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </button>
                 </div>
                 <div class="terminal-body">
                     <pre class="terminal-content" id="terminal-anim"></pre>
@@ -506,8 +582,263 @@
                 <p>Built with 🦀 Rust + ratatui. Open source forever.</p>
             </div>
         </div>
-    </div>
+    </footer>
 
-    <script src="script.js"></script>
+    <!-- Back to Top Button -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
+
+    <!-- Copy Buttons -->
+    <script>
+    (function() {
+        document.querySelectorAll('.code-block').forEach(block => {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'Copy';
+            btn.addEventListener('click', () => {
+                const code = block.querySelector('code').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    btn.textContent = 'Copied!';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'Copy';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                });
+            });
+            block.style.position = 'relative';
+            block.appendChild(btn);
+        });
+    })();
+    </script>
+
+    <!-- Navigation Toggle Script -->
+    <script>
+    (function() {
+        const navToggle = document.getElementById('nav-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        
+        if (navToggle && navLinks) {
+            navToggle.addEventListener('click', () => {
+                const isOpen = navToggle.classList.contains('active');
+                navToggle.classList.toggle('active');
+                navToggle.setAttribute('aria-expanded', !isOpen);
+                navLinks.classList.toggle('nav-open');
+            });
+        }
+    })();
+    </script>
+
+    <!-- Scroll Animations -->
+    <script>
+    (function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('visible');
+                    observer.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    })();
+    </script>
+
+    <!-- Terminal Animation -->
+    <script>
+    (function() {
+        const el = document.getElementById('terminal-anim');
+        const pauseBtn = document.getElementById('terminal-pause');
+        if (!el || !pauseBtn) return;
+
+        let isPaused = false;
+        let animationTimeout = null;
+
+        const C = (cls, text) => `<span class="${cls}">${text}</span>`;
+        const dim = t => C('t-dim', t);
+        const cyan = t => C('t-cyan', t);
+        const green = t => C('t-green', t);
+        const yellow = t => C('t-yellow', t);
+
+        // Scene 1: Panel list appears line by line
+        const panels = [
+            dim('┌─ Context Panels ──────────────────────────────────┐'),
+            `${cyan('P1')} ${green('Chat')}         ${dim('│')} 250 tokens   ${dim('│')} Conversation`,
+            `${cyan('P2')} ${green('Tree')}         ${dim('│')} 1,884 tokens ${dim('│')} Directory structure`,
+            `${cyan('P3')} ${green('Todos')}        ${dim('│')} 316 tokens   ${dim('│')} Task tracking`,
+            `${cyan('P4')} ${green('Memories')}     ${dim('│')} 279 tokens   ${dim('│')} Persistent notes`,
+            `${cyan('P5')} ${green('Overview')}     ${dim('│')} 1,104 tokens ${dim('│')} Context usage`,
+            `${cyan('P6')} ${green('Git')}          ${dim('│')} 11 tokens    ${dim('│')} Status &amp; diffs`,
+            dim('└────────────────────────────────────────────────────┘'),
+            dim('  Context: 5,092 / 200,000 tokens (2.5%)'),
+        ];
+
+        // Scene 2: User types a message
+        const userMsg = 'refactor the auth module to use async traits';
+
+        // Scene 3: AI response streams
+        const aiLines = [
+            `${dim('───────────────────────────────────────────────────')}`,
+            `${green('⚙')} Opening ${cyan('src/auth/mod.rs')}...`,
+            `${green('⚙')} Opening ${cyan('src/auth/provider.rs')}...`,
+            `${green('✓')} Replaced ${yellow('3')} sync trait methods with async fn`,
+            `${green('✓')} Updated ${yellow('12')} call sites across ${yellow('4')} files`,
+            `${green('✓')} All tests passing`,
+        ];
+
+        let lines = [];
+        let phase = 0;
+        let idx = 0;
+        let charIdx = 0;
+        let typingLine = '';
+
+        function render() {
+            let out = lines.join('\n');
+            if (typingLine) {
+                out += (lines.length ? '\n' : '') + typingLine;
+            }
+            // Always show cursor
+            out += (lines.length || typingLine ? '\n' : '') + `${yellow('❯')} ${C('t-blink', '█')}`;
+            el.innerHTML = out;
+        }
+
+        function tick() {
+            if (isPaused) return;
+
+            if (phase === 0) {
+                // Phase 0: panels appear one by one
+                if (idx < panels.length) {
+                    lines.push(panels[idx]);
+                    idx++;
+                    render();
+                    animationTimeout = setTimeout(tick, 80);
+                } else {
+                    phase = 1;
+                    idx = 0;
+                    charIdx = 0;
+                    render();
+                    animationTimeout = setTimeout(tick, 600);
+                }
+            } else if (phase === 1) {
+                // Phase 1: user types message
+                if (charIdx < userMsg.length) {
+                    charIdx++;
+                    // Replace cursor line with typing
+                    const typed = userMsg.slice(0, charIdx);
+                    el.innerHTML = lines.join('\n') + '\n' + `${yellow('❯')} ${typed}${C('t-blink', '█')}`;
+                    animationTimeout = setTimeout(tick, 35 + Math.random() * 40);
+                } else {
+                    // "Submit" — add the user line to lines
+                    lines.push(`${yellow('❯')} ${userMsg}`);
+                    phase = 2;
+                    idx = 0;
+                    render();
+                    animationTimeout = setTimeout(tick, 400);
+                }
+            } else if (phase === 2) {
+                // Phase 2: AI response streams in
+                if (idx < aiLines.length) {
+                    lines.push(aiLines[idx]);
+                    idx++;
+                    render();
+                    animationTimeout = setTimeout(tick, 300 + Math.random() * 200);
+                } else {
+                    // Done — pause then restart
+                    animationTimeout = setTimeout(() => {
+                        lines = [];
+                        phase = 0;
+                        idx = 0;
+                        charIdx = 0;
+                        typingLine = '';
+                        render();
+                        animationTimeout = setTimeout(tick, 500);
+                    }, 4000);
+                }
+            }
+        }
+
+        // Pause/Resume button
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            const pauseIcon = pauseBtn.querySelector('.pause-icon');
+            const playIcon = pauseBtn.querySelector('.play-icon');
+            
+            if (isPaused) {
+                if (animationTimeout) clearTimeout(animationTimeout);
+                pauseIcon.style.display = 'none';
+                playIcon.style.display = 'block';
+                pauseBtn.setAttribute('aria-label', 'Resume animation');
+            } else {
+                pauseIcon.style.display = 'block';
+                playIcon.style.display = 'none';
+                pauseBtn.setAttribute('aria-label', 'Pause animation');
+                tick();
+            }
+        });
+
+        // Start after a small delay
+        animationTimeout = setTimeout(tick, 800);
+        render();
+    })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+    (function() {
+        const themeToggle = document.querySelector('.theme-toggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or default to system preference
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+        
+        // Apply the theme
+        html.setAttribute('data-theme', currentTheme);
+        
+        // Toggle theme
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+            }
+        });
+    })();
+    </script>
+
+    <!-- Back to Top Button Script -->
+    <script>
+    (function() {
+        const backToTop = document.getElementById('back-to-top');
+        
+        // Show/hide button based on scroll position
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 400) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+        
+        // Scroll to top on click
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    })();
+    </script>
 </body>
 </html>
