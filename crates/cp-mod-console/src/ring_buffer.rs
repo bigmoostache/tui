@@ -78,10 +78,14 @@ impl RingBuffer {
         lines[start..].join("\n")
     }
 
-    /// Check if the buffer contains a substring pattern.
+    /// Check if the buffer content matches a regex pattern.
+    /// Falls back to literal substring match if the regex is invalid.
     pub fn contains_pattern(&self, pattern: &str) -> bool {
         let (content, _) = self.read_all();
-        content.contains(pattern)
+        match regex::Regex::new(pattern) {
+            Ok(re) => re.is_match(&content),
+            Err(_) => content.contains(pattern),
+        }
     }
 
     /// Monotonic counter of total bytes written (for change detection).
@@ -118,6 +122,15 @@ mod tests {
         rb.write(b"error: something failed\n");
         assert!(rb.contains_pattern("something failed"));
         assert!(!rb.contains_pattern("success"));
+    }
+
+    #[test]
+    fn contains_pattern_regex() {
+        let rb = RingBuffer::new();
+        rb.write(b"[INFO] Server started on port 3000\n");
+        assert!(rb.contains_pattern(r"port \d+"));
+        assert!(rb.contains_pattern(r"Server started"));
+        assert!(!rb.contains_pattern(r"^ERROR"));
     }
 
     #[test]

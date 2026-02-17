@@ -214,7 +214,9 @@ impl Module for ConsoleModule {
                 short_desc: "Wait for process event".to_string(),
                 description: "Registers a waiter for a console event. Two modes: \
                     mode='exit': waits for the process to exit (use for builds, one-shot commands). \
-                    mode='pattern': waits for a substring to appear in output (use for server ready messages, specific log lines). \
+                    mode='pattern': waits for a regex pattern to match in output (use for server ready messages, specific log lines). \
+                    Patterns are full regex — e.g. 'Listening on port \\d+', 'error|warning', 'Finished.*target'. \
+                    Falls back to literal substring match if the regex is invalid. \
                     Two blocking modes: \
                     block=true (default): pauses tool execution until condition is met or max_wait expires. \
                     Best for sequential workflows (build then test). \
@@ -226,11 +228,11 @@ impl Module for ConsoleModule {
                         .desc("Console panel ID (e.g., 'P11')")
                         .required(),
                     ToolParam::new("mode", ParamType::String)
-                        .desc("Wait mode: 'exit' for process completion, 'pattern' for substring match in output")
+                        .desc("Wait mode: 'exit' for process completion, 'pattern' for regex match in output")
                         .enum_vals(&["exit", "pattern"])
                         .required(),
                     ToolParam::new("pattern", ParamType::String)
-                        .desc("Substring to match in output (required when mode='pattern'). Matches against the ring buffer of recent output."),
+                        .desc("Regex pattern to match in output (required when mode='pattern'). E.g. 'Finished.*target', 'error|warning', 'port \\d+'. Falls back to literal match if invalid regex."),
                     ToolParam::new("block", ParamType::Boolean)
                         .desc("true (default): block until condition met. false: async notification via spine.")
                         .default_val("true"),
