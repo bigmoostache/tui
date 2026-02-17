@@ -58,15 +58,13 @@ impl Panel for TreePanel {
         };
         ctx.cache_deprecated = false;
         // Check if content actually changed before updating
-        let new_hash = cp_base::cache::hash_content(&content);
-        if ctx.content_hash.as_deref() == Some(&new_hash) && ctx.cached_content.is_some() {
+        if !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
             return false;
         }
         ctx.cached_content = Some(content);
         ctx.token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
-        ctx.content_hash = Some(new_hash);
         true
     }
 
