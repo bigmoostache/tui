@@ -1174,3 +1174,60 @@ body {
 .insert-coin.show {
     opacity: 1;
 }
+
+/* ===== Back to Top Button ===== */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 48px;
+    height: 48px;
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(92, 224, 216, 0.3);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    z-index: 90;
+}
+
+.back-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.back-to-top:hover {
+    background: var(--accent-green);
+    box-shadow: 0 6px 16px rgba(92, 224, 160, 0.4);
+    transform: translateY(-2px);
+}
+
+.back-to-top:active {
+    transform: translateY(0);
+}
+
+[data-theme="light"] .back-to-top {
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+}
+
+[data-theme="light"] .back-to-top:hover {
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+@media (max-width: 768px) {
+    .back-to-top {
+        bottom: 1.5rem;
+        right: 1.5rem;
+        width: 44px;
+        height: 44px;
+    }
+}
