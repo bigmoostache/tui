@@ -2,6 +2,7 @@
 //!
 //! Called from app.rs both periodically (main loop) and synchronously (after InputSubmit).
 
+use cp_base::config::PROMPTS;
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State};
 
@@ -31,6 +32,9 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     if state.is_streaming {
         return SpineDecision::Idle;
     }
+
+    // Check context threshold and emit notification if crossed
+    check_context_threshold(state);
 
     // Check if any auto-continuation wants to fire
     let continuations = all_continuations();
@@ -130,4 +134,47 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
             true
         }
     }
+}
+
+/// Check if context usage has crossed the cleaning threshold.
+/// If so, fire a one-shot notification to inform the AI to manage its context.
+/// The notification is deduplicated by source tag so it only fires once per threshold crossing.
+fn check_context_threshold(state: &mut State) {
+    let threshold_tokens = state.cleaning_threshold_tokens();
+    if threshold_tokens == 0 {
+        return;
+    }
+
+    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+
+    if total_tokens < threshold_tokens {
+        return;
+    }
+
+    // Check if we already have an unprocessed notification for this
+    let source_tag = "context_threshold";
+    let already_notified = SpineState::get(state)
+        .notifications
+        .iter()
+        .any(|n| !n.processed && n.source == source_tag);
+
+    if already_notified {
+        return;
+    }
+
+    // Build notification content from the YAML prompt template
+    let budget_tokens = state.effective_context_budget();
+    let usage_pct = if budget_tokens > 0 {
+        (total_tokens as f64 / budget_tokens as f64 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+
+    let content = PROMPTS
+        .context_threshold_notification
+        .replace("{usage_pct}", &format!("{:.0}", usage_pct))
+        .replace("{used_tokens}", &total_tokens.to_string())
+        .replace("{budget_tokens}", &budget_tokens.to_string());
+
+    SpineState::create_notification(state, NotificationType::Custom, source_tag.to_string(), content);
 }

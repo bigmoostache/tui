@@ -46,6 +46,7 @@ pub enum Action {
     ConfigNextTheme,
     ConfigPrevTheme,
     OpenCommandPalette,
+    ResetSessionCosts,
     SelectContextById(String),
     None,
 }

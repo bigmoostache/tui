@@ -313,11 +313,12 @@ fn build_tree_new(
             // Check for folder description
             let folder_desc = desc_map.get(&entry_path).map(|d| &d.description);
 
+            let triangle = if is_open { "▼ " } else { "▶ " };
             if is_open {
                 if let Some(desc) = folder_desc {
-                    output.push_str(&format!("{}{}{}/  - {}\n", prefix, connector, name_str, desc));
+                    output.push_str(&format!("{}{}{}{}/  - {}\n", prefix, connector, triangle, name_str, desc));
                 } else {
-                    output.push_str(&format!("{}{}{}/\n", prefix, connector, name_str));
+                    output.push_str(&format!("{}{}{}{}/\n", prefix, connector, triangle, name_str));
                 }
                 build_tree_new(
                     &entry.path(),
@@ -329,9 +330,9 @@ fn build_tree_new(
                     output,
                 );
             } else if let Some(desc) = folder_desc {
-                output.push_str(&format!("{}{}{}/ - {}\n", prefix, connector, name_str, desc));
+                output.push_str(&format!("{}{}{}{}/ - {}\n", prefix, connector, triangle, name_str, desc));
             } else {
-                output.push_str(&format!("{}{}{}/\n", prefix, connector, name_str));
+                output.push_str(&format!("{}{}{}{}/ \n", prefix, connector, triangle, name_str));
             }
         } else if let Some(desc) = desc_map.get(&entry_path) {
             // Check if description is stale
