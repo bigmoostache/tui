@@ -138,7 +138,17 @@ impl ConsoleState {
         let now = now_ms();
         let mut remaining_blocking = Vec::new();
         for waiter in blocking_waiters {
-            // Check timeout first
+            // Check if condition is satisfied FIRST (before timeout check)
+            // to avoid race where pattern arrives in the same poll cycle as deadline
+            let cs = Self::get(state);
+            if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
+                if let Some(ref id) = waiter.tool_use_id {
+                    satisfied_blocking.push((id.clone(), result));
+                }
+                continue;
+            }
+
+            // Then check timeout
             if let Some(deadline) = waiter.deadline_ms {
                 if now >= deadline {
                     if let Some(ref id) = waiter.tool_use_id {
@@ -161,14 +171,7 @@ impl ConsoleState {
                     continue;
                 }
             }
-            let cs = Self::get(state);
-            if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
-                if let Some(ref id) = waiter.tool_use_id {
-                    satisfied_blocking.push((id.clone(), result));
-                }
-            } else {
-                remaining_blocking.push(waiter);
-            }
+            remaining_blocking.push(waiter);
         }
 
         // Check async waiters

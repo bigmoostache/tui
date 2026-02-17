@@ -33,14 +33,17 @@ pub struct SessionHandle {
 unsafe impl Send for SessionHandle {}
 unsafe impl Sync for SessionHandle {}
 
-/// Build the log file path for a given session key.
+/// Build the log file path for a given session key (always absolute).
 pub fn log_file_path(key: &str) -> PathBuf {
-    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key))
+    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key));
+    // Ensure absolute path so cwd doesn't break file resolution
+    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
-/// Build the input file path for a given session key.
+/// Build the input file path for a given session key (always absolute).
 pub fn input_file_path(key: &str) -> PathBuf {
-    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.in", key))
+    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.in", key));
+    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
 impl SessionHandle {
