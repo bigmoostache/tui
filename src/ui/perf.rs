@@ -182,7 +182,7 @@ impl PerfMetrics {
         }
 
         // Check if stats need refresh (time-based, not frame-based)
-        use crate::constants::PERF_STATS_REFRESH_MS;
+        use crate::infra::constants::PERF_STATS_REFRESH_MS;
         let last_refresh = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).last_stats_refresh;
         if last_refresh.elapsed().as_millis() >= PERF_STATS_REFRESH_MS as u128 {
             self.refresh_system_stats();

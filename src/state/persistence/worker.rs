@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{STATES_DIR, STORE_DIR};
+use crate::infra::constants::{STATES_DIR, STORE_DIR};
 use crate::state::WorkerState;
 
 fn states_dir() -> PathBuf {

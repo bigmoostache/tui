@@ -24,7 +24,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     // Show retry count when retrying after API errors
     if state.api_retry_count > 0 {
         spans.push(Span::styled(
-            format!(" RETRY {}/{} ", state.api_retry_count, crate::constants::MAX_API_RETRIES),
+            format!(" RETRY {}/{} ", state.api_retry_count, crate::infra::constants::MAX_API_RETRIES),
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -199,7 +199,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Auto-continuation status card (always visible)
     {
-        use crate::config::normalize_icon;
+        use crate::infra::config::normalize_icon;
         use cp_mod_spine::SpineState;
         let spine_cfg = &SpineState::get(state).config;
         let (icon, bg_color) = if spine_cfg.continue_until_todos_done {

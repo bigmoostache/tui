@@ -1,19 +1,23 @@
 pub mod chars;
 pub mod helpers;
+pub mod help;
+pub mod highlight;
 mod input;
 pub mod markdown;
+pub mod perf;
 mod sidebar;
 pub mod spinner;
 pub mod theme;
+pub mod typewriter;
 
 use ratatui::{
     prelude::*,
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
-use crate::core::panels;
-use crate::perf::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
+use crate::infra::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
+use crate::app::panels;
+use crate::ui::perf::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
 use crate::state::{ContextType, State};
 
 pub fn render(frame: &mut Frame, state: &mut State) {
@@ -548,7 +552,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
         ]));
     } else if let Some(result) = &state.api_check_result {
-        use crate::config::normalize_icon;
+        use crate::infra::config::normalize_icon;
         let (icon, color, msg) = if result.all_ok() {
             (normalize_icon("✓"), theme::success(), "API OK")
         } else if let Some(err) = &result.error {
@@ -674,7 +678,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     // Show current theme with preview icons
     {
-        use crate::config::{THEME_ORDER, get_theme};
+        use crate::infra::config::{THEME_ORDER, get_theme};
         let current_theme = get_theme(&state.active_theme);
         let fallback_icon = "📄".to_string();
 

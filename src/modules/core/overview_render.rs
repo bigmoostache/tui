@@ -227,7 +227,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
     let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
-    let now_ms = crate::core::panels::now_ms();
+    let now_ms = crate::app::panels::now_ms();
 
     let modules = all_modules();
 

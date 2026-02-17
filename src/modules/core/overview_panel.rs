@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::actions::Action;
-use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::core::panels::{ContextItem, Panel};
+use crate::app::actions::Action;
+use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::app::panels::{ContextItem, Panel};
 use crate::state::{ContextType, State};
 
 use super::overview_render;
@@ -51,7 +51,7 @@ impl Panel for OverviewPanel {
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::OVERVIEW) {
             ctx.token_count = token_count;
             ctx.cached_content = Some(content.clone());
-            crate::core::panels::update_if_changed(ctx, &content);
+            crate::app::panels::update_if_changed(ctx, &content);
         }
     }
 

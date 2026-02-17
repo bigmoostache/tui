@@ -5,7 +5,7 @@
 
 use std::sync::mpsc::Sender;
 
-use crate::cache::{CacheUpdate, process_cache_request};
+use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, get_context_type_meta};
 
 /// Check if any async-wait panels have cache_deprecated = true
@@ -31,7 +31,7 @@ pub fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>
     for ctx in &state.context {
         let needs_wait = get_context_type_meta(ctx.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false);
         if needs_wait && ctx.cache_deprecated && !ctx.cache_in_flight {
-            let panel = crate::core::panels::get_panel(&ctx.context_type);
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
             if let Some(request) = panel.build_cache_request(ctx, state) {
                 process_cache_request(request, cache_tx.clone());
                 any_triggered = true;

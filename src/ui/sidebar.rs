@@ -1,7 +1,7 @@
 use ratatui::{prelude::*, widgets::Paragraph};
 
 use super::{chars, helpers::*, spinner, theme};
-use crate::constants::SIDEBAR_HELP_HEIGHT;
+use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
 
 /// Maximum number of dynamic contexts (P7+) to show per page

@@ -23,8 +23,8 @@ use std::path::PathBuf;
 
 use cp_mod_logs::LogsState;
 
-use crate::config::set_active_theme;
-use crate::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::infra::config::set_active_theme;
+use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
 use crate::state::{ContextElement, ContextType, Message, PanelData, SharedConfig, State, WorkerState};
 
 /// Errors directory name
@@ -66,7 +66,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         cache_deprecated: true, // Will be refreshed on load
         cache_in_flight: false,
         // Use saved timestamp if available, otherwise current time for new panels
-        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
+        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::app::panels::now_ms() },
         content_hash: panel.content_hash.clone(),
         source_hash: None,
         current_page: 0,
@@ -232,9 +232,9 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     let mut deletes = Vec::new();
     let ensure_dirs = vec![
         dir.clone(),
-        dir.join(crate::constants::STATES_DIR),
-        dir.join(crate::constants::PANELS_DIR),
-        dir.join(crate::constants::MESSAGES_DIR),
+        dir.join(crate::infra::constants::STATES_DIR),
+        dir.join(crate::infra::constants::PANELS_DIR),
+        dir.join(crate::infra::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
     ];
 
@@ -310,13 +310,13 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     };
     if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
         writes.push(WriteOp {
-            path: dir.join(crate::constants::STATES_DIR).join(format!("{}.json", DEFAULT_WORKER_ID)),
+            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{}.json", DEFAULT_WORKER_ID)),
             content: json.into_bytes(),
         });
     }
 
     // Panels
-    let panels_dir = dir.join(crate::constants::PANELS_DIR);
+    let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in state.context.iter() {
@@ -352,7 +352,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     }
 
     // History messages for ConversationHistory panels
-    let messages_dir = dir.join(crate::constants::MESSAGES_DIR);
+    let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     for ctx in &state.context {
         if ctx.context_type == ContextType::CONVERSATION_HISTORY
             && let Some(ref msgs) = ctx.history_messages
@@ -389,7 +389,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
 
 /// Build a WriteOp for a single message (CPU work only — no I/O).
 pub fn build_message_op(msg: &Message) -> WriteOp {
-    let dir = PathBuf::from(STORE_DIR).join(crate::constants::MESSAGES_DIR);
+    let dir = PathBuf::from(STORE_DIR).join(crate::infra::constants::MESSAGES_DIR);
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let yaml = serde_yaml::to_string(msg).unwrap_or_default();
     WriteOp { path: dir.join(format!("{}.yaml", file_id)), content: yaml.into_bytes() }

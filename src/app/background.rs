@@ -5,7 +5,7 @@ use std::thread;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::constants::{API_ENDPOINT, API_VERSION, MAX_TLDR_TOKENS, MODEL_TLDR, prompts};
+use crate::infra::constants::{API_ENDPOINT, API_VERSION, MAX_TLDR_TOKENS, MODEL_TLDR, prompts};
 use crate::llms::error::LlmError;
 use crate::state::estimate_tokens;
 

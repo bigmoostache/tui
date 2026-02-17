@@ -1,4 +1,4 @@
-use crate::persistence::log_error;
+use crate::state::persistence::log_error;
 use crate::state::{ContextType, State, estimate_tokens};
 
 use super::ActionResult;
@@ -57,7 +57,7 @@ pub fn handle_stream_done(
         // Remove our estimate, add actual
         ctx.token_count =
             ctx.token_count.saturating_sub(state.streaming_estimated_tokens).saturating_add(output_tokens);
-        ctx.last_refresh_ms = crate::core::panels::now_ms();
+        ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
     state.streaming_estimated_tokens = 0;
 

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use crate::constants::{
+use crate::infra::constants::{
     TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
 

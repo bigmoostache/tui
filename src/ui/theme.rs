@@ -1,2 +1,2 @@
 // Re-export theme colors from centralized constants
-pub use crate::constants::theme::*;
+pub use crate::infra::constants::theme::*;

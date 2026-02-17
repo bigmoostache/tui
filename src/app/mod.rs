@@ -1,5 +1,8 @@
+pub mod actions;
 mod app;
+pub mod background;
 mod context;
+pub mod events;
 mod init;
 pub mod panels;
 mod wait;

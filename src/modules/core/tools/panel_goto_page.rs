@@ -1,6 +1,6 @@
-use crate::core::panels::paginate_content;
+use crate::app::panels::paginate_content;
 use crate::state::{State, estimate_tokens};
-use crate::tools::{ToolResult, ToolUse};
+use crate::infra::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("panel_id").and_then(|v| v.as_str()) {

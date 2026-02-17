@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{PANELS_DIR, STORE_DIR};
+use crate::infra::constants::{PANELS_DIR, STORE_DIR};
 use crate::state::PanelData;
 
 fn panels_dir() -> PathBuf {

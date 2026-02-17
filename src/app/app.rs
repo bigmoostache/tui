@@ -5,21 +5,21 @@ use std::time::Duration;
 use crossterm::event;
 use ratatui::prelude::*;
 
-use crate::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
-use crate::api::{StreamEvent, StreamParams, start_streaming};
-use crate::background::{TlDrResult, generate_tldr};
-use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
-use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
-use crate::core::panels::now_ms;
-use crate::events::handle_event;
-use crate::gh_watcher::GhWatcher;
-use crate::help::CommandPalette;
-use crate::persistence::{PersistenceWriter, build_message_op, build_save_batch, check_ownership, save_state};
+use crate::app::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
+use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
+use crate::app::background::{TlDrResult, generate_tldr};
+use crate::state::cache::{CacheRequest, CacheUpdate, process_cache_request};
+use crate::infra::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
+use crate::app::panels::now_ms;
+use crate::app::events::handle_event;
+use crate::infra::gh_watcher::GhWatcher;
+use crate::ui::help::CommandPalette;
+use crate::state::persistence::{PersistenceWriter, build_message_op, build_save_batch, check_ownership, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
-use crate::tools::{ToolResult, ToolUse, execute_tool, perform_reload};
-use crate::typewriter::TypewriterBuffer;
+use crate::infra::tools::{ToolResult, ToolUse, execute_tool, perform_reload};
+use crate::ui::typewriter::TypewriterBuffer;
 use crate::ui;
-use crate::watcher::{FileWatcher, WatchEvent};
+use crate::infra::watcher::{FileWatcher, WatchEvent};
 
 use super::context::prepare_stream_context;
 use super::init::get_active_agent_content;
@@ -304,7 +304,7 @@ impl App {
                         model,
                         e
                     );
-                    crate::persistence::log_error(&log_msg);
+                    crate::state::persistence::log_error(&log_msg);
 
                     // Check if we should retry
                     if will_retry {
@@ -454,7 +454,7 @@ impl App {
                 }],
                 tool_results: Vec::new(),
                 input_tokens: 0,
-                timestamp_ms: crate::core::panels::now_ms(),
+                timestamp_ms: crate::app::panels::now_ms(),
             };
             self.save_message_async(&tool_msg);
             self.state.messages.push(tool_msg);
@@ -503,7 +503,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
-            timestamp_ms: crate::core::panels::now_ms(),
+            timestamp_ms: crate::app::panels::now_ms(),
         };
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
@@ -532,7 +532,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
-            timestamp_ms: crate::core::panels::now_ms(),
+            timestamp_ms: crate::app::panels::now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 
@@ -636,13 +636,13 @@ impl App {
 
         if needs_tmux {
             // send_keys: deprecate tmux panels and wait for refresh
-            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
+            crate::app::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
             // Trigger tmux panel refreshes
             for ctx in &self.state.context {
                 if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated && !ctx.cache_in_flight {
-                    let panel = crate::core::panels::get_panel(&ctx.context_type);
+                    let panel = crate::app::panels::get_panel(&ctx.context_type);
                     if let Some(request) = panel.build_cache_request(ctx, &self.state) {
-                        crate::cache::process_cache_request(request, self.cache_tx.clone());
+                        crate::state::cache::process_cache_request(request, self.cache_tx.clone());
                     }
                 }
             }
@@ -729,7 +729,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
-            timestamp_ms: crate::core::panels::now_ms(),
+            timestamp_ms: crate::app::panels::now_ms(),
         };
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
@@ -757,7 +757,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
-            timestamp_ms: crate::core::panels::now_ms(),
+            timestamp_ms: crate::app::panels::now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 
@@ -938,7 +938,7 @@ impl App {
             if !ctx.context_type.is_fixed() {
                 continue;
             }
-            let panel = crate::core::panels::get_panel(&ctx.context_type);
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -983,7 +983,7 @@ impl App {
                 let idx = state.context.iter().position(|c| c.context_type == *context_type);
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);
-                let panel = crate::core::panels::get_panel(&ctx.context_type);
+                let panel = crate::app::panels::get_panel(&ctx.context_type);
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
                 state.context.insert(idx, ctx);
@@ -996,7 +996,7 @@ impl App {
             let idx = state.context.iter().position(|c| c.id == *context_id);
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);
-            let panel = crate::core::panels::get_panel(&ctx.context_type);
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
             // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
             let _changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
@@ -1054,7 +1054,7 @@ impl App {
                 continue;
             }
             let ctx = &self.state.context[i];
-            let panel = crate::core::panels::get_panel(&ctx.context_type);
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -1101,7 +1101,7 @@ impl App {
                 continue;
             }
 
-            let panel = crate::core::panels::get_panel(&ctx.context_type);
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
 
             // Case 1: Initial load — panel has no content yet
             if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {

@@ -1,4 +1,4 @@
-use crate::persistence::{delete_message, save_message};
+use crate::state::persistence::{delete_message, save_message};
 use crate::state::{ContextType, Message, State, estimate_tokens};
 use cp_mod_prompt::{PromptItem, PromptState};
 use cp_mod_spine::{NotificationType, SpineState};
@@ -54,7 +54,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     // Add user message tokens to Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         ctx.token_count += user_token_estimate;
-        ctx.last_refresh_ms = crate::core::panels::now_ms();
+        ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
 
     // Create a UserMessage notification — spine will detect this and start streaming
@@ -101,7 +101,7 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
     // Reset token count for Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         ctx.token_count = 0;
-        ctx.last_refresh_ms = crate::core::panels::now_ms();
+        ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
     ActionResult::Save
 }

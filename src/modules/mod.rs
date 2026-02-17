@@ -2,10 +2,10 @@ pub mod core;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::core::panels::Panel;
+use crate::app::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
-use crate::tools::{ToolResult, ToolUse};
+use crate::infra::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ToolResult, ToolUse};
 
 pub use cp_mod_files::FilesModule;
 pub use cp_mod_git::GitModule;
@@ -80,7 +80,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(TodoModule),
         Box::new(MemoryModule),
         Box::new(ScratchpadModule),
-        Box::new(PresetModule::new(all_modules, active_tool_definitions, crate::core::ensure_default_contexts)),
+        Box::new(PresetModule::new(all_modules, active_tool_definitions, crate::app::ensure_default_contexts)),
         Box::new(SpineModule),
         Box::new(LogsModule),
     ]

@@ -1,2 +1,2 @@
 // Re-export UI characters from centralized constants
-pub use crate::constants::chars::*;
+pub use crate::infra::constants::chars::*;

@@ -32,7 +32,7 @@ impl Drop for ProfileGuard {
         let ms = us / 1000;
 
         // Always record to in-memory perf system
-        crate::perf::PERF.record_op(self.name, us);
+        crate::ui::perf::PERF.record_op(self.name, us);
 
         // Log to file only for slow operations
         if ms as u128 >= THRESHOLD_MS
@@ -46,6 +46,6 @@ impl Drop for ProfileGuard {
 #[macro_export]
 macro_rules! profile {
     ($name:expr) => {
-        $crate::profiler::ProfileGuard::new($name)
+        $crate::infra::profiler::ProfileGuard::new($name)
     };
 }

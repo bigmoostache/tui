@@ -10,3 +10,7 @@ pub use cp_base::state::*;
 pub use cp_base::state::config;
 #[cfg(test)]
 pub use cp_base::state::message;
+
+// ── Local submodules ──
+pub mod cache;
+pub mod persistence;

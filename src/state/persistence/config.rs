@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-use crate::constants::{CONFIG_FILE, STORE_DIR};
+use crate::infra::constants::{CONFIG_FILE, STORE_DIR};
 use crate::state::SharedConfig;
 
 fn config_path() -> PathBuf {

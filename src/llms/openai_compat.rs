@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages};
-use crate::constants::{library, prompts};
-use crate::core::panels::now_ms;
+use crate::infra::constants::{library, prompts};
+use crate::app::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::tool_defs::ToolDefinition;
+use crate::infra::tool_defs::ToolDefinition;
 
 // ───────────────────────────────────────────────────────────────────
 // Shared message type
@@ -125,7 +125,7 @@ pub struct BuildOptions {
 /// conversion with [ID]: prefixes, extra context, footer/header.
 pub fn build_messages(
     messages: &[Message],
-    context_items: &[crate::core::panels::ContextItem],
+    context_items: &[crate::app::panels::ContextItem],
     opts: &BuildOptions,
 ) -> Vec<OaiMessage> {
     let mut out: Vec<OaiMessage> = Vec::new();
@@ -416,7 +416,7 @@ impl ToolCallAccumulator {
     }
 
     /// Drain all completed tool calls into ToolUse events.
-    pub fn drain(&mut self) -> Vec<crate::tools::ToolUse> {
+    pub fn drain(&mut self) -> Vec<crate::infra::tools::ToolUse> {
         self.calls
             .drain()
             .filter_map(|(_, (id, name, arguments))| {
@@ -425,7 +425,7 @@ impl ToolCallAccumulator {
                 }
                 let input: Value =
                     serde_json::from_str(&arguments).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                Some(crate::tools::ToolUse { id, name, input })
+                Some(crate::infra::tools::ToolUse { id, name, input })
             })
             .collect()
     }

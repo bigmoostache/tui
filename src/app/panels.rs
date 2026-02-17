@@ -115,7 +115,7 @@ pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cache::CacheUpdate;
+    use crate::state::cache::CacheUpdate;
     use crate::state::ContextElement;
 
     /// Helper: create a minimal ContextElement for testing
