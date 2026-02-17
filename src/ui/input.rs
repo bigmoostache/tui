@@ -68,6 +68,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let (provider_name, model_name) = match state.llm_provider {
         LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
         LlmProvider::ClaudeCode => ("OAuth", state.anthropic_model.display_name()),
+        LlmProvider::ClaudeCodeApiKey => ("APIKey", state.anthropic_model.display_name()),
         LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
         LlmProvider::Groq => ("Groq", state.groq_model.display_name()),
         LlmProvider::DeepSeek => ("DeepSeek", state.deepseek_model.display_name()),

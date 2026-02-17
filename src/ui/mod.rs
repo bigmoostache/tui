@@ -470,6 +470,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let providers = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
         (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
+        (LlmProvider::ClaudeCodeApiKey, "6", "Claude Code (API Key)"),
         (LlmProvider::Grok, "3", "Grok (xAI)"),
         (LlmProvider::Groq, "4", "Groq"),
         (LlmProvider::DeepSeek, "5", "DeepSeek"),
@@ -503,7 +504,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     lines.push(Line::from(""));
 
     match state.llm_provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
             for (model, key) in [
                 (AnthropicModel::ClaudeOpus45, "a"),
                 (AnthropicModel::ClaudeSonnet45, "b"),

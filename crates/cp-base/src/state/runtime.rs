@@ -248,7 +248,9 @@ impl State {
     pub fn current_model(&self) -> String {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => self.anthropic_model.api_name().to_string(),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.api_name().to_string()
+            }
             LlmProvider::Grok => self.grok_model.api_name().to_string(),
             LlmProvider::Groq => self.groq_model.api_name().to_string(),
             LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
@@ -264,7 +266,9 @@ impl State {
     pub fn model_context_window(&self) -> usize {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => self.anthropic_model.context_window(),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.context_window()
+            }
             LlmProvider::Grok => self.grok_model.context_window(),
             LlmProvider::Groq => self.groq_model.context_window(),
             LlmProvider::DeepSeek => self.deepseek_model.context_window(),
@@ -290,7 +294,9 @@ impl State {
     pub fn cache_hit_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => self.anthropic_model.cache_hit_price_per_mtok(),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_hit_price_per_mtok()
+            }
             LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
@@ -301,7 +307,9 @@ impl State {
     pub fn cache_miss_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => self.anthropic_model.cache_miss_price_per_mtok(),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_miss_price_per_mtok()
+            }
             LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
@@ -312,7 +320,9 @@ impl State {
     pub fn output_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => self.anthropic_model.output_price_per_mtok(),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.output_price_per_mtok()
+            }
             LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
