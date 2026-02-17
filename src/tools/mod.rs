@@ -17,11 +17,7 @@ pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Set flag - actual reload happens in app.rs after tool result is saved
     state.reload_pending = true;
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: "Reload initiated. Restarting TUI...".to_string(),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_string(), false)
 }
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)

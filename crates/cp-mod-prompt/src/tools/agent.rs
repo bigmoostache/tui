@@ -10,36 +10,20 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let content = tool.input.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     if name.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Missing required 'name' parameter".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     }
 
     if content.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Missing required 'content' parameter".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Missing required 'content' parameter".to_string(), true);
     }
 
     let id = storage::slugify(&name);
     if id.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Name must contain at least one alphanumeric character".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Name must contain at least one alphanumeric character".to_string(), true);
     }
 
     if PromptState::get(state).agents.iter().any(|a| a.id == id) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Agent with ID '{}' already exists", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Agent with ID '{}' already exists", id), true);
     }
 
     let item = PromptItem {
@@ -57,42 +41,26 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created agent '{}' with ID '{}'", name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created agent '{}' with ID '{}'", name, id), false)
 }
 
 pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
         }
     };
 
     let agent = match PromptState::get_mut(state).agents.iter_mut().find(|a| a.id == id) {
         Some(a) => a,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Agent '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
         }
     };
 
     if agent.is_builtin {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Cannot edit built-in agent '{}'", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in agent '{}'", id), true);
     }
 
     let mut changes = Vec::new();
@@ -113,11 +81,7 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if changes.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "No changes specified".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true);
     }
 
     // Save to disk
@@ -127,22 +91,14 @@ pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Updated agent '{}': {}", id, changes.join(", ")),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Updated agent '{}': {}", id, changes.join(", ")), false)
 }
 
 pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
         }
     };
 
@@ -150,22 +106,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(agent) = PromptState::get(state).agents.iter().find(|a| a.id == id)
         && agent.is_builtin
     {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Cannot delete built-in agent '{}'", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in agent '{}'", id), true);
     }
 
     let ps = PromptState::get_mut(state);
     let idx = match ps.agents.iter().position(|a| a.id == id) {
         Some(i) => i,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Agent '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
         }
     };
 
@@ -180,11 +128,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Deleted agent '{}' ({})", agent.name, id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
 
 pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -195,21 +139,13 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Switched to default agent ({})", library::default_agent_id()),
-            is_error: false,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Switched to default agent ({})", library::default_agent_id()), false);
     }
 
     let id = id.unwrap();
 
     if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Agent '{}' not found", id),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
     }
 
     PromptState::get_mut(state).active_agent_id = Some(id.to_string());
@@ -218,5 +154,5 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Loaded agent '{}' ({})", name, id), is_error: false }
+    ToolResult::new(tool.id.clone(), format!("Loaded agent '{}' ({})", name, id), false)
 }

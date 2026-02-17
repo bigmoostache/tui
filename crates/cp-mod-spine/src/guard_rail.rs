@@ -29,7 +29,7 @@ pub trait GuardRailStopLogic: Send + Sync {
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
 pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
     static GUARD_RAILS: &[&dyn GuardRailStopLogic] =
-        &[&MaxOutputTokensGuard, &MaxCostGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
+        &[&MaxOutputTokensGuard, &MaxCostGuard, &MaxStreamCostGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
     GUARD_RAILS
 }
 
@@ -98,6 +98,46 @@ impl MaxCostGuard {
         let hit_cost = State::token_cost(state.cache_hit_tokens, state.cache_hit_price_per_mtok());
         let miss_cost = State::token_cost(state.cache_miss_tokens, state.cache_miss_price_per_mtok());
         let output_cost = State::token_cost(state.total_output_tokens, state.output_price_per_mtok());
+        hit_cost + miss_cost + output_cost
+    }
+}
+
+// ============================================================================
+// Implementation: MaxStreamCostGuard
+// ============================================================================
+
+/// Block if current stream cost exceeds the configured USD limit.
+pub struct MaxStreamCostGuard;
+
+impl GuardRailStopLogic for MaxStreamCostGuard {
+    fn name(&self) -> &str {
+        "MaxStreamCost"
+    }
+
+    fn should_block(&self, state: &State) -> bool {
+        if let Some(max_cost) = SpineState::get(state).config.max_stream_cost {
+            let current_cost = Self::calculate_stream_cost(state);
+            current_cost >= max_cost
+        } else {
+            false
+        }
+    }
+
+    fn block_reason(&self, state: &State) -> String {
+        let current_cost = Self::calculate_stream_cost(state);
+        format!(
+            "Stream cost limit reached: ${:.4} / ${:.4}",
+            current_cost,
+            SpineState::get(state).config.max_stream_cost.unwrap_or(0.0)
+        )
+    }
+}
+
+impl MaxStreamCostGuard {
+    fn calculate_stream_cost(state: &State) -> f64 {
+        let hit_cost = State::token_cost(state.stream_cache_hit_tokens, state.cache_hit_price_per_mtok());
+        let miss_cost = State::token_cost(state.stream_cache_miss_tokens, state.cache_miss_price_per_mtok());
+        let output_cost = State::token_cost(state.stream_output_tokens, state.output_price_per_mtok());
         hit_cost + miss_cost + output_cost
     }
 }

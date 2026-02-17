@@ -9,6 +9,7 @@ pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -150,6 +151,13 @@ impl Module for MemoryModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("memory_create", visualize_memory_output as ToolVisualizer),
+            ("memory_update", visualize_memory_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "memory",
@@ -174,4 +182,54 @@ impl Module for MemoryModule {
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Memory", "Store persistent memories across the conversation")]
     }
+}
+
+/// Visualizer for memory tool results.
+/// Colors importance levels and highlights created/updated memory summaries.
+fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let critical_color = Color::Rgb(255, 85, 85); // Red for critical
+    let high_color = Color::Rgb(255, 184, 108); // Orange for high
+    let medium_color = Color::Rgb(241, 250, 140); // Yellow for medium
+    let low_color = Color::Rgb(139, 233, 253); // Cyan for low
+    let success_color = Color::Rgb(80, 250, 123); // Green for success messages
+    let error_color = Color::Rgb(255, 85, 85); // Red for errors
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Created") || line.starts_with("Updated") {
+            Style::default().fg(success_color)
+        } else if line.contains("critical") {
+            Style::default().fg(critical_color)
+        } else if line.contains("high") {
+            Style::default().fg(high_color)
+        } else if line.contains("medium") {
+            Style::default().fg(medium_color)
+        } else if line.contains("low") {
+            Style::default().fg(low_color)
+        } else if line.starts_with("M") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Memory IDs like M1, M2
+            Style::default().fg(low_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

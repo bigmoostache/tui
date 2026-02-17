@@ -77,8 +77,85 @@ fn markdown_display_width(text: &str) -> usize {
     width
 }
 
-/// Render a markdown table with aligned columns
-pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span<'static>>> {
+/// Wrap text to fit within a given width, breaking on word boundaries.
+/// Returns a Vec of lines, each fitting within `width` characters.
+fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    if markdown_display_width(text) <= width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0;
+
+    for word in text.split_whitespace() {
+        let word_width = markdown_display_width(word);
+
+        if current_width == 0 {
+            // First word on line — always add it (even if longer than width)
+            if word_width > width {
+                // Break long word character by character
+                for ch in word.chars() {
+                    if current_width >= width {
+                        lines.push(std::mem::take(&mut current_line));
+                        current_width = 0;
+                    }
+                    current_line.push(ch);
+                    current_width += 1;
+                }
+            } else {
+                current_line.push_str(word);
+                current_width = word_width;
+            }
+        } else if current_width + 1 + word_width <= width {
+            // Fits on current line with a space
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            // Doesn't fit — start a new line
+            lines.push(std::mem::take(&mut current_line));
+            if word_width > width {
+                current_width = 0;
+                for ch in word.chars() {
+                    if current_width >= width {
+                        lines.push(std::mem::take(&mut current_line));
+                        current_width = 0;
+                    }
+                    current_line.push(ch);
+                    current_width += 1;
+                }
+            } else {
+                current_line.push_str(word);
+                current_width = word_width;
+            }
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+
+    lines
+}
+
+/// Render a markdown table with aligned columns.
+///
+/// Strategy: compute fixed column widths → for each row, wrap cell text to fit
+/// → render each display line as a sequence of fixed-width cells separated by │.
+/// Vertical separators are always at the same character positions.
+pub fn render_markdown_table(
+    lines: &[&str],
+    _base_style: Style,
+    max_width: usize,
+) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
@@ -111,6 +188,40 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
         }
     }
 
+    // Constrain columns to fit within max_width
+    // Each column separator " │ " takes 3 chars, so separators = (num_cols - 1) * 3
+    let separator_width = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
+    let total_content_width: usize = col_widths.iter().sum();
+    let total_width = total_content_width + separator_width;
+
+    if total_width > max_width && max_width > separator_width {
+        let available = max_width - separator_width;
+        // Shrink columns proportionally
+        let mut new_widths: Vec<usize> = col_widths
+            .iter()
+            .map(|&w| {
+                let proportional = (w as f64 / total_content_width as f64 * available as f64) as usize;
+                proportional.max(3) // minimum 3 chars per column
+            })
+            .collect();
+        // Distribute any remaining space to the widest columns
+        let used: usize = new_widths.iter().sum();
+        if used < available {
+            let mut remaining = available - used;
+            // Sort column indices by original width (descending) to give extra space to wider columns
+            let mut col_indices: Vec<usize> = (0..num_cols).collect();
+            col_indices.sort_by(|&a, &b| col_widths[b].cmp(&col_widths[a]));
+            for &idx in &col_indices {
+                if remaining == 0 {
+                    break;
+                }
+                new_widths[idx] += 1;
+                remaining -= 1;
+            }
+        }
+        col_widths = new_widths;
+    }
+
     // Render each row with aligned columns
     let mut result: Vec<Vec<Span<'static>>> = Vec::new();
 
@@ -126,34 +237,76 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
             }
             result.push(spans);
         } else {
-            // Render data row
-            let mut spans: Vec<Span<'static>> = Vec::new();
+            // Render data row (with multi-line wrapping)
             let is_header = row_idx == 0;
 
+            // Wrap each cell's content to its column width
+            let mut wrapped_cells: Vec<Vec<String>> = Vec::new();
+            let mut max_lines = 1usize;
+
             for (col, width) in col_widths.iter().enumerate() {
-                if col > 0 {
-                    spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
-                }
-
                 let cell = row.get(col).map(|s| s.as_str()).unwrap_or("");
-                let display_width = markdown_display_width(cell);
-                let padding_needed = width.saturating_sub(display_width);
-
-                if is_header {
-                    // Headers: bold, no inline markdown parsing
-                    spans.push(Span::styled(cell.to_string(), Style::default().fg(theme::accent()).bold()));
-                } else {
-                    // Data cells: parse inline markdown
-                    let cell_spans = parse_inline_markdown(cell);
-                    spans.extend(cell_spans);
-                }
-
-                // Add padding
-                if padding_needed > 0 {
-                    spans.push(Span::styled(" ".repeat(padding_needed), Style::default()));
-                }
+                let cell_lines = wrap_cell_text(cell, *width);
+                max_lines = max_lines.max(cell_lines.len());
+                wrapped_cells.push(cell_lines);
             }
-            result.push(spans);
+
+            // Render each display line of this logical row
+            for line_idx in 0..max_lines {
+                let mut spans: Vec<Span<'static>> = Vec::new();
+
+                for (col, width) in col_widths.iter().enumerate() {
+                    if col > 0 {
+                        spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
+                    }
+
+                    let cell_text = wrapped_cells
+                        .get(col)
+                        .and_then(|lines| lines.get(line_idx))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    // Build a single fixed-width span for this cell.
+                    // Content + padding always equals exactly `width` display chars.
+                    // This guarantees │ separators are at fixed positions.
+                    let display_width = markdown_display_width(cell_text);
+                    let padding = " ".repeat(width.saturating_sub(display_width));
+
+                    if is_header {
+                        // Header: single styled span with content + padding baked in
+                        spans.push(Span::styled(
+                            format!("{}{}", cell_text, padding),
+                            Style::default().fg(theme::accent()).bold(),
+                        ));
+                    } else if cell_text.is_empty() {
+                        // Empty cell: just spaces
+                        spans.push(Span::styled(" ".repeat(*width), Style::default()));
+                    } else {
+                        // Data cell: render markdown, then add padding as a plain span
+                        let cell_spans = parse_inline_markdown(cell_text);
+                        spans.extend(cell_spans);
+                        if !padding.is_empty() {
+                            spans.push(Span::styled(padding, Style::default()));
+                        }
+                    }
+                }
+                result.push(spans);
+            }
+
+            // Add thin separator line between data rows (not after last row, not after header's separator)
+            if row_idx < rows.len() - 1 && !is_separator_row.get(row_idx + 1).copied().unwrap_or(false) {
+                let mut sep_spans: Vec<Span<'static>> = Vec::new();
+                for (col, width) in col_widths.iter().enumerate() {
+                    if col > 0 {
+                        sep_spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
+                    }
+                    sep_spans.push(Span::styled(
+                        "─".repeat(*width),
+                        Style::default().fg(theme::border()),
+                    ));
+                }
+                result.push(sep_spans);
+            }
         }
     }
 

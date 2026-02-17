@@ -9,6 +9,7 @@ pub use types::{ContinuationAction, Notification, NotificationType, SpineConfig,
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -143,6 +144,13 @@ impl Module for SpineModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("notification_mark_processed", visualize_spine_output as ToolVisualizer),
+            ("spine_configure", visualize_spine_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "spine",
@@ -172,6 +180,51 @@ impl Module for SpineModule {
         // User pressed Esc — prevent spine from immediately relaunching
         SpineState::get_mut(state).config.user_stopped = true;
     }
+}
+
+/// Visualizer for spine tool results.
+/// Shows configuration changes with before/after values and highlights notification IDs.
+fn visualize_spine_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let warning_color = Color::Rgb(241, 250, 140);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Marked") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("Updated") || line.contains("→") {
+            Style::default().fg(info_color)
+        } else if line.contains("=") || line.contains(":") {
+            // Config key-value pairs
+            Style::default().fg(info_color)
+        } else if line.starts_with("N") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Notification IDs like N1, N2
+            Style::default().fg(warning_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }
 
 /// Prune processed notifications: keep all unprocessed + latest 10 processed.

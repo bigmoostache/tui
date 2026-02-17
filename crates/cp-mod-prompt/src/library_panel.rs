@@ -200,11 +200,14 @@ impl Panel for LibraryPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        // Compute token count from context content
+        // Compute token count from context content and track content changes
         let items = self.context(state);
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) {
             let total: usize = items.iter().map(|i| cp_base::state::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
+            // Build combined content for hash tracking
+            let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");
+            cp_base::panels::update_if_changed(ctx, &combined);
         }
     }
 

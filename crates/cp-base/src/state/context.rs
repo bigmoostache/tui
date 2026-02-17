@@ -103,6 +103,7 @@ impl ContextType {
     pub const CONVERSATION_HISTORY: &str = "conversation_history";
     pub const SPINE: &str = "spine";
     pub const LOGS: &str = "logs";
+    pub const CONSOLE: &str = "console";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     pub fn is_fixed(&self) -> bool {

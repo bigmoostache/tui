@@ -61,7 +61,7 @@ The token count at the bottom is real. The AI reads it. When `app.rs` is eating 
 
 ## What makes it different
 
-**The AI manages its own context.** This isn't a feature — it's the architecture. Other tools give the AI a hidden context window and hope for the best. Context Pilot gives the AI a visible, manipulable workspace with 47 tools:
+**The AI manages its own context.** This isn't a feature — it's the architecture. Other tools give the AI a hidden context window and hope for the best. Context Pilot gives the AI a visible, manipulable workspace with 48 tools:
 
 - **Explore** — open files, navigate directories, glob and grep. Annotate everything with descriptions that persist after closing.
 - **Edit** — surgical text replacement. The AI sees exact file content and matches it.
@@ -71,11 +71,11 @@ The token count at the bottom is real. The AI reads it. When `app.rs` is eating 
 - **Configure** — switch agent personalities, load skill documents, save/restore workspace presets, enable/disable individual tools.
 
 <details>
-<summary><b>Full tool list (47)</b></summary>
+<summary><b>Full tool list (48)</b></summary>
 
 | Category | Tools |
 |----------|-------|
-| **Context** | `context_close` · `system_reload` · `tool_manage` · `module_toggle` · `panel_goto_page` |
+| **Context** | `context_close` · `system_reload` · `tool_manage` · `module_toggle` · `panel_goto_page` · `ask_user_question` |
 | **Agents & Skills** | `agent_create` · `agent_edit` · `agent_delete` · `agent_load` · `skill_create` · `skill_edit` · `skill_delete` · `skill_load` · `skill_unload` · `command_create` · `command_edit` · `command_delete` |
 | **Files** | `file_open` · `file_edit` · `file_write` · `file_glob` · `file_grep` |
 | **Tree** | `tree_filter` · `tree_toggle` · `tree_describe` |
@@ -92,7 +92,7 @@ The token count at the bottom is real. The AI reads it. When `app.rs` is eating 
 
 Rust. Single binary. ~15K lines. [Ratatui](https://github.com/ratatui/ratatui) + crossterm.
 
-- **14 modules** — each provides tools and panels: core, files, git, github, glob, grep, logs, memory, preset, prompt, scratchpad, spine, tmux, todo, tree
+- **15 modules** — each provides tools and panels: core, files, git, github, glob, grep, logs, memory, preset, prompt, scratchpad, spine, tmux, todo, tree
 - **5 LLM providers** — Anthropic, Claude Code (OAuth), DeepSeek, Grok (xAI), Groq
 - **Smart caching** — SHA-256 change detection, background refresh, inotify file watching. Open files auto-update when changed on disk.
 - **Autonomous mode** — the Spine module can auto-continue across multiple turns with guard rails: token limits, cost caps, duration limits, message caps

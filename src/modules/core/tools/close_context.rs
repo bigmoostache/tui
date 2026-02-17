@@ -6,16 +6,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ids = match tool.input.get("ids").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'ids' array parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_string(), true);
         }
     };
 
     if ids.is_empty() {
-        return ToolResult { tool_use_id: tool.id.clone(), content: "Empty 'ids' array".to_string(), is_error: true };
+        return ToolResult::new(tool.id.clone(), "Empty 'ids' array".to_string(), true);
     }
 
     let mut closed: Vec<String> = Vec::new();
@@ -104,5 +100,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: closed.is_empty() && skipped.is_empty() }
+    ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty())
 }

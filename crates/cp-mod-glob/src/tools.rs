@@ -7,21 +7,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'pattern' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'pattern' parameter".to_string(), true);
         }
     };
 
     // Validate glob pattern early (cheap operation)
     if globset::GlobBuilder::new(pattern).literal_separator(true).build().is_err() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Invalid glob pattern: '{}'", pattern),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern: '{}'", pattern), true);
     }
 
     let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -62,11 +54,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created glob {} for '{}' in '{}'", context_id, pattern, &search_path),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created glob {} for '{}' in '{}'", context_id, pattern, &search_path), false)
 }
 
 /// Compute glob results and return (formatted output, match count)

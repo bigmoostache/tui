@@ -13,6 +13,7 @@ pub const SLEEP_DURATION_SECS: u64 = 0;
 /// Deprecation timer for tmux panels (milliseconds)
 pub(crate) const TMUX_DEPRECATION_MS: u64 = 100; // 100ms — capture-pane is a cheap kernel pipe read
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -119,6 +120,15 @@ impl Module for TmuxModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("console_create", visualize_tmux_output as ToolVisualizer),
+            ("console_edit", visualize_tmux_output as ToolVisualizer),
+            ("console_send_keys", visualize_tmux_output as ToolVisualizer),
+            ("console_sleep", visualize_tmux_output as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![cp_base::state::ContextTypeMeta {
             context_type: "tmux",
@@ -160,4 +170,43 @@ impl Module for TmuxModule {
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Console", "Execute commands and monitor terminal output")]
     }
+}
+
+/// Visualizer for tmux tool results.
+/// Highlights pane IDs, key sequences sent, and differentiates creation vs send vs sleep results.
+fn visualize_tmux_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Panel created:") || line.starts_with("Sent keys") || line.starts_with("Updated") || line.starts_with("Refreshed") {
+            Style::default().fg(success_color)
+        } else if line.contains("%") || line.contains("pane") {
+            // Pane IDs like %0, %1
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

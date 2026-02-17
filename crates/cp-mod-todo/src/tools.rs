@@ -7,16 +7,12 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let todos = match tool.input.get("todos").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'todos' array parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
         }
     };
 
     if todos.is_empty() {
-        return ToolResult { tool_use_id: tool.id.clone(), content: "Empty 'todos' array".to_string(), is_error: true };
+        return ToolResult::new(tool.id.clone(), "Empty 'todos' array".to_string(), true);
     }
 
     let mut created: Vec<String> = Vec::new();
@@ -93,27 +89,19 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty() }
+    ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
 pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let updates = match tool.input.get("updates").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'updates' array parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
         }
     };
 
     if updates.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'updates' array".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_string(), true);
     }
 
     let mut updated: Vec<String> = Vec::new();
@@ -340,22 +328,14 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: updated.is_empty() && deleted.is_empty() && propagated.is_empty(),
-    }
+    ToolResult::new(tool.id.clone(), output, updated.is_empty() && deleted.is_empty() && propagated.is_empty())
 }
 
 pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(i) => i,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);
         }
     };
 
@@ -379,29 +359,17 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     let move_idx = match ts.todos.iter().position(|t| t.id == id) {
         Some(idx) => idx,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Todo '{}' not found", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Todo '{}' not found", id), true);
         }
     };
 
     // Validate after_id exists if specified
     if let Some(aid) = after_id {
         if aid == id {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Cannot move '{}' after itself", id),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Cannot move '{}' after itself", id), true);
         }
         if !ts.todos.iter().any(|t| t.id == aid) {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Target '{}' not found", aid),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Target '{}' not found", aid), true);
         }
     }
 
@@ -429,5 +397,5 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(aid) => format!("after {}", aid),
     };
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Moved {} to {}", id, position_desc), is_error: false }
+    ToolResult::new(tool.id.clone(), format!("Moved {} to {}", id, position_desc), false)
 }

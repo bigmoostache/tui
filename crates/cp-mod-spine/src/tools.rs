@@ -8,11 +8,7 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(i) => i,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'id' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
         }
     };
 
@@ -20,24 +16,12 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_processed = SpineState::get(state).notifications.iter().find(|n| n.id == id).map(|n| n.processed);
 
     match already_processed {
-        Some(true) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Notification {} is already processed", id),
-            is_error: false,
-        },
+        Some(true) => ToolResult::new(tool.id.clone(), format!("Notification {} is already processed", id), false),
         Some(false) => {
             SpineState::mark_notification_processed(state, id);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Marked notification {} as processed", id),
-                is_error: false,
-            }
+            ToolResult::new(tool.id.clone(), format!("Marked notification {} as processed", id), false)
         }
-        None => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Notification '{}' not found", id),
-            is_error: true,
-        },
+        None => ToolResult::new(tool.id.clone(), format!("Notification '{}' not found", id), true),
     }
 }
 
@@ -74,6 +58,16 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         } else if let Some(n) = v.as_f64() {
             SpineState::get_mut(state).config.max_cost = Some(n);
             changes.push(format!("max_cost = ${:.2}", n));
+        }
+    }
+
+    if let Some(v) = tool.input.get("max_stream_cost") {
+        if v.is_null() {
+            SpineState::get_mut(state).config.max_stream_cost = None;
+            changes.push("max_stream_cost = disabled".to_string());
+        } else if let Some(n) = v.as_f64() {
+            SpineState::get_mut(state).config.max_stream_cost = Some(n);
+            changes.push(format!("max_stream_cost = ${:.2}", n));
         }
     }
 
@@ -117,19 +111,11 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SPINE));
 
     if changes.is_empty() {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "No changes made. Pass at least one parameter to configure.".to_string(),
-            is_error: false,
-        }
+        ToolResult::new(tool.id.clone(), "No changes made. Pass at least one parameter to configure.".to_string(), false)
     } else {
-        ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!(
-                "Spine configured:\n{}",
-                changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
-            ),
-            is_error: false,
-        }
+        ToolResult::new(tool.id.clone(), format!(
+            "Spine configured:\n{}",
+            changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
+        ), false)
     }
 }

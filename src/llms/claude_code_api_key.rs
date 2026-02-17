@@ -1,12 +1,10 @@
-//! Claude Code OAuth API implementation.
+//! Claude Code API Key implementation.
 //!
-//! Uses OAuth tokens from ~/.claude/.credentials.json with Bearer authentication.
+//! Uses ANTHROPIC_API_KEY from environment with Bearer authentication.
 //! Replicates Claude Code's request signature to access Claude 4.5 models.
 
 use std::env;
-use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
@@ -28,8 +26,8 @@ use crate::tools::ToolUse;
 /// API endpoint with beta flag required for Claude 4.5 access
 const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
-/// Beta header with all required flags for Claude Code access
-const OAUTH_BETA_HEADER: &str = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05";
+/// Beta header with all required flags for Claude Code access (API key mode)
+const OAUTH_BETA_HEADER: &str = "interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15";
 
 /// Billing header that must be included in system prompt
 const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.44.fbe; cc_entrypoint=cli; cch=e5401;";
@@ -194,59 +192,24 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
     let _ = std::fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
 }
 
-/// Claude Code OAuth client
-pub struct ClaudeCodeClient {
-    access_token: Option<SecretBox<String>>,
+/// Claude Code API Key client
+pub struct ClaudeCodeApiKeyClient {
+    api_key: Option<SecretBox<String>>,
 }
 
-#[derive(Deserialize)]
-struct CredentialsFile {
-    #[serde(rename = "claudeAiOauth")]
-    claude_ai_oauth: OAuthCredentials,
-}
-
-#[derive(Deserialize)]
-struct OAuthCredentials {
-    #[serde(rename = "accessToken")]
-    access_token: String,
-    #[serde(rename = "expiresAt")]
-    expires_at: u64,
-}
-
-impl ClaudeCodeClient {
+impl ClaudeCodeApiKeyClient {
     pub fn new() -> Self {
-        let access_token = Self::load_oauth_token();
-        Self { access_token }
+        let api_key = Self::load_api_key();
+        Self { api_key }
     }
 
-    fn load_oauth_token() -> Option<SecretBox<String>> {
-        let home = env::var("HOME").ok()?;
-        let home_path = PathBuf::from(&home);
-
-        // Try hidden credentials file first
-        let creds_path = home_path.join(".claude").join(".credentials.json");
-        let path = if creds_path.exists() {
-            creds_path
-        } else {
-            // Fallback to non-hidden
-            home_path.join(".claude").join("credentials.json")
-        };
-
-        let content = fs::read_to_string(&path).ok()?;
-        let creds: CredentialsFile = serde_json::from_str(&content).ok()?;
-
-        // Check if token is expired
-        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
-
-        if now_ms > creds.claude_ai_oauth.expires_at {
-            return None; // Token expired
-        }
-
-        Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
+    fn load_api_key() -> Option<SecretBox<String>> {
+        let key = env::var("ANTHROPIC_API_KEY").ok()?;
+        Some(SecretBox::new(Box::new(key)))
     }
 }
 
-impl Default for ClaudeCodeClient {
+impl Default for ClaudeCodeApiKeyClient {
     fn default() -> Self {
         Self::new()
     }
@@ -292,12 +255,12 @@ struct StreamUsage {
     cache_read_input_tokens: Option<usize>,
 }
 
-impl LlmClient for ClaudeCodeClient {
+impl LlmClient for ClaudeCodeApiKeyClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let access_token = self
-            .access_token
+        let api_key = self
+            .api_key
             .as_ref()
-            .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
+            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not found in environment".into()))?;
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
@@ -578,7 +541,7 @@ impl LlmClient for ClaudeCodeClient {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
+            .header("x-api-key", api_key.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -588,7 +551,8 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -769,14 +733,14 @@ impl LlmClient for ClaudeCodeClient {
     }
 
     fn check_api(&self, model: &str) -> ApiCheckResult {
-        let access_token = match self.access_token.as_ref() {
+        let api_key = match self.api_key.as_ref() {
             Some(t) => t.expose_secret(),
             None => {
                 return ApiCheckResult {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("OAuth token not found or expired".to_string()),
+                    error: Some("ANTHROPIC_API_KEY not found in environment".to_string()),
                 };
             }
         };
@@ -803,7 +767,7 @@ impl LlmClient for ClaudeCodeClient {
         let auth_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("x-api-key", api_key)
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -813,7 +777,8 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -846,7 +811,7 @@ impl LlmClient for ClaudeCodeClient {
         let stream_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("x-api-key", api_key)
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -856,7 +821,8 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -882,7 +848,7 @@ impl LlmClient for ClaudeCodeClient {
         let tools_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("x-api-key", api_key)
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -892,7 +858,8 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -927,10 +894,10 @@ mod tests {
     /// Minimal request matching working Python exactly.
     /// No panels, no tools, no message prefixes — just raw API call.
     #[test]
-    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
+    #[ignore] // Requires API key — run with `cargo test -- --ignored`
     fn test_general_kenobi() {
         let token =
-            ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
+            ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
         let client = Client::new();
 
@@ -955,7 +922,7 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", token.expose_secret()))
+            .header("x-api-key", token.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -965,7 +932,8 @@ mod tests {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -985,10 +953,10 @@ mod tests {
 
     /// Same as above but with tools and streaming — matches what stream() actually sends.
     #[test]
-    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
+    #[ignore] // Requires API key — run with `cargo test -- --ignored`
     fn test_general_kenobi_with_tools_streaming() {
         let token =
-            ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
+            ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
         let client = Client::new();
 
@@ -1022,7 +990,7 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", token.expose_secret()))
+            .header("x-api-key", token.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -1032,7 +1000,8 @@ mod tests {
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")

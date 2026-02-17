@@ -18,6 +18,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
+                    KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
                     KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
                     _ => {}
                 }
@@ -93,9 +94,10 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('3') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
         KeyCode::Char('4') => Some(Action::ConfigSelectProvider(LlmProvider::Groq)),
         KeyCode::Char('5') => Some(Action::ConfigSelectProvider(LlmProvider::DeepSeek)),
+        KeyCode::Char('6') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCodeApiKey)),
         // Letter keys select model based on current provider
         KeyCode::Char('a') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
                 Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45))
             }
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
@@ -103,7 +105,7 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
             LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat)),
         },
         KeyCode::Char('b') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
                 Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45))
             }
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
@@ -111,7 +113,7 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
             LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
         },
         KeyCode::Char('c') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
                 Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45))
             }
             LlmProvider::Grok | LlmProvider::DeepSeek => Some(Action::None),

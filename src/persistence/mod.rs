@@ -236,6 +236,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::constants::PANELS_DIR),
         dir.join(crate::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
+        dir.join(cp_mod_console::CONSOLE_DIR),
     ];
 
     // Build module data maps
