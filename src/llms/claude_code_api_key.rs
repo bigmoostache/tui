@@ -26,11 +26,11 @@ use crate::infra::tools::ToolUse;
 /// API endpoint with beta flag required for Claude 4.5 access
 const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
-/// Beta header with all required flags for Claude Code access
-const OAUTH_BETA_HEADER: &str = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05";
+/// Beta header with all required flags for Claude Code access (API key mode)
+const OAUTH_BETA_HEADER: &str = "interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15";
 
 /// Billing header that must be included in system prompt
-const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.37.fbe; cc_entrypoint=cli; cch=e5401;";
+const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.44.fbe; cc_entrypoint=cli; cch=e5401;";
 
 /// System reminder injected into first user message for Claude Code validation
 const SYSTEM_REMINDER: &str =
@@ -182,7 +182,7 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
         "request_headers": {
             "anthropic-beta": OAUTH_BETA_HEADER,
             "anthropic-version": API_VERSION,
-            "user-agent": "claude-cli/2.1.37 (external, cli)",
+            "user-agent": "claude-cli/2.1.44 (external, cli)",
             "x-app": "cli",
         },
         "request_body": api_request,
@@ -546,12 +546,13 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -771,12 +772,13 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -814,12 +816,13 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -850,12 +853,13 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -918,17 +922,18 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", token.expose_secret()))
+            .header("x-api-key", token.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
@@ -985,17 +990,18 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", token.expose_secret()))
+            .header("x-api-key", token.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
             .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+            .header("user-agent", "claude-cli/2.1.44 (external, cli)")
             .header("x-app", "cli")
             .header("x-stainless-arch", "x64")
             .header("x-stainless-lang", "js")
             .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
+            .header("x-stainless-package-version", "0.74.0")
+            .header("x-stainless-timeout", "600")
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
