@@ -10,11 +10,11 @@ mod tools;
 
 use serde_json::json;
 
-use crate::core::panels::Panel;
+use crate::app::panels::Panel;
 use crate::modules::ToolVisualizer;
 use crate::state::{ContextType, ContextTypeMeta, State};
-use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
-use crate::tools::{ToolResult, ToolUse};
+use crate::infra::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ToolResult, ToolUse};
 
 use self::conversation_panel::ConversationPanel;
 use self::overview_panel::OverviewPanel;
@@ -362,7 +362,7 @@ impl Module for CoreModule {
             "panel_goto_page" => Some(self::tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)
-            "system_reload" => Some(crate::tools::execute_reload_tui(tool, state)),
+            "system_reload" => Some(crate::infra::tools::execute_reload_tui(tool, state)),
 
             // Meta tools
             "tool_manage" => Some(self::tools::manage_tools::execute(tool, state)),

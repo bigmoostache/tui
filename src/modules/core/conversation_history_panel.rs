@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel, paginate_content};
+use crate::app::panels::{ContextItem, Panel, paginate_content};
 use crate::modules::core::conversation_render;
 use crate::state::{ContextType, State};
 use crate::ui::theme;

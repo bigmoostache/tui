@@ -14,11 +14,11 @@ use super::{
     ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text,
     panel_timestamp_text, prepare_panel_messages,
 };
-use crate::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
-use crate::core::panels::now_ms;
+use crate::infra::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
+use crate::app::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::tool_defs::build_api_tools;
-use crate::tools::ToolUse;
+use crate::infra::tool_defs::build_api_tools;
+use crate::infra::tools::ToolUse;
 
 /// Anthropic Claude client
 pub struct AnthropicClient {
@@ -354,7 +354,7 @@ impl LlmClient for AnthropicClient {
 /// Context items are injected as fake tool call/result pairs at the start
 fn messages_to_api(
     messages: &[Message],
-    context_items: &[crate::core::panels::ContextItem],
+    context_items: &[crate::app::panels::ContextItem],
     include_last_tool_uses: bool,
     seed_content: Option<&str>,
 ) -> Vec<ApiMessage> {
@@ -415,7 +415,7 @@ fn messages_to_api(
             role: "user".to_string(),
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "panel_footer".to_string(),
-                content: crate::constants::prompts::panel_footer_ack().to_string(),
+                content: crate::infra::constants::prompts::panel_footer_ack().to_string(),
             }],
         });
 

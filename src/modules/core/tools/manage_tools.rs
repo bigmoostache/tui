@@ -1,5 +1,5 @@
 use crate::state::State;
-use crate::tools::{ToolResult, ToolUse};
+use crate::infra::tools::{ToolResult, ToolUse};
 
 /// The ID of this tool - it cannot be disabled
 pub const MANAGE_TOOLS_ID: &str = "manage_tools";

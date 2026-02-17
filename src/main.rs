@@ -1,25 +1,9 @@
-mod actions;
-mod api;
-mod background;
-mod cache;
-mod config;
-mod constants;
-mod core;
-mod events;
-mod gh_watcher;
-mod help;
-mod highlight;
+mod app;
+mod infra;
 mod llms;
 mod modules;
-mod perf;
-mod persistence;
-mod profiler;
 mod state;
-mod tool_defs;
-mod tools;
-mod typewriter;
 mod ui;
-mod watcher;
 
 use std::io;
 use std::sync::mpsc;
@@ -31,11 +15,11 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-use api::StreamEvent;
-use background::TlDrResult;
-use cache::CacheUpdate;
-use core::{App, ensure_default_agent, ensure_default_contexts};
-use persistence::load_state;
+use infra::api::StreamEvent;
+use app::background::TlDrResult;
+use state::cache::CacheUpdate;
+use app::{App, ensure_default_agent, ensure_default_contexts};
+use state::persistence::load_state;
 
 fn main() -> io::Result<()> {
     // Parse CLI args
@@ -50,7 +34,7 @@ fn main() -> io::Result<()> {
     let mut state = load_state();
 
     // Set callback hooks for extracted module crates
-    state.highlight_fn = Some(highlight::highlight_file);
+    state.highlight_fn = Some(ui::highlight::highlight_file);
 
     // Validate module dependencies at startup
     modules::validate_dependencies(&state.active_modules);

@@ -16,10 +16,10 @@ use std::sync::mpsc::Sender;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::core::panels::ContextItem;
+use crate::app::panels::ContextItem;
 use crate::state::Message;
-use crate::tool_defs::ToolDefinition;
-use crate::tools::ToolResult;
+use crate::infra::tool_defs::ToolDefinition;
+use crate::infra::tools::ToolResult;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub use cp_base::llm_types::{
@@ -207,13 +207,13 @@ fn format_time_delta(delta_ms: u64) -> String {
 
 /// Generate the header text for dynamic panel display
 pub fn panel_header_text() -> &'static str {
-    crate::constants::prompts::panel_header()
+    crate::infra::constants::prompts::panel_header()
 }
 
 /// Generate the timestamp text for an individual panel
 /// Handles zero/unknown timestamps gracefully
 pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
-    use crate::constants::prompts;
+    use crate::infra::constants::prompts;
 
     // Check for zero/invalid timestamp (1970-01-01 or very old)
     // Consider anything before year 2020 as invalid (timestamp < ~1577836800000)
@@ -228,7 +228,7 @@ pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
 
 /// Generate the footer text for dynamic panel display, including message timestamps
 pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
-    use crate::constants::prompts;
+    use crate::infra::constants::prompts;
 
     // Get last 25 messages with non-zero timestamps
     let recent_messages: Vec<&Message> = messages.iter().filter(|m| m.timestamp_ms > 0).rev().take(25).collect();

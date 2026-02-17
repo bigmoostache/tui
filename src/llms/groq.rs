@@ -15,8 +15,8 @@ use serde_json::Value;
 use super::error::LlmError;
 use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
-use crate::constants::MAX_RESPONSE_TOKENS;
-use crate::tool_defs::ToolDefinition;
+use crate::infra::constants::MAX_RESPONSE_TOKENS;
+use crate::infra::tool_defs::ToolDefinition;
 
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 

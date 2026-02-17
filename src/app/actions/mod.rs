@@ -13,7 +13,7 @@ pub mod streaming;
 // Re-export helpers for external use
 pub use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
 
-use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
+use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
 use cp_mod_prompt::PromptState;
 
@@ -246,7 +246,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 history_messages: None,
                 cache_deprecated: false,
                 cache_in_flight: false,
-                last_refresh_ms: crate::core::panels::now_ms(),
+                last_refresh_ms: crate::app::panels::now_ms(),
                 content_hash: None,
                 source_hash: None,
                 current_page: 0,
@@ -368,7 +368,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::TogglePerfMonitor => {
-            state.perf_enabled = crate::perf::PERF.toggle();
+            state.perf_enabled = crate::ui::perf::PERF.toggle();
             state.dirty = true;
             ActionResult::Nothing
         }

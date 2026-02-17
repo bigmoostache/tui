@@ -53,22 +53,22 @@ pub fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
 
 /// Handle ConfigNextTheme action
 pub fn handle_config_next_theme(state: &mut State) -> ActionResult {
-    use crate::config::THEME_ORDER;
+    use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let next_idx = (current_idx + 1) % THEME_ORDER.len();
     state.active_theme = THEME_ORDER[next_idx].to_string();
-    crate::config::set_active_theme(&state.active_theme);
+    crate::infra::config::set_active_theme(&state.active_theme);
     state.dirty = true;
     ActionResult::Save
 }
 
 /// Handle ConfigPrevTheme action
 pub fn handle_config_prev_theme(state: &mut State) -> ActionResult {
-    use crate::config::THEME_ORDER;
+    use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let prev_idx = if current_idx == 0 { THEME_ORDER.len() - 1 } else { current_idx - 1 };
     state.active_theme = THEME_ORDER[prev_idx].to_string();
-    crate::config::set_active_theme(&state.active_theme);
+    crate::infra::config::set_active_theme(&state.active_theme);
     state.dirty = true;
     ActionResult::Save
 }

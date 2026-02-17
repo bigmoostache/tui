@@ -121,7 +121,7 @@ pub const DEFAULT_WORKER_ID: &str = "main_worker";
 // =============================================================================
 
 pub mod theme {
-    use crate::config::active_theme;
+    use crate::infra::config::active_theme;
     use ratatui::style::Color;
 
     fn rgb(c: [u8; 3]) -> Color {
@@ -204,7 +204,7 @@ pub mod chars {
 // =============================================================================
 
 pub mod icons {
-    use crate::config::{active_theme, normalize_icon};
+    use crate::infra::config::{active_theme, normalize_icon};
 
     // Message types - accessor functions for active theme (normalized to 2 cells)
     pub fn msg_user() -> String {
@@ -240,7 +240,7 @@ pub mod icons {
 // =============================================================================
 
 pub mod library {
-    use crate::config::LIBRARY;
+    use crate::infra::config::LIBRARY;
 
     pub fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
@@ -249,7 +249,7 @@ pub mod library {
 }
 
 pub mod prompts {
-    use crate::config::PROMPTS;
+    use crate::infra::config::PROMPTS;
 
     pub fn tldr_prompt() -> &'static str {
         &PROMPTS.tldr_prompt

@@ -1,13 +1,13 @@
-use crate::cache::hash_content;
-use crate::constants::{
+use crate::state::cache::hash_content;
+use crate::infra::constants::{
     DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS,
 };
-use crate::core::panels::{ContextItem, collect_all_context, now_ms, refresh_all_panels};
+use crate::app::panels::{ContextItem, collect_all_context, now_ms, refresh_all_panels};
 use crate::state::{
     ContextElement, ContextType, Message, MessageStatus, MessageType, State, compute_total_pages, estimate_tokens,
 };
-use crate::tool_defs::ToolDefinition;
-use crate::tools::refresh_conversation_context;
+use crate::infra::tool_defs::ToolDefinition;
+use crate::infra::tools::refresh_conversation_context;
 
 /// Context data prepared for streaming
 pub struct StreamContext {
@@ -310,7 +310,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
         let removed: Vec<Message> = state.messages.drain(..boundary).collect();
         for msg in &removed {
             if let Some(uid) = &msg.uid {
-                crate::persistence::delete_message(uid);
+                crate::state::persistence::delete_message(uid);
             }
         }
 

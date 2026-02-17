@@ -19,11 +19,11 @@ use super::{
     ApiCheckResult, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text,
     prepare_panel_messages,
 };
-use crate::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
-use crate::core::panels::now_ms;
+use crate::infra::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
+use crate::app::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
-use crate::tool_defs::build_api_tools;
-use crate::tools::ToolUse;
+use crate::infra::tool_defs::build_api_tools;
+use crate::infra::tools::ToolUse;
 
 /// API endpoint with beta flag required for Claude 4.5 access
 const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
@@ -380,7 +380,7 @@ impl LlmClient for ClaudeCodeClient {
                 "content": [{
                     "type": "tool_result",
                     "tool_use_id": "panel_footer",
-                    "content": crate::constants::prompts::panel_footer_ack()
+                    "content": crate::infra::constants::prompts::panel_footer_ack()
                 }]
             }));
         }
@@ -922,7 +922,7 @@ impl LlmClient for ClaudeCodeClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::API_VERSION;
+    use crate::infra::constants::API_VERSION;
 
     /// Minimal request matching working Python exactly.
     /// No panels, no tools, no message prefixes — just raw API call.

@@ -1,5 +1,5 @@
 use crate::state::State;
-use crate::tools::{ToolResult, ToolUse};
+use crate::infra::tools::{ToolResult, ToolUse};
 use cp_base::question_form::{PendingQuestionForm, Question, QuestionOption};
 
 /// Execute the ask_user_question tool.

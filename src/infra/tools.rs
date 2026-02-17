@@ -22,7 +22,7 @@ pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)
 pub fn perform_reload(state: &mut State) {
-    use crate::persistence::save_state;
+    use crate::state::persistence::save_state;
     use crossterm::{
         execute,
         terminal::{LeaveAlternateScreen, disable_raw_mode},

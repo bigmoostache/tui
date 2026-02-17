@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::constants::icons;
+use crate::infra::constants::icons;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::ui::{helpers::wrap_text, markdown::*, theme};
 

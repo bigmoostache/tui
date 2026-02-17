@@ -14,7 +14,7 @@ use serde::Serialize;
 use super::error::LlmError;
 use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
-use crate::constants::MAX_RESPONSE_TOKENS;
+use crate::infra::constants::MAX_RESPONSE_TOKENS;
 
 const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
 

@@ -8,8 +8,8 @@ use ratatui::{
 
 use cp_mod_prompt::PromptState;
 
-use crate::actions::Action;
-use crate::core::panels::{ContextItem, Panel};
+use crate::app::actions::Action;
+use crate::app::panels::{ContextItem, Panel};
 use crate::state::{
     ContextType, FullContentCache, InputRenderCache, MessageRenderCache, MessageStatus, MessageType, State, hash_values,
 };
