@@ -121,6 +121,31 @@
                 </tbody>
             </table>
 
+            <h3><code>ask_user_question</code></h3>
+            <p>Presents 1-4 multiple-choice questions to the user as an interactive form. Use this to gather user preferences, clarify ambiguous instructions, or get implementation decisions from the user.</p>
+            <p>The form replaces the input field until the user submits answers or presses <kbd>Esc</kbd> to dismiss. Each question supports 2-4 options, with an auto-appended "Other" option for free-text input. Questions can allow single or multiple selections.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>questions</code></td><td>object[]</td><td>✓</td><td>Array of 1-4 question objects</td></tr>
+                </tbody>
+            </table>
+            <p><strong>Question object structure:</strong></p>
+            <ul>
+                <li><code>question</code> (string, required) — The question text</li>
+                <li><code>options</code> (string[], required) — 2-4 answer options. If recommending an option, list it first with "(Recommended)" in the label</li>
+                <li><code>multiSelect</code> (boolean, optional) — Allow multiple selections (default: false)</li>
+            </ul>
+            <div class="info-box tip">
+                <div class="info-label">Example Use Cases</div>
+                <ul>
+                    <li>Ask which authentication method to implement (OAuth, JWT, Session-based)</li>
+                    <li>Clarify which database to use (PostgreSQL, MySQL, SQLite)</li>
+                    <li>Get preference on code style or framework choices</li>
+                    <li>Confirm destructive operations before proceeding</li>
+                </ul>
+            </div>
+
             <h2 id="file">File Operations</h2>
 
             <h3><code>file_open</code></h3>
