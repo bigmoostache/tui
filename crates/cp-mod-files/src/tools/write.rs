@@ -8,22 +8,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: file_path".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
         }
     };
 
     let contents = match tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str()) {
         Some(c) => c,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required parameter: contents".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_string(), true);
         }
     };
 
@@ -36,20 +28,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         && !parent.exists()
         && let Err(e) = fs::create_dir_all(parent)
     {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to create directory '{}': {}", parent.display(), e),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Failed to create directory '{}': {}", parent.display(), e), true);
     }
 
     // Write the file
     if let Err(e) = fs::write(path, contents) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to write file '{}': {}", path_str, e),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Failed to write file '{}': {}", path_str, e), true);
     }
 
     let token_count = estimate_tokens(contents);
@@ -115,5 +99,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     result_msg.push_str("```");
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
+    ToolResult::new(tool.id.clone(), result_msg, false)
 }

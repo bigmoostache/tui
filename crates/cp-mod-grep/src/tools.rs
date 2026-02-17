@@ -12,21 +12,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'pattern' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'pattern' parameter".to_string(), true);
         }
     };
 
     // Validate regex pattern early (cheap operation)
     if let Err(e) = Regex::new(pattern) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Invalid regex pattern: {}", e),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Invalid regex pattern: {}", e), true);
     }
 
     let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -72,11 +64,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created grep {} for '{}' in '{}'", context_id, pattern, &search_path),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Created grep {} for '{}' in '{}'", context_id, pattern, &search_path), false)
 }
 
 /// Compute grep results and return (formatted output, match count)

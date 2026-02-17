@@ -11,6 +11,7 @@ mod tools;
 use serde_json::json;
 
 use crate::core::panels::Panel;
+use crate::modules::ToolVisualizer;
 use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
@@ -373,4 +374,57 @@ impl Module for CoreModule {
             _ => None,
         }
     }
+
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("context_close", visualize_core_output as ToolVisualizer),
+            ("tool_manage", visualize_core_output as ToolVisualizer),
+            ("system_reload", visualize_core_output as ToolVisualizer),
+            ("panel_goto_page", visualize_core_output as ToolVisualizer),
+        ]
+    }
+}
+
+/// Visualizer for core tool results.
+/// Colors closed panel names, highlights enabled/disabled tool status, and shows module activation state changes.
+fn visualize_core_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let warning_color = Color::Rgb(241, 250, 140);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Closed") || line.contains("enabled") {
+            Style::default().fg(success_color)
+        } else if line.contains("disabled") {
+            Style::default().fg(warning_color)
+        } else if line.contains("Reloading") || line.contains("TUI") {
+            Style::default().fg(info_color)
+        } else if line.starts_with("P") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+            // Panel IDs like P1, P2
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

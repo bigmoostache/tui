@@ -7,39 +7,23 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path = match tool.input.get("path").and_then(|v| v.as_str()) {
         Some(p) => p,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'path' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'path' parameter".to_string(), true);
         }
     };
 
     // Check if file is already open
     if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' is already open in context", path),
-            is_error: false,
-        };
+        return ToolResult::new(tool.id.clone(), format!("File '{}' is already open in context", path), false);
     }
 
     // Check if file exists (quick metadata check, not a full read)
     let path_obj = Path::new(path);
     if !path_obj.exists() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' not found", path),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("File '{}' not found", path), true);
     }
 
     if !path_obj.is_file() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("'{}' is not a file", path),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("'{}' is not a file", path), true);
     }
 
     let file_name = path_obj.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
@@ -74,9 +58,5 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     elem.set_meta("file_path", &path.to_string());
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Opened '{}' as {}", path, context_id),
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), format!("Opened '{}' as {}", path, context_id), false)
 }

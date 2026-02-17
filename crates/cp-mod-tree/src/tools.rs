@@ -71,11 +71,7 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
     let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("toggle");
 
     if paths.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Missing 'paths' parameter".to_string(),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), "Missing 'paths' parameter".to_string(), true);
     }
 
     let mut opened = Vec::new();
@@ -150,11 +146,7 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
         invalidate_tree_cache(state);
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
-        is_error: false,
-    }
+    ToolResult::new(tool.id.clone(), if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, false)
 }
 
 /// Execute tree_describe_files tool - add/update/remove file descriptions
@@ -164,11 +156,7 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
     let descriptions = match descriptions {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'descriptions' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_string(), true);
         }
     };
 
@@ -246,11 +234,7 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
         invalidate_tree_cache(state);
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
-        is_error: !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty(),
-    }
+    ToolResult::new(tool.id.clone(), if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty())
 }
 
 /// Execute edit_tree_filter tool (keep existing functionality)
@@ -258,11 +242,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     let filter = match tool.input.get("filter").and_then(|v| v.as_str()) {
         Some(f) => f,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'filter' parameter".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
         }
     };
 
@@ -271,7 +251,7 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
 
-    ToolResult { tool_use_id: tool.id.clone(), content: format!("Updated tree filter:\n{}", filter), is_error: false }
+    ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{}", filter), false)
 }
 
 /// Normalize a path to a consistent format

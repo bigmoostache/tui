@@ -14,6 +14,7 @@ pub(crate) const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
 
 use serde_json::json;
 
+use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -128,6 +129,13 @@ impl Module for GitModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("git_execute", visualize_git_output as ToolVisualizer),
+            ("git_configure_p6", visualize_git_config as ToolVisualizer),
+        ]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![
             cp_base::state::ContextTypeMeta {
@@ -229,4 +237,104 @@ impl Module for GitModule {
     fn watcher_immediate_refresh(&self) -> bool {
         false // Prevent feedback loop: git status writes .git/index
     }
+}
+
+/// Visualizer for git_execute tool results.
+/// Color-codes git command output with branch names in cyan, status indicators,
+/// diff hunks with +/- in green/red, file names in yellow.
+fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123); // Green
+    let error_color = Color::Rgb(255, 85, 85); // Red
+    let branch_color = Color::Rgb(139, 233, 253); // Cyan
+    let warning_color = Color::Rgb(241, 250, 140); // Yellow
+    let secondary_color = Color::Rgb(150, 150, 170); // Gray
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        // Determine color based on line content
+        let style = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
+            Style::default().fg(success_color)
+        } else if line.starts_with("Error:") || line.starts_with("fatal:") || line.starts_with("error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("+ ") || line.starts_with("+++ ") {
+            // Git diff additions
+            Style::default().fg(success_color)
+        } else if line.starts_with("- ") || line.starts_with("--- ") {
+            // Git diff deletions
+            Style::default().fg(error_color)
+        } else if line.starts_with("@@") {
+            // Diff hunk headers
+            Style::default().fg(branch_color)
+        } else if line.starts_with("commit ") || line.starts_with("Author:") || line.starts_with("Date:") {
+            // Git log headers
+            Style::default().fg(branch_color)
+        } else if line.starts_with("* ") || line.contains("HEAD ->") || line.contains("origin/") {
+            // Branch indicators
+            Style::default().fg(branch_color)
+        } else if line.starts_with("modified:") || line.starts_with("new file:") || line.starts_with("deleted:") {
+            // Git status file indicators
+            Style::default().fg(warning_color)
+        } else if line.starts_with("#") {
+            // Git comments
+            Style::default().fg(secondary_color)
+        } else {
+            Style::default()
+        };
+
+        // Truncate long lines
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
+}
+
+/// Visualizer for git_configure_p6 tool results.
+/// Highlights configuration changes with success color and shows before/after values.
+fn visualize_git_config(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.contains("Updated") || line.contains("Configured") || line.contains("enabled") || line.contains("disabled") {
+            Style::default().fg(success_color)
+        } else if line.contains("->") || line.contains(":") {
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }

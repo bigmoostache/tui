@@ -10,21 +10,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let questions_val = match tool.input.get("questions").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(), true);
         }
     };
 
     // Validate question count
     if questions_val.is_empty() || questions_val.len() > 4 {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Expected 1-4 questions, got {}", questions_val.len()),
-            is_error: true,
-        };
+        return ToolResult::new(tool.id.clone(), format!("Expected 1-4 questions, got {}", questions_val.len()), true);
     }
 
     let mut questions = Vec::new();
@@ -33,11 +25,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let question = match q_val.get("question").and_then(|v| v.as_str()) {
             Some(s) => s.to_string(),
             None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Question {}: missing 'question' field", i + 1),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'question' field", i + 1), true);
             }
         };
 
@@ -50,11 +38,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Question {}: missing 'header' field", i + 1),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'header' field", i + 1), true);
             }
         };
 
@@ -63,20 +47,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let options_val = match q_val.get("options").and_then(|v| v.as_array()) {
             Some(arr) => arr,
             None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Question {}: missing 'options' field", i + 1),
-                    is_error: true,
-                };
+                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i + 1), true);
             }
         };
 
         if options_val.len() < 2 || options_val.len() > 4 {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Question {}: expected 2-4 options, got {}", i + 1, options_val.len()),
-                is_error: true,
-            };
+            return ToolResult::new(tool.id.clone(), format!("Question {}: expected 2-4 options, got {}", i + 1, options_val.len()), true);
         }
 
         let mut options = Vec::new();
@@ -84,21 +60,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             let label = match o_val.get("label").and_then(|v| v.as_str()) {
                 Some(s) => s.to_string(),
                 None => {
-                    return ToolResult {
-                        tool_use_id: tool.id.clone(),
-                        content: format!("Question {} option {}: missing 'label'", i + 1, j + 1),
-                        is_error: true,
-                    };
+                    return ToolResult::new(tool.id.clone(), format!("Question {} option {}: missing 'label'", i + 1, j + 1), true);
                 }
             };
             let description = match o_val.get("description").and_then(|v| v.as_str()) {
                 Some(s) => s.to_string(),
                 None => {
-                    return ToolResult {
-                        tool_use_id: tool.id.clone(),
-                        content: format!("Question {} option {}: missing 'description'", i + 1, j + 1),
-                        is_error: true,
-                    };
+                    return ToolResult::new(tool.id.clone(), format!("Question {} option {}: missing 'description'", i + 1, j + 1), true);
                 }
             };
             options.push(QuestionOption { label, description });
@@ -112,5 +80,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.set_ext(form);
 
     // Return a placeholder — the real result is injected by app.rs when user responds
-    ToolResult { tool_use_id: tool.id.clone(), content: "__QUESTION_PENDING__".to_string(), is_error: false }
+    ToolResult::new(tool.id.clone(), "__QUESTION_PENDING__".to_string(), false)
 }

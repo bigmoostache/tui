@@ -7,7 +7,7 @@ pub const PRESETS_DIR: &str = "presets";
 
 use std::collections::HashSet;
 
-use cp_base::modules::Module;
+use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
 use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
@@ -104,6 +104,13 @@ impl Module for PresetModule {
         }
     }
 
+    fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
+        vec![
+            ("preset_snapshot_myself", visualize_preset_output as ToolVisualizer),
+            ("preset_load", visualize_preset_output as ToolVisualizer),
+        ]
+    }
+
     fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
         None
     }
@@ -122,4 +129,43 @@ impl Module for PresetModule {
         }
         Some(output)
     }
+}
+
+/// Visualizer for preset tool results.
+/// Shows preset name and lists captured modules/tools with colored indicators.
+fn visualize_preset_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let success_color = Color::Rgb(80, 250, 123);
+    let info_color = Color::Rgb(139, 233, 253);
+    let error_color = Color::Rgb(255, 85, 85);
+
+    let mut lines = Vec::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            lines.push(Line::from(""));
+            continue;
+        }
+
+        let style = if line.starts_with("Error:") {
+            Style::default().fg(error_color)
+        } else if line.starts_with("Snapshot saved:") || line.starts_with("Loaded preset") {
+            Style::default().fg(success_color)
+        } else if line.contains("'") {
+            // Preset names in quotes
+            Style::default().fg(info_color)
+        } else {
+            Style::default()
+        };
+
+        let display = if line.len() > width {
+            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+        } else {
+            line.to_string()
+        };
+        lines.push(Line::from(Span::styled(display, style)));
+    }
+
+    lines
 }
