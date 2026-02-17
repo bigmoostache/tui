@@ -167,11 +167,16 @@ impl Module for ConsoleModule {
                 short_desc: "Spawn a new process".to_string(),
                 description: "Spawns a child process and creates a console panel to monitor its output. \
                     The process runs in the background and survives TUI reloads. \
-                    Close the panel to kill the process."
+                    Close the panel to kill the process. \
+                    For one-shot commands (e.g. 'cargo build'), pass the full command directly — \
+                    the panel shows output and exits when done. \
+                    For interactive shells, pass 'bash' and use cp_console_send_keys to run commands. \
+                    For long-running servers (e.g. 'npm run dev'), combine with cp_console_wait \
+                    (block=false, mode='pattern') to get notified when ready."
                     .to_string(),
                 params: vec![
                     ToolParam::new("command", ParamType::String)
-                        .desc("Shell command to execute (e.g., 'npm run dev', 'cargo build', 'bash')")
+                        .desc("Shell command to execute (e.g., 'npm run dev', 'cargo build 2>&1', 'bash')")
                         .required(),
                     ToolParam::new("cwd", ParamType::String)
                         .desc("Working directory for the command (defaults to project root)"),
@@ -186,14 +191,18 @@ impl Module for ConsoleModule {
                 name: "Console Send Keys".to_string(),
                 short_desc: "Send input to process".to_string(),
                 description: "Sends input text to a running console's stdin. Use for interactive processes. \
-                    Newline is NOT appended automatically — include \\n if needed."
+                    Newline is NOT appended automatically — include \\n if needed. \
+                    Typical usage: send a command followed by \\n (e.g. 'ls -la\\n'). \
+                    For interactive prompts, send the expected response (e.g. 'yes\\n' or 'q'). \
+                    NOTE: Escape sequences like \\x03 (Ctrl+C) are NOT interpreted as control characters — \
+                    they are sent as literal text. To stop a process, close the panel instead."
                     .to_string(),
                 params: vec![
                     ToolParam::new("id", ParamType::String)
                         .desc("Console panel ID (e.g., 'P11')")
                         .required(),
                     ToolParam::new("input", ParamType::String)
-                        .desc("Text to send to stdin (e.g., 'yes\\n' or 'q')")
+                        .desc("Text to send to stdin (e.g., 'cargo test\\n' or 'yes\\n')")
                         .required(),
                 ],
                 enabled: true,
@@ -203,27 +212,30 @@ impl Module for ConsoleModule {
                 id: "cp_console_wait".to_string(),
                 name: "Console Wait".to_string(),
                 short_desc: "Wait for process event".to_string(),
-                description: "Registers a waiter for a console event. \
-                    mode='exit': waits for the process to exit. \
-                    mode='pattern': waits for a string pattern to appear in output. \
-                    block=true (default): blocks tool execution until condition is met. \
-                    block=false: registers an async watcher that creates a notification when satisfied."
+                description: "Registers a waiter for a console event. Two modes: \
+                    mode='exit': waits for the process to exit (use for builds, one-shot commands). \
+                    mode='pattern': waits for a substring to appear in output (use for server ready messages, specific log lines). \
+                    Two blocking modes: \
+                    block=true (default): pauses tool execution until condition is met or max_wait expires. \
+                    Best for sequential workflows (build then test). \
+                    block=false: registers an async watcher — you continue working and get a spine notification \
+                    when the condition is satisfied. Best for long-running processes where you don't want to block."
                     .to_string(),
                 params: vec![
                     ToolParam::new("id", ParamType::String)
                         .desc("Console panel ID (e.g., 'P11')")
                         .required(),
                     ToolParam::new("mode", ParamType::String)
-                        .desc("Wait mode")
+                        .desc("Wait mode: 'exit' for process completion, 'pattern' for substring match in output")
                         .enum_vals(&["exit", "pattern"])
                         .required(),
                     ToolParam::new("pattern", ParamType::String)
-                        .desc("Pattern to match in output (required when mode='pattern')"),
+                        .desc("Substring to match in output (required when mode='pattern'). Matches against the ring buffer of recent output."),
                     ToolParam::new("block", ParamType::Boolean)
-                        .desc("Whether to block tool execution (default: true)")
+                        .desc("true (default): block until condition met. false: async notification via spine.")
                         .default_val("true"),
                     ToolParam::new("max_wait", ParamType::Integer)
-                        .desc("Maximum wait time in seconds, 1-30 (default: 30). Applies to block=true only.")
+                        .desc("Max wait in seconds, 1-30 (default: 30). Only applies when block=true. On timeout, returns last output lines.")
                         .default_val("30"),
                 ],
                 enabled: true,
