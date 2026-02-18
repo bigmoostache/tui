@@ -249,15 +249,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cp-mod-debug"
-version = "0.1.0"
-dependencies = [
- "cp-base",
- "ratatui",
- "serde_json",
-]
-
-[[package]]
 name = "cp-mod-files"
 version = "0.1.0"
 dependencies = [
@@ -2695,7 +2686,6 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-console",
- "cp-mod-debug",
  "cp-mod-files",
  "cp-mod-git",
  "cp-mod-github",

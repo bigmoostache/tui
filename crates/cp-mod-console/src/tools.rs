@@ -1,3 +1,5 @@
+use std::process::{Command, Stdio};
+
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -8,6 +10,9 @@ use crate::types::{ConsoleState, ConsoleWaiter, format_wait_result};
 /// Sentinel value returned when a blocking console_wait is registered.
 /// The binary's event loop replaces this with the real result when satisfied.
 pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
+
+/// Maximum execution time for debug_bash (blocking tool — must be short).
+const BASH_MAX_EXECUTION_SECS: u64 = 10;
 
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
 /// Returns (session_key, panel_id) or an error.
@@ -201,4 +206,69 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         cs.async_waiters.push(waiter);
         ToolResult::new(tool.id.clone(), format!("Watcher registered for '{}'", panel_id), false)
     }
+}
+
+pub fn execute_debug_bash(tool: &ToolUse) -> ToolResult {
+    let command = match tool.input.get("command").and_then(|v| v.as_str()) {
+        Some(c) => c,
+        None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
+    };
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str());
+
+    let mut cmd = Command::new("sh");
+    cmd.args(["-c", command]);
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
+    };
+
+    let timeout = std::time::Duration::from_secs(BASH_MAX_EXECUTION_SECS);
+    let start = std::time::Instant::now();
+
+    // Poll for exit with timeout
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!("Command timed out after {}s and was killed", BASH_MAX_EXECUTION_SECS),
+                        true,
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to wait: {}", e), true),
+        }
+    }
+
+    let output = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to read output: {}", e), true),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let code = output.status.code().unwrap_or(-1);
+    let mut result = format!("exit_code: {}\n", code);
+    if !stdout.is_empty() {
+        result.push_str(&format!("--- stdout ---\n{}", stdout));
+    }
+    if !stderr.is_empty() {
+        result.push_str(&format!("--- stderr ---\n{}", stderr));
+    }
+    if stdout.is_empty() && stderr.is_empty() {
+        result.push_str("(no output)");
+    }
+    ToolResult::new(tool.id.clone(), result, code != 0)
 }

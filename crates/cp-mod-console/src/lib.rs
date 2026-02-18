@@ -280,6 +280,24 @@ impl Module for ConsoleModule {
                 enabled: true,
                 category: "Console".to_string(),
             },
+            ToolDefinition {
+                id: "debug_bash".to_string(),
+                name: "Debug Bash".to_string(),
+                short_desc: "Run a command and return output".to_string(),
+                description: "Runs a shell command synchronously and returns stdout+stderr directly. \
+                    No server, no background process — just exec and return. \
+                    Use for debugging and quick one-off commands."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("command", ParamType::String)
+                        .desc("Shell command to execute (e.g., 'ls -la', 'cat /tmp/foo')")
+                        .required(),
+                    ToolParam::new("cwd", ParamType::String)
+                        .desc("Working directory (defaults to project root)"),
+                ],
+                enabled: true,
+                category: "Console".to_string(),
+            },
         ]
     }
 
@@ -288,6 +306,7 @@ impl Module for ConsoleModule {
             "cp_console_create" => Some(tools::execute_create(tool, state)),
             "cp_console_send_keys" => Some(tools::execute_send_keys(tool, state)),
             "cp_console_wait" => Some(tools::execute_wait(tool, state)),
+            "debug_bash" => Some(tools::execute_debug_bash(tool)),
             _ => None,
         }
     }
