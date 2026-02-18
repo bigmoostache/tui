@@ -177,11 +177,6 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file: {}", e), true);
     }
 
-    // Invoke file edit callback if registered
-    if let Some(callback) = state.file_edit_callback {
-        callback(path_str, false, state);
-    }
-
     // Update the context element's token count
     if let Some(ctx) = state
         .context
@@ -225,6 +220,11 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     result_msg.push_str("```");
+
+    // Invoke file edit callback if registered (after all state updates)
+    if let Some(callback) = state.file_edit_callback {
+        callback(path_str, false, state);
+    }
 
     ToolResult::new(tool.id.clone(), result_msg, false)
 }

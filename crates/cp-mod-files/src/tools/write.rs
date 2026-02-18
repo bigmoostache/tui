@@ -36,11 +36,6 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file '{}': {}", path_str, e), true);
     }
 
-    // Invoke file edit callback if registered
-    if let Some(callback) = state.file_edit_callback {
-        callback(path_str, is_new, state);
-    }
-
     let token_count = estimate_tokens(contents);
     let line_count = contents.lines().count();
 
@@ -103,6 +98,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         result_msg.push_str(&format!("+ {}\n", line));
     }
     result_msg.push_str("```");
+
+    // Invoke file edit callback if registered (after all state updates)
+    if let Some(callback) = state.file_edit_callback {
+        callback(path_str, is_new, state);
+    }
 
     ToolResult::new(tool.id.clone(), result_msg, false)
 }
