@@ -145,7 +145,23 @@ impl ConsoleState {
             let cs = Self::get(state);
             if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
                 if let Some(ref id) = waiter.tool_use_id {
-                    satisfied_blocking.push((id.clone(), result));
+                    if waiter.is_debug_bash {
+                        // For easy_bash: return full output in simple format
+                        let (output, _) = cs.sessions.get(&waiter.session_name)
+                            .map(|h| h.buffer.read_all())
+                            .unwrap_or_default();
+                        let exit_code = cs.sessions.get(&waiter.session_name)
+                            .and_then(|h| h.get_status().exit_code())
+                            .unwrap_or(-1);
+                        let trimmed = output.trim();
+                        if trimmed.is_empty() {
+                            satisfied_blocking.push((id.clone(), format!("exit_code: {}\n(no output)", exit_code)));
+                        } else {
+                            satisfied_blocking.push((id.clone(), format!("{}", trimmed)));
+                        }
+                    } else {
+                        satisfied_blocking.push((id.clone(), result));
+                    }
                 }
                 if waiter.is_debug_bash {
                     debug_bash_cleanup.push(waiter.session_name.clone());
