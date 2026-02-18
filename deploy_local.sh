@@ -34,6 +34,11 @@ echo "[2/4] Installing to $INSTALL_PATH..."
 rm -f "$INSTALL_PATH"
 cp "$SCRIPT_DIR/target/release/tui" "$INSTALL_PATH"
 chmod +x "$INSTALL_PATH"
+# Also install the console server binary alongside
+INSTALL_DIR="$(dirname "$INSTALL_PATH")"
+rm -f "$INSTALL_DIR/cp-console-server"
+cp "$SCRIPT_DIR/target/release/cp-console-server" "$INSTALL_DIR/cp-console-server"
+chmod +x "$INSTALL_DIR/cp-console-server"
 echo "      Installed. ($(du -h "$INSTALL_PATH" | cut -f1))"
 
 # 3. Global gitignore

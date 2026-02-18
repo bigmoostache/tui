@@ -24,10 +24,36 @@ fn server_pid_path() -> PathBuf {
     PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join("server.pid")
 }
 
-/// Path to the server binary (next to the TUI binary).
+/// Path to the server binary. Checks multiple locations:
+/// 1. Next to the current TUI binary (deployed)
+/// 2. In target/release/ (cargo run --release)
+/// 3. In target/debug/ (cargo run)
 fn server_binary_path() -> PathBuf {
     let exe = std::env::current_exe().unwrap_or_default();
-    exe.parent().unwrap_or(std::path::Path::new(".")).join("cp-console-server")
+    let next_to_exe = exe.parent().unwrap_or(std::path::Path::new(".")).join("cp-console-server");
+    if next_to_exe.exists() {
+        return next_to_exe;
+    }
+
+    // Try workspace target directories (when running via cargo run)
+    // Walk up from exe to find the workspace root (has Cargo.toml)
+    let mut dir = exe.parent();
+    while let Some(d) = dir {
+        let cargo_toml = d.join("Cargo.toml");
+        if cargo_toml.exists() {
+            // Check target/release and target/debug
+            for profile in &["release", "debug"] {
+                let candidate = d.join("target").join(profile).join("cp-console-server");
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+        dir = d.parent();
+    }
+
+    // Fallback to next-to-exe (will fail with a clear error)
+    next_to_exe
 }
 
 /// Build the log file path for a given session key (always absolute).

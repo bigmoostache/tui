@@ -95,6 +95,11 @@ impl Module for ConsoleModule {
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        // Ensure the console server is running
+        if let Err(e) = manager::find_or_create_server() {
+            eprintln!("Console server startup failed: {}", e);
+        }
+
         // Restore counter
         if let Some(v) = data.get("next_session_id").and_then(|v| v.as_u64()) {
             let cs = ConsoleState::get_mut(state);
