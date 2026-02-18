@@ -12,6 +12,71 @@ use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use crate::CONSOLE_DIR;
 
+/// Environment variable set on all spawned processes to tag them as TUI-launched.
+/// Value is a hash of the working directory so multiple TUI instances don't collide.
+pub const ENV_TAG: &str = "CONTEXT_PILOT_SESSION";
+
+/// Compute the session tag for the current working directory.
+pub fn session_tag() -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let mut hasher = DefaultHasher::new();
+    cwd.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+/// Kill orphaned processes from previous TUI sessions that weren't cleaned up.
+/// Scans /proc for processes with our CONTEXT_PILOT_SESSION env var and kills
+/// any whose PID isn't in the provided set of known PIDs.
+///
+/// IMPORTANT: Only kills the specific PID (SIGTERM then SIGKILL fallback).
+/// Never uses process group kill (`-$PID`) which can cascade to SSH sessions.
+pub fn kill_orphaned_processes(known_pids: &std::collections::HashSet<u32>) {
+    let tag = session_tag();
+
+    let proc_dir = match std::fs::read_dir("/proc") {
+        Ok(d) => d,
+        Err(_) => return, // Not on Linux or no /proc access
+    };
+
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        let pid: u32 = match name_str.parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        // Skip our own PID and known live sessions
+        if pid == std::process::id() || known_pids.contains(&pid) {
+            continue;
+        }
+
+        // Read environ (null-separated key=value pairs)
+        let environ_path = format!("/proc/{}/environ", pid);
+        let environ = match std::fs::read(&environ_path) {
+            Ok(data) => data,
+            Err(_) => continue,
+        };
+
+        let needle = format!("{}={}", ENV_TAG, tag);
+        let needle_bytes = needle.as_bytes();
+
+        let found = environ.split(|&b| b == 0).any(|entry| entry == needle_bytes);
+
+        if found {
+            // Kill only this specific PID — never the process group
+            let _ = Command::new("kill").args([&pid.to_string()]).output();
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            if is_pid_alive(pid) {
+                let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+            }
+        }
+    }
+}
+
 /// A managed child process session.
 /// All fields are Send + Sync via Arc wrappers.
 pub struct SessionHandle {
@@ -64,6 +129,9 @@ impl SessionHandle {
         //   -c: run command instead of interactive shell
         let mut cmd = Command::new("script");
         cmd.args(["-q", "-f", "-c", &command, &log_path_str]);
+
+        // Tag the process so we can find orphans after crash/SIGKILL
+        cmd.env(ENV_TAG, session_tag());
 
         // Pipe stdin so we can send input via send_keys()
         // Stdout/stderr null — all output captured by script to the log file
@@ -221,10 +289,10 @@ impl SessionHandle {
 
     /// Kill the process.
     ///
-    /// Sends SIGTERM to the `script` process only (not the process group).
-    /// When `script` dies, its PTY master fd closes, which sends SIGHUP to
-    /// all child processes via the PTY — this is the clean shutdown path.
-    /// Falls back to SIGKILL after a brief delay if SIGTERM doesn't work.
+    /// Sends SIGTERM to the process group first for graceful shutdown.
+    /// Falls back to SIGKILL after a brief delay if processes are still alive.
+    /// process_group(0) at spawn time makes PID == PGID, so -{pid} kills
+    /// script and all its children.
     pub fn kill(&self) {
         // Signal polling thread to stop
         self.stop_polling.store(true, Ordering::Relaxed);
