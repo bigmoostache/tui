@@ -117,6 +117,19 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
     state.dirty = true;
 }
 
+/// Snap a byte index forward to the nearest UTF-8 char boundary.
+/// Returns `s.len()` if `idx >= s.len()`.
+fn snap_to_char_boundary(s: &str, idx: usize) -> usize {
+    if idx >= s.len() {
+        return s.len();
+    }
+    let mut i = idx;
+    while !s.is_char_boundary(i) && i < s.len() {
+        i += 1;
+    }
+    i
+}
+
 /// Paginate content for LLM context output.
 /// Returns the original content unchanged when total_pages <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
@@ -129,7 +142,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
     }
 
     let chars_per_page = PANEL_PAGE_TOKENS as f32 * CHARS_PER_TOKEN;
-    let start_char = (current_page as f32 * chars_per_page) as usize;
+    let start_char = snap_to_char_boundary(full_content, (current_page as f32 * chars_per_page) as usize);
 
     // Snap start to next line boundary
     let start = if start_char == 0 {
@@ -141,7 +154,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content[start_char..].find('\n').map(|pos| start_char + pos + 1).unwrap_or(full_content.len())
     };
 
-    let end_char = start + chars_per_page as usize;
+    let end_char = snap_to_char_boundary(full_content, start + chars_per_page as usize);
     let end = if end_char >= full_content.len() {
         full_content.len()
     } else {
