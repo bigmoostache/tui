@@ -66,7 +66,13 @@ fn create_panel_closure_messages(
             id: tool_id.clone(),
             name: "context_close".to_string(),
             input: serde_json::json!({
-                "ids": [closed_panel_desc.split_whitespace().next().unwrap_or("")]
+                "ids": [
+                    // Extract panel ID (everything before the first space or parenthesis)
+                    closed_panel_desc
+                        .split(|c: char| c.is_whitespace() || c == '(')
+                        .next()
+                        .unwrap_or("")
+                ]
             }),
         }],
         tool_results: Vec::new(),
@@ -466,9 +472,9 @@ mod tests {
         assert!(result_msg.tool_results[0].content.contains("Automatically closed panel"));
         assert!(result_msg.tool_results[0].content.contains("P10 (Chat 01:00–02:00)"));
         
-        // Verify counters were incremented
+        // Verify counters were incremented twice (once per message)
         assert_eq!(state.next_tool_id, 2);
         assert_eq!(state.next_result_id, 2);
-        assert_eq!(state.global_next_uid, 102); // Two UIDs created
+        assert_eq!(state.global_next_uid, 102); // Incremented from 100 to 101, then 101 to 102
     }
 }
