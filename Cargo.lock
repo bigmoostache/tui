@@ -242,6 +242,7 @@ dependencies = [
  "cp-base",
  "crossterm",
  "ratatui",
+ "regex",
  "serde",
  "serde_json",
 ]

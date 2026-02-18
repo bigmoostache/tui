@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
-use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use cp_base::constants::{chars, theme};
+use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
+use cp_base::config::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 

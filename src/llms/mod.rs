@@ -6,7 +6,6 @@ pub mod anthropic;
 pub mod claude_code;
 pub mod claude_code_api_key;
 pub mod deepseek;
-pub mod error;
 pub mod grok;
 pub mod groq;
 pub mod openai_compat;
@@ -278,4 +277,73 @@ pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMes
             content: format!("======= [{}] {} =======\n{}", item.id, item.header, item.content),
         })
         .collect()
+}
+
+pub mod error {
+    use std::fmt;
+
+    /// Typed error for LLM streaming operations.
+    #[derive(Debug)]
+    pub enum LlmError {
+        Auth(String),
+        Network(String),
+        Api { status: u16, body: String },
+        StreamRead(String),
+        Parse(String),
+    }
+
+    impl fmt::Display for LlmError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                LlmError::Auth(msg) => write!(f, "Auth error: {}", msg),
+                LlmError::Network(msg) => write!(f, "Network error: {}", msg),
+                LlmError::Api { status, body } => write!(f, "API error {}: {}", status, body),
+                LlmError::StreamRead(msg) => write!(f, "Stream read error: {}", msg),
+                LlmError::Parse(msg) => write!(f, "Parse error: {}", msg),
+            }
+        }
+    }
+
+    impl std::error::Error for LlmError {}
+
+    impl From<reqwest::Error> for LlmError {
+        fn from(e: reqwest::Error) -> Self {
+            LlmError::Network(e.to_string())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn display_auth() {
+            let e = LlmError::Auth("key missing".into());
+            assert_eq!(e.to_string(), "Auth error: key missing");
+        }
+
+        #[test]
+        fn display_api() {
+            let e = LlmError::Api { status: 429, body: "rate limited".into() };
+            assert_eq!(e.to_string(), "API error 429: rate limited");
+        }
+
+        #[test]
+        fn display_network() {
+            let e = LlmError::Network("timeout".into());
+            assert_eq!(e.to_string(), "Network error: timeout");
+        }
+
+        #[test]
+        fn display_stream_read() {
+            let e = LlmError::StreamRead("connection reset".into());
+            assert_eq!(e.to_string(), "Stream read error: connection reset");
+        }
+
+        #[test]
+        fn display_parse() {
+            let e = LlmError::Parse("invalid json".into());
+            assert_eq!(e.to_string(), "Parse error: invalid json");
+        }
+    }
 }

@@ -5,7 +5,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::STORE_DIR;
 use cp_base::panels::now_ms;
 
 use crate::ring_buffer::RingBuffer;
