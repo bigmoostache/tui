@@ -254,6 +254,8 @@ impl Module for ConsoleModule {
                     mode='pattern': waits for a regex pattern to match in output (use for server ready messages, specific log lines). \
                     Patterns are full regex — e.g. 'Listening on port \\d+', 'error|warning', 'Finished.*target'. \
                     Falls back to literal substring match if the regex is invalid. \
+                    IMPORTANT: Include both success AND failure patterns using regex alternation (|) so you \
+                    catch errors early instead of waiting for timeout. E.g. 'ready to accept|error|panic|failed'. \
                     Two blocking modes: \
                     block=true (default): pauses tool execution until condition is met or max_wait expires. \
                     Best for sequential workflows (build then test). \
@@ -269,9 +271,11 @@ impl Module for ConsoleModule {
                         .enum_vals(&["exit", "pattern"])
                         .required(),
                     ToolParam::new("pattern", ParamType::String)
-                        .desc("Regex pattern to match in output (required when mode='pattern'). E.g. 'Finished.*target', 'error|warning', 'port \\d+'. Falls back to literal match if invalid regex."),
+                        .desc("Regex pattern to match in output (required when mode='pattern'). \
+                            Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
+                            Falls back to literal match if invalid regex."),
                     ToolParam::new("block", ParamType::Boolean)
-                        .desc("true (default): block until condition met. false: async notification via spine.")
+                        .desc("true (default): blocks tool execution until matched or timeout. false: async — spine notification on match.")
                         .default_val("true"),
                     ToolParam::new("max_wait", ParamType::Integer)
                         .desc("Max wait in seconds, 1-30 (default: 30). Only applies when block=true. On timeout, returns last output lines.")
@@ -286,7 +290,9 @@ impl Module for ConsoleModule {
                 short_desc: "Run a command and return output".to_string(),
                 description: "Runs a shell command synchronously and returns stdout+stderr directly. \
                     No server, no background process — just exec and return. \
-                    Use for debugging and quick one-off commands."
+                    Use for debugging and quick one-off commands. \
+                    BLOCKING: freezes tool execution until command completes (max 10s, then killed). \
+                    Do NOT use for long-running or interactive commands — use cp_console_create instead."
                     .to_string(),
                 params: vec![
                     ToolParam::new("command", ParamType::String)
