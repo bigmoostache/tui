@@ -217,11 +217,12 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
         None => return Response::err(format!("Session '{}' not found", key)),
     };
     if !session.is_terminal() {
-        // SIGTERM to script PID only — PTY teardown propagates to children
-        let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+        // SIGTERM to process group (script + all children)
+        // Safe because process_group(0) at spawn ensures PGID = script PID
+        let _ = Command::new("kill").args([&format!("-{}", session.pid)]).output();
         std::thread::sleep(std::time::Duration::from_millis(100));
         if is_pid_alive(session.pid) {
-            let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+            let _ = Command::new("kill").args(["-9", &format!("-{}", session.pid)]).output();
         }
         session.status = SessionStatus::Exited(-9);
     }
@@ -234,10 +235,10 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     if let Some(mut session) = map.remove(key) {
         if !session.is_terminal() {
-            let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+            let _ = Command::new("kill").args([&format!("-{}", session.pid)]).output();
             std::thread::sleep(std::time::Duration::from_millis(100));
             if is_pid_alive(session.pid) {
-                let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+                let _ = Command::new("kill").args(["-9", &format!("-{}", session.pid)]).output();
             }
         }
         session.stdin.take();
