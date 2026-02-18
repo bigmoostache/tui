@@ -320,4 +320,65 @@ mod tests {
         assert!(first_deletion_pos < first_addition_pos);
         assert!(first_addition_pos < diff_end_pos);
     }
+
+    #[test]
+    fn test_file_edit_with_callback() {
+        use std::fs;
+        use tempfile::TempDir;
+        
+        // Create a temp directory and file
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "original content\n").unwrap();
+        
+        // Create a minimal state without callback (callback would be set by main.rs)
+        let mut state = State::default();
+        
+        // Add the file to context
+        let mut ctx = cp_base::state::ContextElement {
+            id: "C1".to_string(),
+            uid: Some("UID_1_P".to_string()),
+            context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::FILE),
+            name: "test.txt".to_string(),
+            token_count: 10,
+            metadata: std::collections::HashMap::new(),
+            cached_content: None,
+            history_messages: None,
+            cache_deprecated: false,
+            cache_in_flight: false,
+            last_refresh_ms: 0,
+            content_hash: None,
+            source_hash: None,
+            current_page: 0,
+            total_pages: 1,
+            full_token_count: 0,
+            panel_cache_hit: false,
+            panel_total_cost: 0.0,
+        };
+        ctx.set_meta("file_path", &file_path.to_string_lossy().to_string());
+        state.context.push(ctx);
+        
+        // Create a tool use
+        let mut input = serde_json::Map::new();
+        input.insert("file_path".to_string(), serde_json::Value::String(file_path.to_string_lossy().to_string()));
+        input.insert("old_string".to_string(), serde_json::Value::String("original content".to_string()));
+        input.insert("new_string".to_string(), serde_json::Value::String("modified content".to_string()));
+        
+        let tool = ToolUse {
+            id: "T1".to_string(),
+            name: "file_edit".to_string(),
+            input: serde_json::Value::Object(input),
+        };
+        
+        // Execute the edit - this should succeed even without a callback
+        let result = execute_edit(&tool, &mut state);
+        
+        // Verify the edit succeeded
+        assert!(!result.is_error);
+        assert!(result.content.contains("modified content"));
+        
+        // Verify the file was actually modified
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "modified content\n");
+    }
 }
