@@ -43,16 +43,15 @@ impl Module for ConsoleModule {
 
     fn reset_state(&self, state: &mut State) {
         // Collect file paths before shutdown (shutdown drains sessions)
-        let paths: Vec<(String, String)> = {
+        let paths: Vec<String> = {
             let cs = ConsoleState::get(state);
-            cs.sessions.values().map(|h| (h.log_path.clone(), h.input_path.clone())).collect()
+            cs.sessions.values().map(|h| h.log_path.clone()).collect()
         };
         ConsoleState::shutdown_all(state);
         state.set_ext(ConsoleState::new());
-        // Clean up log + input files
-        for (log, input) in paths {
+        // Clean up log files
+        for log in paths {
             let _ = std::fs::remove_file(&log);
-            let _ = std::fs::remove_file(&input);
         }
     }
 
@@ -71,7 +70,6 @@ impl Module for ConsoleModule {
                         command: handle.command.clone(),
                         cwd: handle.cwd.clone(),
                         log_path: handle.log_path.clone(),
-                        input_path: handle.input_path.clone(),
                         started_at: handle.started_at,
                     },
                 );
@@ -115,7 +113,6 @@ impl Module for ConsoleModule {
                 meta.cwd.clone(),
                 meta.pid,
                 meta.log_path.clone(),
-                meta.input_path.clone(),
                 meta.started_at,
             );
             reconnected.push((name.clone(), handle));
@@ -133,6 +130,22 @@ impl Module for ConsoleModule {
                 ctx.cache_deprecated = true;
             }
         }
+
+        // Phase 3: Remove orphaned console panels that have no matching session
+        // (e.g. sessions that were terminal at save time and weren't persisted)
+        let live_names: std::collections::HashSet<String> = {
+            let cs = ConsoleState::get(state);
+            cs.sessions.keys().cloned().collect()
+        };
+        state.context.retain(|c| {
+            if c.context_type.as_str() != ContextType::CONSOLE {
+                return true; // keep non-console panels
+            }
+            match c.get_meta_str("console_name") {
+                Some(name) => live_names.contains(name),
+                None => false, // malformed console panel, remove
+            }
+        });
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
@@ -194,8 +207,10 @@ impl Module for ConsoleModule {
                     Newline is NOT appended automatically — include \\n if needed. \
                     Typical usage: send a command followed by \\n (e.g. 'ls -la\\n'). \
                     For interactive prompts, send the expected response (e.g. 'yes\\n' or 'q'). \
-                    NOTE: Escape sequences like \\x03 (Ctrl+C) are NOT interpreted as control characters — \
-                    they are sent as literal text. To stop a process, close the panel instead."
+                    Escape sequences are interpreted as control characters: \
+                    \\x03 (Ctrl+C to interrupt), \\x04 (Ctrl+D for EOF), \\e[A (up arrow), \
+                    \\n (newline), \\t (tab), \\xHH (arbitrary hex byte). \
+                    To stop a process, send \\x03 (Ctrl+C) or close the panel."
                     .to_string(),
                 params: vec![
                     ToolParam::new("id", ParamType::String)
@@ -272,12 +287,12 @@ impl Module for ConsoleModule {
             return None;
         }
         let name = ctx.get_meta_str("console_name").unwrap_or_default().to_string();
-        // Grab file paths before removing
-        let (log_path, input_path) = {
+        // Grab file path before removing
+        let log_path = {
             let cs = ConsoleState::get(state);
             cs.sessions
                 .get(&name)
-                .map(|h| (h.log_path.clone(), h.input_path.clone()))
+                .map(|h| h.log_path.clone())
                 .unwrap_or_default()
         };
         ConsoleState::kill_session(state, &name);
@@ -285,12 +300,9 @@ impl Module for ConsoleModule {
             let cs = ConsoleState::get_mut(state);
             cs.sessions.remove(&name);
         }
-        // Delete log + input files
+        // Delete log file
         if !log_path.is_empty() {
             let _ = std::fs::remove_file(&log_path);
-        }
-        if !input_path.is_empty() {
-            let _ = std::fs::remove_file(&input_path);
         }
         Some(Ok(format!("console: {}", name)))
     }

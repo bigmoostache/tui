@@ -13,7 +13,9 @@ use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
-pub use cp_base::panels::{ContextItem, Panel, mark_panels_dirty, now_ms, paginate_content, update_if_changed};
+pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
+#[cfg(test)]
+pub use cp_base::panels::mark_panels_dirty;
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).
 /// This is NOT part of the Panel trait — it uses binary-specific deps (theme, profile!, UI helpers).
@@ -78,10 +80,22 @@ pub fn render_panel_default(panel: &dyn Panel, frame: &mut Frame, state: &mut St
     }
 }
 
-/// Get the appropriate panel for a context type (delegates to module system)
+/// Get the appropriate panel for a context type (delegates to module system).
+/// Returns a no-op fallback for orphaned context types (e.g., removed modules).
 pub fn get_panel(context_type: &ContextType) -> Box<dyn Panel> {
-    crate::modules::create_panel(context_type)
-        .unwrap_or_else(|| panic!("No module provides a panel for {:?}", context_type))
+    crate::modules::create_panel(context_type).unwrap_or_else(|| Box::new(FallbackPanel))
+}
+
+/// Minimal panel for context types whose module has been removed.
+struct FallbackPanel;
+
+impl Panel for FallbackPanel {
+    fn title(&self, _state: &State) -> String {
+        "(removed)".to_string()
+    }
+    fn content(&self, _state: &State, _base_style: ratatui::prelude::Style) -> Vec<ratatui::text::Line<'static>> {
+        vec![ratatui::text::Line::from("Panel module no longer available")]
+    }
 }
 
 /// Refresh all panels (update token counts, etc.)
@@ -259,27 +273,6 @@ mod tests {
     }
 
     #[test]
-    fn tmux_panel_apply_cache_update() {
-        let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::new(ContextType::TMUX));
-        ctx.set_meta("tmux_pane_id", &"%0".to_string());
-        ctx.cache_deprecated = true;
-
-        let panel = get_panel(&ContextType::new(ContextType::TMUX));
-        let update = CacheUpdate::Content {
-            context_id: "P99".to_string(),
-            content: "$ ls\nfile1.txt\nfile2.txt".to_string(),
-            token_count: 5,
-        };
-        let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
-
-        assert!(changed);
-        assert!(!ctx.cache_deprecated);
-        assert!(ctx.source_hash.is_some());
-        assert!(ctx.content_hash.is_some());
-    }
-
-    #[test]
     fn git_status_apply_cache_update() {
         let mut state = State::default();
         // Initialize GitState
@@ -409,12 +402,6 @@ mod tests {
     // ── Timer interval tests ───────────────────────────────────────
 
     #[test]
-    fn tmux_has_timer_interval() {
-        let panel = get_panel(&ContextType::new(ContextType::TMUX));
-        assert!(panel.cache_refresh_interval_ms().is_some(), "Tmux should have timer interval");
-    }
-
-    #[test]
     fn git_has_timer_interval() {
         let panel = get_panel(&ContextType::new(ContextType::GIT));
         assert!(panel.cache_refresh_interval_ms().is_some(), "Git should have timer interval");
@@ -454,7 +441,7 @@ mod tests {
         assert!(ContextType::new(ContextType::TREE).needs_cache());
         assert!(ContextType::new(ContextType::GLOB).needs_cache());
         assert!(ContextType::new(ContextType::GREP).needs_cache());
-        assert!(ContextType::new(ContextType::TMUX).needs_cache());
+        // tmux module removed — no longer in registry
         assert!(ContextType::new(ContextType::GIT).needs_cache());
         assert!(ContextType::new(ContextType::GIT_RESULT).needs_cache());
         assert!(ContextType::new(ContextType::GITHUB_RESULT).needs_cache());

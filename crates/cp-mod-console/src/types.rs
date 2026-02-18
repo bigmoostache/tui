@@ -13,7 +13,6 @@ pub struct SessionMeta {
     pub command: String,
     pub cwd: Option<String>,
     pub log_path: String,
-    pub input_path: String,
     pub started_at: u64,
 }
 
@@ -180,11 +179,13 @@ impl ConsoleState {
         for waiter in async_waiters {
             let cs = Self::get(state);
             if let Some(handle) = cs.sessions.get(&waiter.session_name) {
+                let is_terminal = handle.get_status().is_terminal();
                 let satisfied = match waiter.mode.as_str() {
-                    "exit" => handle.get_status().is_terminal(),
+                    "exit" => is_terminal,
                     "pattern" => {
                         if let Some(ref pat) = waiter.pattern {
-                            handle.buffer.contains_pattern(pat)
+                            // Pattern matched, or process exited (pattern can never appear)
+                            handle.buffer.contains_pattern(pat) || is_terminal
                         } else {
                             false
                         }
