@@ -146,9 +146,9 @@ impl ConsoleState {
             if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
                 if let Some(ref id) = waiter.tool_use_id {
                     if waiter.is_debug_bash {
-                        // For easy_bash: return full output in simple format
-                        let (output, _) = cs.sessions.get(&waiter.session_name)
-                            .map(|h| h.buffer.read_all())
+                        // For easy_bash: read log file directly (buffer may lag behind)
+                        let output = cs.sessions.get(&waiter.session_name)
+                            .map(|h| std::fs::read_to_string(&h.log_path).unwrap_or_default())
                             .unwrap_or_default();
                         let exit_code = cs.sessions.get(&waiter.session_name)
                             .and_then(|h| h.get_status().exit_code())
