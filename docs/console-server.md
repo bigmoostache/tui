@@ -12,8 +12,8 @@ When the TUI reloads (hot-reload, crash recovery, `reload_tui`), its process exi
 graph TD
     TUI["TUI binary<br/>(cp-mod-console client)"]
     SRV["cp-console-server<br/>(daemon, own session via setsid)"]
-    S1["script -q -f -c 'cmd1' log1<br/>(PR_SET_PDEATHSIG → SIGHUP)"]
-    S2["script -q -f -c 'cmd2' log2<br/>(PR_SET_PDEATHSIG → SIGHUP)"]
+    S1["sh -c 'cmd1'<br/>(stdout/stderr → log1)"]
+    S2["sh -c 'cmd2'<br/>(stdout/stderr → log2)"]
     C1["child process<br/>(e.g. ssh, cargo build)"]
     C2["child process<br/>(e.g. npm run dev)"]
     LOG1[".context-pilot/console/c_1.log"]
@@ -24,16 +24,16 @@ graph TD
     SRV -- "owns stdin pipe" --> S2
     S1 --> C1
     S2 --> C2
-    S1 -- "script writes to" --> LOG1
-    S2 -- "script writes to" --> LOG2
+    S1 -- "stdout/stderr redirect" --> LOG1
+    S2 -- "stdout/stderr redirect" --> LOG2
     TUI -. "file poller reads" .-> LOG1
     TUI -. "file poller reads" .-> LOG2
 ```
 
 Key points:
 - The server calls `setsid()` so it is not a child of the TUI.
-- Each `script` process uses `prctl(PR_SET_PDEATHSIG, SIGHUP)` so it receives SIGHUP when the server dies. This cascades: server dies → script gets SIGHUP → script dies → PTY master closes → child process gets terminal hangup → child dies.
-- Output capture: `script -q -f` writes all PTY output to a log file. The TUI polls that file into a `RingBuffer` for display.
+- On SIGTERM/SIGINT/SIGHUP, the server kills all children and exits cleanly. On abnormal death (SIGKILL), children become orphans — the TUI's orphan cleanup handles them on next startup.
+- Output capture: stdout/stderr are redirected to a log file at spawn time. The TUI polls that file into a `RingBuffer` for display.
 - Input: the server holds each session's `ChildStdin`. The TUI sends keystrokes via the `send` command, and the server writes them to stdin.
 
 ## Communication protocol
@@ -71,7 +71,7 @@ sequenceDiagram
 | Command    | Fields                                      | Description                                          |
 |------------|---------------------------------------------|------------------------------------------------------|
 | `ping`     |                                             | Health check. Returns `{"ok": true}`.                |
-| `create`   | `key`, `command`, `log_path`, `cwd?`        | Spawn a `script` process. Returns `pid`.             |
+| `create`   | `key`, `command`, `log_path`, `cwd?`        | Spawn a `sh -c` process. Returns `pid`.              |
 | `send`     | `key`, `input`                              | Write bytes to session stdin (escape sequences interpreted). |
 | `kill`     | `key`, `force?`                             | SIGTERM then SIGKILL the `script` process.           |
 | `remove`   | `key`, `force?`                             | Kill (if running) + remove session from server map.  |
@@ -153,4 +153,4 @@ So `cargo build --release -p cp-mod-console` puts the binary where `cargo run --
 
 ### Process cleanup on server death
 
-Each `script` child is spawned with `prctl(PR_SET_PDEATHSIG, SIGHUP)`, so killing the server automatically sends SIGHUP to all `script` processes. When `script` dies, its PTY master closes, which delivers a terminal hangup to the child shell — so the entire tree is cleaned up. No orphaned processes.
+On SIGTERM/SIGINT/SIGHUP, the server iterates all sessions, sends SIGTERM (then SIGKILL if needed) to each child, and exits. This is the supervisord/systemd approach — explicit cleanup, no kernel magic. On abnormal death (SIGKILL), children become orphans reparented to PID 1. The TUI's orphan cleanup handles them on next startup.

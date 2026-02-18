@@ -1,8 +1,14 @@
 //! Console Server: persistent daemon that owns child processes.
 //!
-//! Spawns `script -q -f -c` processes and holds their stdin pipes.
+//! Spawns `sh -c` processes with stdout/stderr redirected to log files.
 //! TUI communicates via JSON lines over a Unix socket.
 //! Survives TUI exit/reload — processes stay alive.
+//!
+//! # Process cleanup
+//!
+//! On SIGTERM/SIGINT, the server kills all children and exits cleanly.
+//! On abnormal death (SIGKILL), children become orphans — the TUI's
+//! orphan cleanup handles them on next startup.
 //!
 //! # Rebuilding after changes
 //!
@@ -21,18 +27,20 @@
 //! ```
 //!
 //! The TUI's `find_or_create_server()` will spawn the new binary automatically
-//! on next launch or module reload. Children receive SIGHUP when the server dies
-//! (via `prctl(PR_SET_PDEATHSIG)`), so killing the server tears down all sessions.
+//! on next launch or module reload.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
+
+/// Global flag set by signal handler to trigger graceful shutdown.
+static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
 // Protocol types
@@ -162,25 +170,22 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     if let Some(parent) = log.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Err(e) = std::fs::write(&log, b"") {
-        return Response::err(format!("Failed to create log: {}", e));
-    }
 
-    let mut cmd = Command::new("script");
-    cmd.args(["-q", "-f", "-c", command, log_path]);
-    cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
+    let log_file = match std::fs::File::create(&log) {
+        Ok(f) => f,
+        Err(e) => return Response::err(format!("Failed to create log: {}", e)),
+    };
+    let log_err = match log_file.try_clone() {
+        Ok(f) => f,
+        Err(e) => return Response::err(format!("Failed to clone log fd: {}", e)),
+    };
+
+    let mut cmd = Command::new("sh");
+    cmd.args(["-c", command]);
+    cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
 
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
-    }
-
-    // When the server dies, children get SIGHUP via prctl(PR_SET_PDEATHSIG).
-    // This ensures script processes (and their PTY children) are cleaned up.
-    unsafe {
-        cmd.pre_exec(|| {
-            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGHUP);
-            Ok(())
-        });
     }
 
     let mut child = match cmd.spawn() {
@@ -456,18 +461,82 @@ fn main() {
         }
     };
 
+    // Set socket to non-blocking so we can check SHUTDOWN_REQUESTED between accepts
+    listener.set_nonblocking(true).ok();
+
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
 
+    // Install SIGTERM/SIGINT handlers — set flag, cleanup thread does the rest
+    install_signal_handlers();
+
+    // Spawn a shutdown monitor thread that watches SHUTDOWN_REQUESTED
+    {
+        let sessions = Arc::clone(&sessions);
+        let socket_path = socket_path.clone();
+        let pid_path = pid_path.clone();
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+                    kill_all_sessions(&sessions);
+                    let _ = std::fs::remove_file(&socket_path);
+                    let _ = std::fs::remove_file(&pid_path);
+                    std::process::exit(0);
+                }
+            }
+        });
+    }
+
     // Accept connections (one thread per connection)
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
                 let sessions = Arc::clone(&sessions);
                 std::thread::spawn(move || {
                     handle_connection(stream, sessions);
                 });
             }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // No pending connection — sleep briefly and retry
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
             Err(_) => continue,
         }
+
+        if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+            kill_all_sessions(&sessions);
+            let _ = std::fs::remove_file(&socket_path);
+            let _ = std::fs::remove_file(&pid_path);
+            std::process::exit(0);
+        }
     }
+}
+
+/// Install SIGTERM and SIGINT handlers that set SHUTDOWN_REQUESTED.
+fn install_signal_handlers() {
+    unsafe {
+        libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
+        libc::signal(libc::SIGINT, signal_handler as *const () as libc::sighandler_t);
+        libc::signal(libc::SIGHUP, signal_handler as *const () as libc::sighandler_t);
+    }
+}
+
+extern "C" fn signal_handler(_sig: libc::c_int) {
+    SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
+}
+
+/// Kill all sessions — used during shutdown.
+fn kill_all_sessions(sessions: &Sessions) {
+    let mut map = sessions.lock().unwrap();
+    for (_, session) in map.iter_mut() {
+        if !session.is_terminal() {
+            let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if is_pid_alive(session.pid) {
+                let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+            }
+        }
+        session.stdin.take();
+    }
+    map.clear();
 }
