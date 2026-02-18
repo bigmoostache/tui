@@ -15,8 +15,8 @@ use crate::state::{
 };
 use crate::ui::theme;
 
-use super::conversation_list::{self, ListAction};
-use super::conversation_render;
+use super::list::{self, ListAction};
+use super::render;
 
 pub struct ConversationPanel;
 
@@ -126,7 +126,7 @@ impl ConversationPanel {
                     // Render each frozen message with full formatting
                     for msg in msgs {
                         let lines =
-                            conversation_render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                            render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
                         text.extend(lines);
                     }
 
@@ -177,7 +177,7 @@ impl ConversationPanel {
                 }
 
                 // Cache miss - render message
-                let lines = conversation_render::render_message(
+                let lines = render::render_message(
                     msg,
                     viewport_width,
                     base_style,
@@ -206,7 +206,7 @@ impl ConversationPanel {
                 text.extend(cached.lines.iter().cloned());
             } else {
                 // Cache miss
-                let input_lines = conversation_render::render_input(
+                let input_lines = render::render_input(
                     &state.input,
                     state.input_cursor,
                     viewport_width,
@@ -221,7 +221,7 @@ impl ConversationPanel {
             }
         } else {
             // No cache
-            let input_lines = conversation_render::render_input(
+            let input_lines = render::render_input(
                 &state.input,
                 state.input_cursor,
                 viewport_width,
@@ -283,7 +283,7 @@ impl Panel for ConversationPanel {
                     Some(Action::InputSubmit)
                 } else {
                     // Check for list continuation, otherwise add newline
-                    match conversation_list::detect_list_action(&state.input) {
+                    match list::detect_list_action(&state.input) {
                         Some(ListAction::Continue(text)) => Some(Action::InsertText(text)),
                         Some(ListAction::RemoveItem) => Some(Action::RemoveListItem),
                         None => Some(Action::InputChar('\n')),

@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
 use crate::app::panels::{ContextItem, Panel, paginate_content};
-use crate::modules::core::conversation_render;
+use crate::modules::conversation::render;
 use crate::state::{ContextType, State};
 use crate::ui::theme;
 
@@ -52,7 +52,7 @@ impl Panel for ConversationHistoryPanel {
         if let Some(ref msgs) = ctx.history_messages {
             for msg in msgs {
                 let msg_lines =
-                    conversation_render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                    render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
                 lines.extend(msg_lines);
             }
         } else if let Some(content) = &ctx.cached_content {

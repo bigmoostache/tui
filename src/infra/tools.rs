@@ -3,8 +3,8 @@ pub use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::state::State;
 
-// Re-export from core module for backwards compatibility
-pub use crate::modules::core::conversation::refresh_conversation_context;
+// Re-export from conversation module for backwards compatibility
+pub use crate::modules::conversation::refresh::refresh_conversation_context;
 
 /// Execute a tool and return the result.
 /// Delegates to the module system for dispatch.

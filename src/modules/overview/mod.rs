@@ -1,11 +1,6 @@
-pub mod conversation;
-mod conversation_history_panel;
-mod conversation_list;
-mod conversation_panel;
-pub(crate) mod conversation_render;
-mod overview_context;
-mod overview_panel;
-mod overview_render;
+mod context;
+mod panel;
+mod render;
 mod tools;
 
 use serde_json::json;
@@ -16,21 +11,20 @@ use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
 
-use self::conversation_panel::ConversationPanel;
-use self::overview_panel::OverviewPanel;
+use self::panel::OverviewPanel;
 use super::Module;
 
-pub struct CoreModule;
+pub struct OverviewModule;
 
-impl Module for CoreModule {
+impl Module for OverviewModule {
     fn id(&self) -> &'static str {
         "core"
     }
     fn name(&self) -> &'static str {
-        "Core"
+        "Overview"
     }
     fn description(&self) -> &'static str {
-        "Essential context and system tools"
+        "Overview panel and system tools"
     }
     fn is_core(&self) -> bool {
         true
@@ -149,28 +143,8 @@ impl Module for CoreModule {
         vec![ContextType::new(ContextType::OVERVIEW)]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::CONVERSATION_HISTORY)]
-    }
-
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
-    }
-
-    fn on_close_context(
-        &self,
-        ctx: &crate::state::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
-        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
-            return Some(Err(format!(
-                "{} — Cannot close conversation history with context_close. \
-                 Use close_conversation_history instead, which lets you create logs \
-                 and memories to preserve important information before closing.",
-                ctx.id
-            )));
-        }
-        None
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -192,44 +166,12 @@ impl Module for CoreModule {
                 short_name: "world",
                 needs_async_wait: false,
             },
-            ContextTypeMeta {
-                context_type: "system",
-                icon_id: "system",
-                is_fixed: false,
-                needs_cache: false,
-                fixed_order: None,
-                display_name: "system",
-                short_name: "seed",
-                needs_async_wait: false,
-            },
-            ContextTypeMeta {
-                context_type: "conversation",
-                icon_id: "conversation",
-                is_fixed: false,
-                needs_cache: false,
-                fixed_order: None,
-                display_name: "conversation",
-                short_name: "chat",
-                needs_async_wait: false,
-            },
-            ContextTypeMeta {
-                context_type: "conversation_history",
-                icon_id: "conversation",
-                is_fixed: false,
-                needs_cache: false,
-                fixed_order: None,
-                display_name: "chat-history",
-                short_name: "history",
-                needs_async_wait: false,
-            },
         ]
     }
 
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::CONVERSATION => Some(Box::new(ConversationPanel)),
             ContextType::OVERVIEW => Some(Box::new(OverviewPanel)),
-            ContextType::CONVERSATION_HISTORY => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
             _ => None,
         }
     }
@@ -305,53 +247,6 @@ impl Module for CoreModule {
         // Add module_toggle tool
         defs.push(super::module_toggle_tool_definition());
 
-        // AskUserQuestion tool (#39)
-        defs.push(ToolDefinition {
-            id: "ask_user_question".to_string(),
-            name: "Ask User Question".to_string(),
-            short_desc: "Ask user multiple-choice questions".to_string(),
-            description: "Presents 1-4 multiple-choice questions to the user as an interactive form. \
-                The form replaces the input field until the user submits answers or presses Esc to dismiss. \
-                Each question has 2-4 options plus an auto-appended \"Other\" free-text option. \
-                Use this to gather preferences, clarify ambiguous instructions, or get implementation decisions. \
-                The user can select one option (or multiple if multiSelect), or choose \"Other\" and type a custom answer. \
-                If recommending a specific option, list it first with \"(Recommended)\" in the label."
-                .to_string(),
-            params: vec![
-                ToolParam::new(
-                    "questions",
-                    ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("question", ParamType::String)
-                            .desc("The complete question text. Should be clear, specific, and end with ?")
-                            .required(),
-                        ToolParam::new("header", ParamType::String)
-                            .desc("Very short label (max 12 chars). E.g. \"Auth method\", \"Library\"")
-                            .required(),
-                        ToolParam::new(
-                            "options",
-                            ParamType::Array(Box::new(ParamType::Object(vec![
-                                ToolParam::new("label", ParamType::String)
-                                    .desc("Display text (1-5 words)")
-                                    .required(),
-                                ToolParam::new("description", ParamType::String)
-                                    .desc("Explanation of what this option means")
-                                    .required(),
-                            ]))),
-                        )
-                        .desc("2-4 available choices. An \"Other\" free-text option is appended automatically.")
-                        .required(),
-                        ToolParam::new("multiSelect", ParamType::Boolean)
-                            .desc("If true, user can select multiple options")
-                            .required(),
-                    ]))),
-                )
-                .desc("1-4 questions to ask the user")
-                .required(),
-            ],
-            enabled: true,
-            category: "Context".to_string(),
-        });
-
         defs
     }
 
@@ -366,9 +261,6 @@ impl Module for CoreModule {
 
             // Meta tools
             "tool_manage" => Some(self::tools::manage_tools::execute(tool, state)),
-
-            // Question tool (#39)
-            "ask_user_question" => Some(self::tools::ask_question::execute(tool, state)),
 
             // module_toggle is handled in dispatch_tool() directly
             _ => None,

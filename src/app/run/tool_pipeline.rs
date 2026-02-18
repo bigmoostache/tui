@@ -1,0 +1,392 @@
+use std::sync::mpsc::Sender;
+
+use crate::app::actions::clean_llm_id_prefix;
+use crate::app::background::{TlDrResult, generate_tldr};
+use crate::app::panels::now_ms;
+use crate::infra::api::StreamEvent;
+use crate::state::cache::process_cache_request;
+use crate::state::persistence::build_message_op;
+use crate::state::{ContextType, Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
+use crate::infra::tools::{execute_tool, perform_reload};
+
+use crate::app::App;
+
+impl App {
+    pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
+        if !self.state.is_streaming
+            || self.pending_done.is_none()
+            || !self.typewriter.pending_chars.is_empty()
+            || self.pending_tools.is_empty()
+        {
+            return;
+        }
+        // Don't process new tools while waiting for panels or deferred sleep
+        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
+            return;
+        }
+        // Don't process tools while a question form is pending user response
+        if self.state.get_ext::<cp_base::ui::PendingQuestionForm>().is_some() {
+            return;
+        }
+        let _guard = crate::profile!("app::tool_exec");
+
+        self.state.dirty = true;
+        let tools = std::mem::take(&mut self.pending_tools);
+        let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
+
+        // Finalize current assistant message
+        let mut needs_tldr: Option<(String, String)> = None;
+        if let Some(msg) = self.state.messages.last_mut()
+            && msg.role == "assistant"
+        {
+            // Clean any LLM ID prefixes before saving
+            msg.content = clean_llm_id_prefix(&msg.content);
+            let op = build_message_op(msg);
+            self.writer.send_message(op);
+            if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
+                needs_tldr = Some((msg.id.clone(), msg.content.clone()));
+            }
+        }
+        if let Some((id, content)) = needs_tldr {
+            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
+            generate_tldr(id, content, tldr_tx.clone());
+        }
+
+        // Create tool call messages
+        for tool in &tools {
+            let tool_id = format!("T{}", self.state.next_tool_id);
+            let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
+            self.state.next_tool_id += 1;
+            self.state.global_next_uid += 1;
+
+            let tool_msg = Message {
+                id: tool_id,
+                uid: Some(tool_uid),
+                role: "assistant".to_string(),
+                message_type: MessageType::ToolCall,
+                content: String::new(),
+                content_token_count: 0,
+                tl_dr: None,
+                tl_dr_token_count: 0,
+                status: MessageStatus::Full,
+                tool_uses: vec![ToolUseRecord {
+                    id: tool.id.clone(),
+                    name: tool.name.clone(),
+                    input: tool.input.clone(),
+                }],
+                tool_results: Vec::new(),
+                input_tokens: 0,
+                timestamp_ms: now_ms(),
+            };
+            self.save_message_async(&tool_msg);
+            self.state.messages.push(tool_msg);
+
+            let result = execute_tool(tool, &mut self.state);
+            tool_results.push(result);
+        }
+
+        // Check if any tool triggered a question form (blocking)
+        let has_pending_question = tool_results.iter().any(|r| r.content == "__QUESTION_PENDING__");
+        if has_pending_question {
+            // Don't create result message or continue streaming yet.
+            // The form is active — when user submits/dismisses, check_question_form()
+            // will replace the placeholder and resume the pipeline.
+            // Store the pending tool results for later resolution.
+            self.pending_question_tool_results = Some(tool_results);
+            self.save_state_async();
+            return;
+        }
+
+        // Create tool result message
+        let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
+        let tool_result_records: Vec<ToolResultRecord> = tool_results
+            .iter()
+            .zip(tools.iter())
+            .map(|(r, t)| ToolResultRecord {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+                is_error: r.is_error,
+                tool_name: t.name.clone(),
+            })
+            .collect();
+        let result_msg = Message {
+            id: result_id,
+            uid: Some(result_uid),
+            role: "user".to_string(),
+            message_type: MessageType::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: tool_result_records,
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.save_message_async(&result_msg);
+        self.state.messages.push(result_msg);
+
+        // Check if reload was requested - perform it after tool result is saved
+        if self.state.reload_pending {
+            perform_reload(&mut self.state);
+            // Note: perform_reload calls std::process::exit(0), so we won't reach here
+        }
+
+        // Create new assistant message
+        let assistant_id = format!("A{}", self.state.next_assistant_id);
+        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        self.state.next_assistant_id += 1;
+        self.state.global_next_uid += 1;
+        let new_assistant_msg = Message {
+            id: assistant_id,
+            uid: Some(assistant_uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::TextMessage,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.state.messages.push(new_assistant_msg);
+
+        self.state.streaming_estimated_tokens = 0;
+
+        // Accumulate token stats from intermediate stream before discarding pending_done
+        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens += cache_hit_tokens;
+            self.state.stream_cache_miss_tokens += cache_miss_tokens;
+            self.state.stream_output_tokens += output_tokens;
+            self.state.cache_hit_tokens += cache_hit_tokens;
+            self.state.cache_miss_tokens += cache_miss_tokens;
+            self.state.total_output_tokens += output_tokens;
+        }
+
+        self.save_state_async();
+
+        // Check if any tool requested a sleep (e.g., console_sleep)
+        if self.state.tool_sleep_until_ms > 0 {
+            // Defer everything — main loop will check timer and continue
+            self.deferred_tool_sleeping = true;
+            self.deferred_tool_sleep_until_ms = self.state.tool_sleep_until_ms;
+            self.deferred_sleep_needs_tmux_refresh = self.state.tool_sleep_needs_tmux_refresh;
+            self.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+            self.state.tool_sleep_needs_tmux_refresh = false;
+            return;
+        }
+
+        // Trigger background cache refresh for dirty file panels (non-blocking)
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+
+        // Check if we need to wait for panels before continuing stream
+        if super::wait::has_dirty_file_panels(&self.state) {
+            // Set waiting flag — main loop will check and continue streaming when ready
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            // No dirty panels — continue streaming immediately
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: if we're waiting for file panels to load,
+    /// check if they're ready (or timed out) and continue streaming.
+    pub(super) fn check_waiting_for_panels(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.state.waiting_for_panels {
+            return;
+        }
+
+        let panels_ready = !super::wait::has_dirty_panels(&self.state);
+        let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
+
+        if panels_ready || timed_out {
+            self.state.waiting_for_panels = false;
+            self.state.dirty = true;
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: if a tool requested a sleep (e.g., console_sleep),
+    /// wait for the timer to expire, then deprecate tmux panels and continue
+    /// through the normal wait_for_panels → continue_streaming pipeline.
+    pub(super) fn check_deferred_sleep(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.deferred_tool_sleeping {
+            return;
+        }
+
+        if now_ms() < self.deferred_tool_sleep_until_ms {
+            return; // Still sleeping — keep processing input normally
+        }
+
+        let needs_tmux = self.deferred_sleep_needs_tmux_refresh;
+        self.deferred_tool_sleeping = false;
+        self.deferred_tool_sleep_until_ms = 0;
+        self.deferred_sleep_needs_tmux_refresh = false;
+        self.state.dirty = true;
+
+        if needs_tmux {
+            // send_keys: deprecate tmux panels and wait for refresh
+            crate::app::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
+            // Trigger tmux panel refreshes
+            for ctx in &self.state.context {
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated && !ctx.cache_in_flight {
+                    let panel = crate::app::panels::get_panel(&ctx.context_type);
+                    if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                        process_cache_request(request, self.cache_tx.clone());
+                    }
+                }
+            }
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated {
+                    ctx.cache_in_flight = true;
+                }
+            }
+            // Also check file panels
+            super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+
+            if super::wait::has_dirty_panels(&self.state) {
+                self.state.waiting_for_panels = true;
+                self.wait_started_ms = now_ms();
+            } else {
+                self.continue_streaming(tx);
+            }
+        } else {
+            // Pure sleep (console_sleep): just continue, no refresh needed
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: if the user has resolved a pending question form,
+    /// replace the __QUESTION_PENDING__ placeholder with the real answer and
+    /// resume the tool pipeline (create result message + continue streaming).
+    pub(super) fn check_question_form(&mut self, tx: &Sender<StreamEvent>) {
+        // Only check if we have pending tool results waiting on a question
+        if self.pending_question_tool_results.is_none() {
+            return;
+        }
+
+        // Check if form is resolved
+        let resolved =
+            self.state.get_ext::<cp_base::ui::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
+
+        if !resolved {
+            return;
+        }
+
+        // Extract the resolved form and remove it from state
+        let form = self
+            .state
+            .module_data
+            .remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>())
+            .and_then(|v| v.downcast::<cp_base::ui::PendingQuestionForm>().ok())
+            .expect("form must exist since we just checked resolved=true");
+
+        let result_json =
+            form.result_json.unwrap_or_else(|| r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string());
+
+        // Replace placeholder in pending tool results
+        let mut tool_results = self.pending_question_tool_results.take().unwrap();
+        for tr in &mut tool_results {
+            if tr.content == "__QUESTION_PENDING__" {
+                tr.content = result_json.clone();
+            }
+        }
+
+        // Now resume the normal pipeline: create result message and continue streaming
+        let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
+        let tool_result_records: Vec<ToolResultRecord> = tool_results
+            .iter()
+            .map(|r| ToolResultRecord {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+                is_error: r.is_error,
+                tool_name: r.tool_name.clone(),
+            })
+            .collect();
+        let result_msg = Message {
+            id: result_id,
+            uid: Some(result_uid),
+            role: "user".to_string(),
+            message_type: MessageType::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: tool_result_records,
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.save_message_async(&result_msg);
+        self.state.messages.push(result_msg);
+
+        // Check if reload was requested
+        if self.state.reload_pending {
+            perform_reload(&mut self.state);
+        }
+
+        // Create new assistant message for continued streaming
+        let assistant_id = format!("A{}", self.state.next_assistant_id);
+        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        self.state.next_assistant_id += 1;
+        self.state.global_next_uid += 1;
+        let new_assistant_msg = Message {
+            id: assistant_id,
+            uid: Some(assistant_uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::TextMessage,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.state.messages.push(new_assistant_msg);
+
+        self.state.streaming_estimated_tokens = 0;
+
+        // Accumulate token stats from intermediate stream
+        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens += cache_hit_tokens;
+            self.state.stream_cache_miss_tokens += cache_miss_tokens;
+            self.state.stream_output_tokens += output_tokens;
+            self.state.cache_hit_tokens += cache_hit_tokens;
+            self.state.cache_miss_tokens += cache_miss_tokens;
+            self.state.total_output_tokens += output_tokens;
+        }
+
+        self.save_state_async();
+        self.state.dirty = true;
+
+        // Continue streaming
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        if super::wait::has_dirty_file_panels(&self.state) {
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            self.continue_streaming(tx);
+        }
+    }
+}

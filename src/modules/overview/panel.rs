@@ -6,7 +6,7 @@ use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::app::panels::{ContextItem, Panel};
 use crate::state::{ContextType, State};
 
-use super::overview_render;
+use super::render;
 
 pub struct OverviewPanel;
 
@@ -59,31 +59,31 @@ impl Panel for OverviewPanel {
         let _guard = crate::profile!("panel::overview::content");
         let mut text: Vec<Line> = Vec::new();
 
-        text.extend(overview_render::render_token_usage(state, base_style));
-        text.extend(overview_render::separator());
+        text.extend(render::render_token_usage(state, base_style));
+        text.extend(render::separator());
 
-        let git_section = overview_render::render_git_status(state, base_style);
+        let git_section = render::render_git_status(state, base_style);
         if !git_section.is_empty() {
             text.extend(git_section);
-            text.extend(overview_render::separator());
+            text.extend(render::separator());
         }
 
-        text.extend(overview_render::render_context_elements(state, base_style));
-        text.extend(overview_render::separator());
+        text.extend(render::render_context_elements(state, base_style));
+        text.extend(render::separator());
 
-        text.extend(overview_render::render_statistics(state, base_style));
-        text.extend(overview_render::separator());
+        text.extend(render::render_statistics(state, base_style));
+        text.extend(render::separator());
 
-        text.extend(overview_render::render_seeds(state, base_style));
-        text.extend(overview_render::separator());
+        text.extend(render::render_seeds(state, base_style));
+        text.extend(render::separator());
 
-        let presets_section = overview_render::render_presets(base_style);
+        let presets_section = render::render_presets(base_style);
         if !presets_section.is_empty() {
             text.extend(presets_section);
-            text.extend(overview_render::separator());
+            text.extend(render::separator());
         }
 
-        text.extend(overview_render::render_tools(state, base_style));
+        text.extend(render::render_tools(state, base_style));
 
         text
     }
@@ -91,6 +91,6 @@ impl Panel for OverviewPanel {
 
 impl OverviewPanel {
     fn generate_context_content(&self, state: &State) -> String {
-        super::overview_context::generate_context_content(state)
+        super::context::generate_context_content(state)
     }
 }

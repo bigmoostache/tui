@@ -3,7 +3,6 @@
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
-
 use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::{Deserialize, Serialize};
@@ -33,11 +32,8 @@ impl AnthropicClient {
 }
 
 impl Default for AnthropicClient {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
-
 #[derive(Debug, Serialize)]
 struct AnthropicRequest {
     model: String,
@@ -171,19 +167,13 @@ impl LlmClient for AnthropicClient {
                     line_count += 1;
                 }
                 Err(e) => {
-                    let tool_ctx = match &current_tool {
-                        Some((id, name, partial)) => {
-                            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
-                        }
-                        None => "No tool in progress".to_string(),
-                    };
-                    let recent =
-                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                    let tool_ctx = current_tool.as_ref().map_or(
+                        "No tool in progress".to_string(),
+                        |(id, name, partial)| format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len()),
+                    );
+                    let recent = if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(
-                        "{}\n\
-                         Stream position: {} bytes, {} lines read\n\
-                         {}\n\
-                         Last SSE lines:\n{}",
+                        "{}\nStream position: {} bytes, {} lines read\n{}\nLast SSE lines:\n{}",
                         e, total_bytes, line_count, tool_ctx, recent
                     )));
                 }
@@ -276,75 +266,58 @@ impl LlmClient for AnthropicClient {
             Some(k) => k,
             None => {
                 return super::ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
+                    auth_ok: false, streaming_ok: false, tools_ok: false,
                     error: Some("ANTHROPIC_API_KEY not set".to_string()),
                 };
             }
         };
 
         let client = Client::new();
+        let base = || {
+            client.post(API_ENDPOINT)
+                .header("x-api-key", api_key.expose_secret())
+                .header("anthropic-version", API_VERSION)
+                .header("content-type", "application/json")
+        };
 
         // Test 1: Basic auth
-        let auth_result = client
-            .post(API_ENDPOINT)
-            .header("x-api-key", api_key.expose_secret())
-            .header("anthropic-version", API_VERSION)
-            .header("content-type", "application/json")
+        let auth_ok = base()
             .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 10,
+                "model": model, "max_tokens": 10,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
-            .send();
-
-        let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+            .send()
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
 
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return super::ApiCheckResult {
+                auth_ok: false, streaming_ok: false, tools_ok: false,
+                error: Some("Auth failed".to_string()),
+            };
         }
 
         // Test 2: Streaming
-        let stream_result = client
-            .post(API_ENDPOINT)
-            .header("x-api-key", api_key.expose_secret())
-            .header("anthropic-version", API_VERSION)
-            .header("content-type", "application/json")
+        let streaming_ok = base()
             .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 10,
-                "stream": true,
+                "model": model, "max_tokens": 10, "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
-            .send();
-
-        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+            .send()
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
 
         // Test 3: Tools
-        let tools_result = client
-            .post(API_ENDPOINT)
-            .header("x-api-key", api_key.expose_secret())
-            .header("anthropic-version", API_VERSION)
-            .header("content-type", "application/json")
+        let tools_ok = base()
             .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 50,
-                "tools": [{
-                    "name": "test_tool",
-                    "description": "A test tool",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }],
+                "model": model, "max_tokens": 50,
+                "tools": [{"name": "test_tool", "description": "A test tool",
+                    "input_schema": {"type": "object", "properties": {}, "required": []}}],
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
-            .send();
-
-        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+            .send()
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
 
         super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }

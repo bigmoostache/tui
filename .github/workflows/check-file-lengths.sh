@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Check that no .rs file exceeds 500 lines.
+# Usage: .github/workflows/check-file-lengths.sh
+set -euo pipefail
+
+exit_code=0
+while IFS= read -r f; do
+  lines=$(wc -l < "$f")
+  if [ "$lines" -gt 500 ]; then
+    echo "::error file=$f::$f has $lines lines (max 500)"
+    echo "FAIL: $f has $lines lines (max 500)" >&2
+    exit_code=1
+  fi
+done < <(find . -name '*.rs' -not -path './target/*')
+exit $exit_code

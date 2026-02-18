@@ -118,17 +118,12 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
         // Issue commands
         "issue" => match action {
             "list" | "view" | "status" => CommandClass::ReadOnly,
-            "create" | "close" | "reopen" | "edit" | "comment" | "delete" | "transfer" | "pin" | "unpin" | "lock"
-            | "unlock" => CommandClass::Mutating,
             _ => CommandClass::Mutating,
         },
 
         // Repo commands
         "repo" => match action {
             "view" | "list" => CommandClass::ReadOnly,
-            "create" | "clone" | "fork" | "delete" | "edit" | "rename" | "archive" | "unarchive" | "sync" => {
-                CommandClass::Mutating
-            }
             _ => CommandClass::Mutating,
         },
 

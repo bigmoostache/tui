@@ -1,4 +1,7 @@
-pub mod core;
+pub mod conversation;
+pub mod conversation_history;
+pub mod overview;
+pub mod questions;
 
 use std::collections::{HashMap, HashSet};
 
@@ -69,7 +72,10 @@ pub fn make_default_context_element(
 /// Returns all registered modules.
 pub fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
-        Box::new(core::CoreModule),
+        Box::new(overview::OverviewModule),
+        Box::new(conversation::ConversationModule),
+        Box::new(conversation_history::ConversationHistoryModule),
+        Box::new(questions::QuestionsModule),
         Box::new(PromptModule),
         Box::new(FilesModule),
         Box::new(TreeModule),
