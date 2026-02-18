@@ -25,6 +25,10 @@ struct Request {
     cwd: Option<String>,
     input: Option<String>,
     log_path: Option<String>,
+    /// When true, kill/remove will terminate running sessions.
+    /// When false (default), kill/remove refuse to act on running sessions.
+    #[serde(default)]
+    force: bool,
 }
 
 #[derive(Serialize)]
