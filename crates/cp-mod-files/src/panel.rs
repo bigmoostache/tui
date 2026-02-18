@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::actions::Action;
-use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use cp_base::constants::theme;
-use cp_base::constants::{PANEL_MAX_LOAD_BYTES, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
+use cp_base::config::theme;
+use cp_base::config::{PANEL_MAX_LOAD_BYTES, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
@@ -54,7 +54,7 @@ impl Panel for FilePanel {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
-        ctx.source_hash = Some(cp_base::cache::hash_content(&content));
+        ctx.source_hash = Some(cp_base::panels::hash_content(&content));
         ctx.cached_content = Some(content);
         ctx.full_token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);

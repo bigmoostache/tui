@@ -1,13 +1,11 @@
-pub mod chars;
+pub use crate::infra::constants::chars;
 pub mod helpers;
 pub mod help;
-pub mod highlight;
 mod input;
 pub mod markdown;
 pub mod perf;
 mod sidebar;
-pub mod spinner;
-pub mod theme;
+pub use crate::infra::constants::theme;
 pub mod typewriter;
 
 use ratatui::{
@@ -69,7 +67,7 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
 
 fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
-    if let Some(form) = state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+    if let Some(form) = state.get_ext::<cp_base::ui::PendingQuestionForm>()
         && !form.resolved
     {
         // Split: content panel on top, question form at bottom
@@ -113,7 +111,7 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 /// Calculate the height needed for the question form
-fn calculate_question_form_height(form: &cp_base::question_form::PendingQuestionForm) -> u16 {
+fn calculate_question_form_height(form: &cp_base::ui::PendingQuestionForm) -> u16 {
     let q = &form.questions[form.current_question];
     // Header line + question text + blank + options (including Other) + blank + nav hint
     let option_lines = q.options.len() as u16 + 1; // +1 for "Other"
@@ -126,7 +124,7 @@ fn calculate_question_form_height(form: &cp_base::question_form::PendingQuestion
 fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
     use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
-    let form = match state.get_ext::<cp_base::question_form::PendingQuestionForm>() {
+    let form = match state.get_ext::<cp_base::ui::PendingQuestionForm>() {
         Some(f) => f,
         None => return,
     };

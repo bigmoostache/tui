@@ -4,9 +4,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
 use super::TMUX_DEPRECATION_MS;
-use cp_base::actions::Action;
-use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use cp_base::constants::{chars, theme};
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
+use cp_base::config::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 

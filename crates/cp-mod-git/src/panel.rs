@@ -6,11 +6,11 @@ use ratatui::prelude::*;
 
 use super::GIT_CMD_TIMEOUT_SECS;
 use super::GIT_STATUS_REFRESH_MS;
-use cp_base::actions::Action;
-use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
-use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
-use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use cp_base::constants::{chars, theme};
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
+use cp_base::config::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::config::{chars, theme};
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};

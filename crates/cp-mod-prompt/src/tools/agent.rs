@@ -1,6 +1,6 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
-use cp_base::constants::library;
+use cp_base::config::library;
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::panels::Panel;
 use crate::state::{ContextType, ContextTypeMeta, State};
-use crate::tool_defs::ToolDefinition;
+use crate::tools::ToolDefinition;
 use crate::tools::{ToolResult, ToolUse};
 
 /// A function that transforms tool result content into styled terminal lines.

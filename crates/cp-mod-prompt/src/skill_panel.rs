@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
 use crate::types::PromptState;
-use cp_base::constants::theme;
+use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 

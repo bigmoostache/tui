@@ -1,4 +1,4 @@
-use cp_base::constants::icons;
+use cp_base::config::icons;
 use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

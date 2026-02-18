@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::app::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::infra::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
 
 pub use cp_mod_files::FilesModule;

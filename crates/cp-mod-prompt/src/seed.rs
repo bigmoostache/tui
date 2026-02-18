@@ -1,4 +1,4 @@
-use cp_base::constants::library;
+use cp_base::config::library;
 use cp_base::state::State;
 
 use crate::types::PromptState;

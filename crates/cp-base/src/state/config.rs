@@ -94,7 +94,7 @@ impl Default for WorkerState {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
-            worker_id: crate::constants::DEFAULT_WORKER_ID.to_string(),
+            worker_id: crate::config::DEFAULT_WORKER_ID.to_string(),
             important_panel_uids: HashMap::new(),
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,

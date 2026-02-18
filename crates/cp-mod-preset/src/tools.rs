@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::STORE_DIR;
 
 use crate::PRESETS_DIR;
 use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
 use cp_base::modules::Module;
 use cp_base::state::{ContextType, State, make_default_context_element};
-use cp_base::tool_defs::ToolDefinition;
+use cp_base::tools::ToolDefinition;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_prompt::PromptState;
 

@@ -16,7 +16,7 @@ use super::error::LlmError;
 use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::MAX_RESPONSE_TOKENS;
-use crate::infra::tool_defs::ToolDefinition;
+use crate::infra::tools::ToolDefinition;
 
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 

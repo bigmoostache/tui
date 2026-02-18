@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use crate::app::panels::ContextItem;
 use crate::state::Message;
-use crate::infra::tool_defs::ToolDefinition;
+use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work

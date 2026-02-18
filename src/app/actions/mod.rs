@@ -47,7 +47,7 @@ fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
 }
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
-pub use cp_base::actions::{Action, ActionResult};
+pub use cp_base::state::{Action, ActionResult};
 
 pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions

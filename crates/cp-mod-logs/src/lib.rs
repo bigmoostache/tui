@@ -13,11 +13,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::STORE_DIR;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::{Panel, mark_panels_dirty, now_ms};
 use cp_base::state::{ContextType, State, estimate_tokens};
-use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
 use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};

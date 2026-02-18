@@ -1,6 +1,6 @@
 use ratatui::{prelude::*, widgets::Paragraph};
 
-use super::{spinner, theme};
+use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
 use cp_mod_git::GitChangeType;
@@ -8,7 +8,7 @@ use cp_mod_prompt::PromptState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
-    let spin = spinner::spinner(state.spinner_frame);
+    let spin = spinner(state.spinner_frame);
 
     let mut spans = vec![Span::styled(" ", base_style)];
 

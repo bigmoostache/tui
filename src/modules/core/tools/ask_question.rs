@@ -1,6 +1,6 @@
 use crate::state::State;
 use crate::infra::tools::{ToolResult, ToolUse};
-use cp_base::question_form::{PendingQuestionForm, Question, QuestionOption};
+use cp_base::ui::{PendingQuestionForm, Question, QuestionOption};
 
 /// Execute the ask_user_question tool.
 /// Parses input, validates constraints, stores PendingQuestionForm in state.

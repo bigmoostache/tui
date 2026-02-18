@@ -22,7 +22,7 @@ use super::{
 use crate::infra::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::app::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
-use crate::infra::tool_defs::build_api_tools;
+use crate::infra::tools::build_api_tools;
 use crate::infra::tools::ToolUse;
 
 /// API endpoint with beta flag required for Claude 4.5 access

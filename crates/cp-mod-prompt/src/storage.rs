@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::STORE_DIR;
 
 use crate::types::{PromptItem, PromptType};
 
@@ -120,7 +120,7 @@ pub fn delete_prompt_from_dir(dir: &Path, id: &str) {
 /// Load all prompts from all three directories + built-ins from library.yaml.
 /// Returns (agents, skills, commands).
 pub fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>) {
-    use cp_base::constants::library;
+    use cp_base::config::library;
 
     let mut agents = load_prompts_from_dir(&dir_for(PromptType::Agent), PromptType::Agent);
     let mut skills = load_prompts_from_dir(&dir_for(PromptType::Skill), PromptType::Skill);

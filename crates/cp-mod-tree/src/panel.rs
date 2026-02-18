@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::actions::Action;
-use cp_base::cache::{CacheRequest, CacheUpdate};
-use cp_base::constants::theme;
-use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate};
+use cp_base::config::theme;
+use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 use cp_base::ui::{find_children_pattern, find_size_pattern};
@@ -58,7 +58,7 @@ impl Panel for TreePanel {
         };
         ctx.cache_deprecated = false;
         // Check if content actually changed before updating
-        let new_hash = cp_base::cache::hash_content(&content);
+        let new_hash = cp_base::panels::hash_content(&content);
         if ctx.content_hash.as_deref() == Some(&new_hash) && ctx.cached_content.is_some() {
             return false;
         }
