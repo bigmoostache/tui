@@ -350,3 +350,125 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::State;
+    use crate::state::context::ContextType;
+    use crate::modules;
+
+    #[test]
+    fn test_is_prompt_too_long_error_detects_error() {
+        assert!(is_prompt_too_long_error("prompt is too long: 207636 tokens > 200000 maximum"));
+        assert!(is_prompt_too_long_error("API error 400: prompt is too long"));
+        assert!(is_prompt_too_long_error("error: prompt_is_too_long"));
+    }
+
+    #[test]
+    fn test_is_prompt_too_long_error_rejects_other_errors() {
+        assert!(!is_prompt_too_long_error("API error 429: rate limited"));
+        assert!(!is_prompt_too_long_error("Network error: timeout"));
+        assert!(!is_prompt_too_long_error("Auth error: invalid key"));
+    }
+
+    #[test]
+    fn test_try_close_oldest_panel_with_no_closable_panels() {
+        let mut state = State::default();
+        // Initialize registry
+        modules::init_registry();
+        
+        // Add only fixed panels (like TODO, GIT, etc.)
+        state.context.push(modules::make_default_context_element(
+            "P1",
+            ContextType::new(ContextType::TODO),
+            "Todo",
+            false,
+        ));
+        state.context.push(modules::make_default_context_element(
+            "P2",
+            ContextType::new(ContextType::GIT),
+            "Git",
+            false,
+        ));
+        
+        // All panels are fixed, so none should be closable
+        let result = try_close_oldest_panel(&mut state);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_try_close_oldest_panel_closes_first_closable() {
+        let mut state = State::default();
+        modules::init_registry();
+        
+        // Add a fixed panel
+        state.context.push(modules::make_default_context_element(
+            "P1",
+            ContextType::new(ContextType::TODO),
+            "Todo",
+            false,
+        ));
+        
+        // Add closable panels (CONVERSATION_HISTORY is non-fixed)
+        state.context.push(modules::make_default_context_element(
+            "P10",
+            ContextType::new(ContextType::CONVERSATION_HISTORY),
+            "Chat 01:00–02:00",
+            false,
+        ));
+        state.context.push(modules::make_default_context_element(
+            "P11",
+            ContextType::new(ContextType::CONVERSATION_HISTORY),
+            "Chat 02:00–03:00",
+            false,
+        ));
+        
+        let initial_count = state.context.len();
+        let result = try_close_oldest_panel(&mut state);
+        
+        assert!(result.is_some());
+        assert_eq!(state.context.len(), initial_count - 1);
+        
+        // Verify the closed panel description
+        let desc = result.unwrap();
+        assert!(desc.contains("P10"));
+        assert!(desc.contains("Chat 01:00–02:00"));
+        
+        // Verify first closable panel was removed
+        assert!(!state.context.iter().any(|c| c.id == "P10"));
+        assert!(state.context.iter().any(|c| c.id == "P11")); // Second closable still exists
+    }
+
+    #[test]
+    fn test_create_panel_closure_messages() {
+        let mut state = State::default();
+        state.next_tool_id = 1;
+        state.next_result_id = 1;
+        state.global_next_uid = 100;
+        
+        let (tool_msg, result_msg) = create_panel_closure_messages(&mut state, "P10 (Chat 01:00–02:00)");
+        
+        // Verify tool call message
+        assert_eq!(tool_msg.id, "T1");
+        assert_eq!(tool_msg.role, "assistant");
+        assert_eq!(tool_msg.message_type, MessageType::ToolCall);
+        assert_eq!(tool_msg.tool_uses.len(), 1);
+        assert_eq!(tool_msg.tool_uses[0].name, "context_close");
+        
+        // Verify tool result message
+        assert_eq!(result_msg.id, "R1");
+        assert_eq!(result_msg.role, "user");
+        assert_eq!(result_msg.message_type, MessageType::ToolResult);
+        assert_eq!(result_msg.tool_results.len(), 1);
+        assert_eq!(result_msg.tool_results[0].tool_use_id, "T1");
+        assert_eq!(result_msg.tool_results[0].tool_name, "context_close");
+        assert!(result_msg.tool_results[0].content.contains("Automatically closed panel"));
+        assert!(result_msg.tool_results[0].content.contains("P10 (Chat 01:00–02:00)"));
+        
+        // Verify counters were incremented
+        assert_eq!(state.next_tool_id, 2);
+        assert_eq!(state.next_result_id, 2);
+        assert_eq!(state.global_next_uid, 102); // Two UIDs created
+    }
+}
