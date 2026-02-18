@@ -39,6 +39,10 @@ impl Module for ConsoleModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(ConsoleState::new());
+        // Ensure the console server is running
+        if let Err(e) = manager::find_or_create_server() {
+            eprintln!("Console server startup failed: {}", e);
+        }
     }
 
     fn reset_state(&self, state: &mut State) {
@@ -63,6 +67,11 @@ impl Module for ConsoleModule {
             if !handle.get_status().is_terminal()
                 && let Some(pid) = handle.pid()
             {
+                // Leak stdin so script doesn't see EOF when TUI exits for reload.
+                // This keeps the pipe fd open (no EOF → script stays alive).
+                // After reload, send_keys already fails with "stdin unavailable".
+                handle.leak_stdin();
+
                 sessions_map.insert(
                     name.clone(),
                     SessionMeta {
@@ -101,16 +110,16 @@ impl Module for ConsoleModule {
         };
 
         if sessions_map.is_empty() {
-            // No known sessions — kill any orphans from previous crashes
+            // No known sessions — kill any orphans on the server
             manager::kill_orphaned_processes(&std::collections::HashSet::new());
             return;
         }
 
-        // Collect known PIDs before orphan scan
-        let known_pids: std::collections::HashSet<u32> = sessions_map.values().map(|m| m.pid).collect();
+        // Collect known session keys for orphan cleanup
+        let known_keys: std::collections::HashSet<String> = sessions_map.keys().cloned().collect();
 
-        // Kill any orphaned processes from previous crashes that aren't in our saved sessions
-        manager::kill_orphaned_processes(&known_pids);
+        // Kill any server-managed sessions that aren't in our saved state
+        manager::kill_orphaned_processes(&known_keys);
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
