@@ -6,7 +6,7 @@ use super::message::Message;
 use super::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache};
 
 use crate::llm_types::ModelInfo;
-use crate::tool_defs::ToolDefinition;
+use crate::tools::ToolDefinition;
 
 /// Type alias for the syntax highlighting callback function.
 /// Takes (file_path, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>

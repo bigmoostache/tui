@@ -13,7 +13,7 @@ use super::{panel_footer_text, panel_header_text, panel_timestamp_text, prepare_
 use crate::infra::constants::{library, prompts};
 use crate::app::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::infra::tool_defs::ToolDefinition;
+use crate::infra::tools::ToolDefinition;
 
 // ───────────────────────────────────────────────────────────────────
 // Shared message type

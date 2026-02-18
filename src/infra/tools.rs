@@ -1,3 +1,4 @@
+pub use cp_base::tools::*;
 pub use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::state::State;

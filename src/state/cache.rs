@@ -7,7 +7,7 @@ use std::sync::mpsc::{self, Sender};
 use std::thread;
 
 // Re-export shared cache types from cp-base
-pub use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
+pub use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 
 /// Maximum concurrent cache worker threads
 const CACHE_POOL_SIZE: usize = 6;

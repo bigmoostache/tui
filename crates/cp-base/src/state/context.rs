@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{active_theme, normalize_icon};
-use crate::constants::CHARS_PER_TOKEN;
+use crate::config::CHARS_PER_TOKEN;
 
 // =============================================================================
 // ContextType Registry — modules register metadata at startup
@@ -230,7 +230,7 @@ pub fn estimate_tokens(text: &str) -> usize {
 
 /// Compute total pages for a given token count using PANEL_PAGE_TOKENS
 pub fn compute_total_pages(token_count: usize) -> usize {
-    let max = crate::constants::PANEL_PAGE_TOKENS;
+    let max = crate::config::PANEL_PAGE_TOKENS;
     if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }
 
@@ -266,7 +266,7 @@ pub fn make_default_context_element(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
+    use crate::config::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     /// Initialize a minimal registry for tests.
     fn init_test_registry() {

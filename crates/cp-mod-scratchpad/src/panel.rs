@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::actions::Action;
-use cp_base::constants::SCROLL_ARROW_AMOUNT;
-use cp_base::constants::theme;
+use cp_base::state::Action;
+use cp_base::config::SCROLL_ARROW_AMOUNT;
+use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 

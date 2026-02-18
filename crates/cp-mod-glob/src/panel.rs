@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::actions::Action;
-use cp_base::cache::{CacheRequest, CacheUpdate};
-use cp_base::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use cp_base::constants::{chars, theme};
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate};
+use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::config::{chars, theme};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
@@ -64,7 +64,7 @@ impl Panel for GlobPanel {
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
         // Only report "changed" when content hash differs
-        let new_hash = cp_base::cache::hash_content(&content);
+        let new_hash = cp_base::panels::hash_content(&content);
         if ctx.content_hash.as_deref() == Some(&new_hash) {
             return false;
         }

@@ -1,6 +1,6 @@
 use ratatui::{prelude::*, widgets::Paragraph};
 
-use super::{chars, helpers::*, spinner, theme};
+use super::{chars, helpers::*, theme};
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
 
@@ -36,7 +36,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Calculate ID width for alignment based on longest ID
     let id_width = state.context.iter().map(|c| c.id.len()).max().unwrap_or(2);
 
-    let spin = spinner::spinner(state.spinner_frame);
+    let spin = spinner(state.spinner_frame);
 
     // Sort contexts by ID for display (P0, P1, P2, ...)
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();

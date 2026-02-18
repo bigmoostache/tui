@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod config;
 pub mod context;
 pub mod message;
@@ -5,6 +6,7 @@ pub mod render_cache;
 pub mod runtime;
 
 // Re-exports for convenience
+pub use actions::{Action, ActionResult};
 pub use config::{ImportantPanelUids, PanelData, SharedConfig, WorkerState};
 pub use context::{
     ContextElement, ContextType, ContextTypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order,

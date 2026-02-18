@@ -13,7 +13,7 @@ pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tool_defs::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::GithubResultPanel;

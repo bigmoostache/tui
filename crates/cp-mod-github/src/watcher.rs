@@ -15,8 +15,8 @@ use std::thread::{self, JoinHandle};
 use secrecy::{ExposeSecret, SecretBox};
 use sha2::{Digest, Sha256};
 
-use cp_base::cache::CacheUpdate;
-use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::panels::CacheUpdate;
+use cp_base::config::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::now_ms;
 use cp_base::state::estimate_tokens;

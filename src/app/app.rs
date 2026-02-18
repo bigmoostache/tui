@@ -24,8 +24,7 @@ use crate::infra::watcher::{FileWatcher, WatchEvent};
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_console::types::ConsoleState;
 
-use super::context::prepare_stream_context;
-use super::init::get_active_agent_content;
+use super::context::{get_active_agent_content, prepare_stream_context};
 
 pub struct App {
     pub state: State,
@@ -170,7 +169,7 @@ impl App {
                 }
 
                 // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::question_form::PendingQuestionForm>()
+                if let Some(form) = self.state.get_ext::<cp_base::ui::PendingQuestionForm>()
                     && !form.resolved
                 {
                     self.handle_question_form_event(&evt);
@@ -411,7 +410,7 @@ impl App {
             return;
         }
         // Don't process tools while a question form is pending user response
-        if self.state.get_ext::<cp_base::question_form::PendingQuestionForm>().is_some() {
+        if self.state.get_ext::<cp_base::ui::PendingQuestionForm>().is_some() {
             return;
         }
         let _guard = crate::profile!("app::tool_exec");
@@ -694,7 +693,7 @@ impl App {
 
         // Check if form is resolved
         let resolved =
-            self.state.get_ext::<cp_base::question_form::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
+            self.state.get_ext::<cp_base::ui::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
 
         if !resolved {
             return;
@@ -704,8 +703,8 @@ impl App {
         let form = self
             .state
             .module_data
-            .remove(&std::any::TypeId::of::<cp_base::question_form::PendingQuestionForm>())
-            .and_then(|v| v.downcast::<cp_base::question_form::PendingQuestionForm>().ok())
+            .remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>())
+            .and_then(|v| v.downcast::<cp_base::ui::PendingQuestionForm>().ok())
             .expect("form must exist since we just checked resolved=true");
 
         let result_json =
@@ -1427,7 +1426,7 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let form = match self.state.get_ext_mut::<cp_base::question_form::PendingQuestionForm>() {
+        let form = match self.state.get_ext_mut::<cp_base::ui::PendingQuestionForm>() {
             Some(f) => f,
             None => return,
         };
