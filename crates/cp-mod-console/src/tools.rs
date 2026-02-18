@@ -1,5 +1,3 @@
-use std::process::{Command, Stdio};
-
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -195,6 +193,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: Some(tool.id.clone()),
         registered_ms: now,
         deadline_ms: if block { Some(now + max_wait * 1000) } else { None },
+        is_debug_bash: false,
     };
 
     if block {
@@ -208,67 +207,44 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-pub fn execute_debug_bash(tool: &ToolUse) -> ToolResult {
+pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
-        Some(c) => c,
+        Some(c) => c.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
     };
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str());
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
 
-    let mut cmd = Command::new("sh");
-    cmd.args(["-c", command]);
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
+    // Spawn via the console server (non-blocking to the main loop)
+    let session_key = {
+        let cs = ConsoleState::get_mut(state);
+        let key = format!("c_{}", cs.next_session_id);
+        cs.next_session_id += 1;
+        key
+    };
 
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
+    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd) {
+        Ok(h) => h,
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
     };
 
-    let timeout = std::time::Duration::from_secs(BASH_MAX_EXECUTION_SECS);
-    let start = std::time::Instant::now();
+    // Store the handle (needed for waiter to check status + read buffer)
+    let cs = ConsoleState::get_mut(state);
+    cs.sessions.insert(session_key.clone(), handle);
 
-    // Poll for exit with timeout
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if start.elapsed() >= timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        format!("Command timed out after {}s and was killed", BASH_MAX_EXECUTION_SECS),
-                        true,
-                    );
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-            Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to wait: {}", e), true),
-        }
-    }
-
-    let output = match child.wait_with_output() {
-        Ok(o) => o,
-        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to read output: {}", e), true),
+    // Register a blocking exit waiter with BASH_MAX_EXECUTION_SECS timeout
+    let now = now_ms();
+    let waiter = ConsoleWaiter {
+        session_name: session_key,
+        mode: "exit".to_string(),
+        pattern: None,
+        blocking: true,
+        tool_use_id: Some(tool.id.clone()),
+        registered_ms: now,
+        deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
+        is_debug_bash: true,
     };
+    let cs = ConsoleState::get_mut(state);
+    cs.blocking_waiters.push(waiter);
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let code = output.status.code().unwrap_or(-1);
-    let mut result = format!("exit_code: {}\n", code);
-    if !stdout.is_empty() {
-        result.push_str(&format!("--- stdout ---\n{}", stdout));
-    }
-    if !stderr.is_empty() {
-        result.push_str(&format!("--- stderr ---\n{}", stderr));
-    }
-    if stdout.is_empty() && stderr.is_empty() {
-        result.push_str("(no output)");
-    }
-    ToolResult::new(tool.id.clone(), result, code != 0)
+    ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
 }
