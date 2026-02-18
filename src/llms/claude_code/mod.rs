@@ -216,29 +216,68 @@ impl ClaudeCodeClient {
     }
 
     fn load_oauth_token() -> Option<SecretBox<String>> {
-        let home = env::var("HOME").ok()?;
-        let home_path = PathBuf::from(&home);
-
-        // Try hidden credentials file first
-        let creds_path = home_path.join(".claude").join(".credentials.json");
-        let path = if creds_path.exists() {
-            creds_path
-        } else {
-            // Fallback to non-hidden
-            home_path.join(".claude").join("credentials.json")
-        };
-
-        let content = fs::read_to_string(&path).ok()?;
+        let content = Self::load_credentials_json()?;
         let creds: CredentialsFile = serde_json::from_str(&content).ok()?;
 
         // Check if token is expired
-        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+        let now_ms =
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
 
         if now_ms > creds.claude_ai_oauth.expires_at {
             return None; // Token expired
         }
 
         Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
+    }
+
+    /// Try to load the raw credentials JSON from file, then macOS Keychain.
+    fn load_credentials_json() -> Option<String> {
+        // 1. File-based: ~/.claude/.credentials.json or ~/.claude/credentials.json
+        if let Some(content) = Self::load_credentials_from_file() {
+            return Some(content);
+        }
+
+        // 2. macOS Keychain: "Claude Code-credentials" service
+        #[cfg(target_os = "macos")]
+        if let Some(content) = Self::load_credentials_from_keychain() {
+            return Some(content);
+        }
+
+        None
+    }
+
+    fn load_credentials_from_file() -> Option<String> {
+        let home = env::var("HOME").ok()?;
+        let home_path = PathBuf::from(&home);
+
+        let creds_path = home_path.join(".claude").join(".credentials.json");
+        let path = if creds_path.exists() {
+            creds_path
+        } else {
+            home_path.join(".claude").join("credentials.json")
+        };
+
+        fs::read_to_string(&path).ok()
+    }
+
+    #[cfg(target_os = "macos")]
+    fn load_credentials_from_keychain() -> Option<String> {
+        let user = env::var("USER").ok()?;
+        let output = std::process::Command::new("security")
+            .args(["find-generic-password", "-s", "Claude Code-credentials", "-a", &user, "-w"])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let content = String::from_utf8(output.stdout).ok()?;
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        Some(trimmed.to_string())
     }
 }
 
