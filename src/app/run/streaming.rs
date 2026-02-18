@@ -5,9 +5,115 @@ use crate::app::background::{TlDrResult, generate_tldr};
 use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
 use crate::infra::constants::{DEFAULT_WORKER_ID, MAX_API_RETRIES};
 use crate::state::persistence::build_message_op;
+use crate::state::{Message, MessageStatus, MessageType};
+use crate::state::message::{ToolUseRecord, ToolResultRecord};
+use crate::app::panels::now_ms;
 
 use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
+
+/// Check if the error message indicates a "prompt is too long" error
+fn is_prompt_too_long_error(error_msg: &str) -> bool {
+    error_msg.contains("prompt is too long") || error_msg.contains("prompt_is_too_long")
+}
+
+/// Find and close the oldest closable panel (non-fixed panel like CONVERSATION_HISTORY)
+/// Returns the panel ID if one was closed, None otherwise
+fn try_close_oldest_panel(state: &mut crate::state::State) -> Option<String> {
+    // Find all non-fixed panels (closable panels)
+    let closable_panels: Vec<(usize, String, String)> = state
+        .context
+        .iter()
+        .enumerate()
+        .filter(|(_, ctx)| !ctx.context_type.is_fixed())
+        .map(|(idx, ctx)| (idx, ctx.id.clone(), ctx.name.clone()))
+        .collect();
+
+    if closable_panels.is_empty() {
+        return None;
+    }
+
+    // Close the first (oldest) closable panel
+    let (idx, panel_id, panel_name) = closable_panels[0].clone();
+    state.context.remove(idx);
+    state.dirty = true;
+
+    Some(format!("{} ({})", panel_id, panel_name))
+}
+
+/// Create fake tool call and result messages to inform the LLM about the panel closure
+fn create_panel_closure_messages(
+    state: &mut crate::state::State,
+    closed_panel_desc: &str,
+) -> (Message, Message) {
+    // Generate tool call message
+    let tool_id = format!("T{}", state.next_tool_id);
+    state.next_tool_id += 1;
+    let tool_uid = format!("UID_{}_T", state.global_next_uid);
+    state.global_next_uid += 1;
+
+    let tool_msg = Message {
+        id: tool_id.clone(),
+        uid: Some(tool_uid),
+        role: "assistant".to_string(),
+        message_type: MessageType::ToolCall,
+        content: String::new(),
+        content_token_count: 0,
+        tl_dr: None,
+        tl_dr_token_count: 0,
+        status: MessageStatus::Full,
+        tool_uses: vec![ToolUseRecord {
+            id: tool_id.clone(),
+            name: "context_close".to_string(),
+            input: serde_json::json!({
+                "ids": [
+                    // Extract panel ID (everything before the first space or parenthesis)
+                    closed_panel_desc
+                        .split(|c: char| c.is_whitespace() || c == '(')
+                        .next()
+                        .unwrap_or("")
+                ]
+            }),
+        }],
+        tool_results: Vec::new(),
+        input_tokens: 0,
+        timestamp_ms: now_ms(),
+    };
+
+    // Generate tool result message
+    let result_id = format!("R{}", state.next_result_id);
+    state.next_result_id += 1;
+    let result_uid = format!("UID_{}_R", state.global_next_uid);
+    state.global_next_uid += 1;
+
+    let result_content = format!(
+        "Automatically closed panel due to context length limit:\n\nClosed 1:\n{}",
+        closed_panel_desc
+    );
+
+    let result_msg = Message {
+        id: result_id.clone(),
+        uid: Some(result_uid),
+        role: "user".to_string(),
+        message_type: MessageType::ToolResult,
+        content: String::new(),
+        content_token_count: 0,
+        tl_dr: None,
+        tl_dr_token_count: 0,
+        status: MessageStatus::Full,
+        tool_uses: Vec::new(),
+        tool_results: vec![ToolResultRecord {
+            tool_use_id: tool_id.clone(),
+            content: result_content,
+            is_error: false,
+            tool_name: "context_close".to_string(),
+        }],
+        input_tokens: 0,
+        timestamp_ms: now_ms(),
+    };
+
+    (tool_msg, result_msg)
+}
 
 impl App {
     pub(super) fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {
@@ -31,7 +137,37 @@ impl App {
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
-                    // Log every error to disk for debugging
+                    
+                    // Check if this is a "prompt is too long" error
+                    let is_too_long = is_prompt_too_long_error(&e);
+                    
+                    if is_too_long {
+                        // Try to close the oldest closable panel
+                        if let Some(closed_panel_desc) = try_close_oldest_panel(&mut self.state) {
+                            
+                            // Create fake tool call and result messages to inform the LLM
+                            let (tool_msg, result_msg) = create_panel_closure_messages(&mut self.state, &closed_panel_desc);
+                            
+                            // Add the messages to the conversation
+                            self.state.messages.push(tool_msg);
+                            self.state.messages.push(result_msg);
+                            
+                            // Log the panel closure
+                            let log_msg = format!(
+                                "Prompt too long error detected. Automatically closed panel: {}\n\
+                                 Will retry without incrementing retry count.\n",
+                                closed_panel_desc
+                            );
+                            crate::state::persistence::log_error(&log_msg);
+                            
+                            // Set retry error without incrementing retry count
+                            self.pending_retry_error = Some(e);
+                            self.state.dirty = true;
+                            return; // Skip normal error handling
+                        }
+                    }
+                    
+                    // Normal error handling (not "prompt too long" or no panel to close)
                     let attempt = self.state.api_retry_count + 1;
                     let will_retry = attempt <= MAX_API_RETRIES;
                     let provider = format!("{:?}", self.state.llm_provider);
@@ -218,5 +354,127 @@ impl App {
             self.typewriter.reset();
             self.pending_done = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::State;
+    use crate::state::context::ContextType;
+    use crate::modules;
+
+    #[test]
+    fn test_is_prompt_too_long_error_detects_error() {
+        assert!(is_prompt_too_long_error("prompt is too long: 207636 tokens > 200000 maximum"));
+        assert!(is_prompt_too_long_error("API error 400: prompt is too long"));
+        assert!(is_prompt_too_long_error("error: prompt_is_too_long"));
+    }
+
+    #[test]
+    fn test_is_prompt_too_long_error_rejects_other_errors() {
+        assert!(!is_prompt_too_long_error("API error 429: rate limited"));
+        assert!(!is_prompt_too_long_error("Network error: timeout"));
+        assert!(!is_prompt_too_long_error("Auth error: invalid key"));
+    }
+
+    #[test]
+    fn test_try_close_oldest_panel_with_no_closable_panels() {
+        let mut state = State::default();
+        // Initialize registry
+        modules::init_registry();
+        
+        // Add only fixed panels (like TODO, GIT, etc.)
+        state.context.push(modules::make_default_context_element(
+            "P1",
+            ContextType::new(ContextType::TODO),
+            "Todo",
+            false,
+        ));
+        state.context.push(modules::make_default_context_element(
+            "P2",
+            ContextType::new(ContextType::GIT),
+            "Git",
+            false,
+        ));
+        
+        // All panels are fixed, so none should be closable
+        let result = try_close_oldest_panel(&mut state);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_try_close_oldest_panel_closes_first_closable() {
+        let mut state = State::default();
+        modules::init_registry();
+        
+        // Add a fixed panel
+        state.context.push(modules::make_default_context_element(
+            "P1",
+            ContextType::new(ContextType::TODO),
+            "Todo",
+            false,
+        ));
+        
+        // Add closable panels (CONVERSATION_HISTORY is non-fixed)
+        state.context.push(modules::make_default_context_element(
+            "P10",
+            ContextType::new(ContextType::CONVERSATION_HISTORY),
+            "Chat 01:00–02:00",
+            false,
+        ));
+        state.context.push(modules::make_default_context_element(
+            "P11",
+            ContextType::new(ContextType::CONVERSATION_HISTORY),
+            "Chat 02:00–03:00",
+            false,
+        ));
+        
+        let initial_count = state.context.len();
+        let result = try_close_oldest_panel(&mut state);
+        
+        assert!(result.is_some());
+        assert_eq!(state.context.len(), initial_count - 1);
+        
+        // Verify the closed panel description
+        let desc = result.unwrap();
+        assert!(desc.contains("P10"));
+        assert!(desc.contains("Chat 01:00–02:00"));
+        
+        // Verify first closable panel was removed
+        assert!(!state.context.iter().any(|c| c.id == "P10"));
+        assert!(state.context.iter().any(|c| c.id == "P11")); // Second closable still exists
+    }
+
+    #[test]
+    fn test_create_panel_closure_messages() {
+        let mut state = State::default();
+        state.next_tool_id = 1;
+        state.next_result_id = 1;
+        state.global_next_uid = 100;
+        
+        let (tool_msg, result_msg) = create_panel_closure_messages(&mut state, "P10 (Chat 01:00–02:00)");
+        
+        // Verify tool call message
+        assert_eq!(tool_msg.id, "T1");
+        assert_eq!(tool_msg.role, "assistant");
+        assert_eq!(tool_msg.message_type, MessageType::ToolCall);
+        assert_eq!(tool_msg.tool_uses.len(), 1);
+        assert_eq!(tool_msg.tool_uses[0].name, "context_close");
+        
+        // Verify tool result message
+        assert_eq!(result_msg.id, "R1");
+        assert_eq!(result_msg.role, "user");
+        assert_eq!(result_msg.message_type, MessageType::ToolResult);
+        assert_eq!(result_msg.tool_results.len(), 1);
+        assert_eq!(result_msg.tool_results[0].tool_use_id, "T1");
+        assert_eq!(result_msg.tool_results[0].tool_name, "context_close");
+        assert!(result_msg.tool_results[0].content.contains("Automatically closed panel"));
+        assert!(result_msg.tool_results[0].content.contains("P10 (Chat 01:00–02:00)"));
+        
+        // Verify counters were incremented twice (once per message)
+        assert_eq!(state.next_tool_id, 2);
+        assert_eq!(state.next_result_id, 2);
+        assert_eq!(state.global_next_uid, 102); // Incremented from 100 to 101, then 101 to 102
     }
 }
