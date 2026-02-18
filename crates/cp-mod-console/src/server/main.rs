@@ -37,69 +37,11 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use serde::{Deserialize, Serialize};
+mod protocol;
+use protocol::{Request, Response, SessionInfo, interpret_escapes};
 
 /// Global flag set by signal handler to trigger graceful shutdown.
 static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
-
-// ---------------------------------------------------------------------------
-// Protocol types
-// ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct Request {
-    cmd: String,
-    key: Option<String>,
-    command: Option<String>,
-    cwd: Option<String>,
-    input: Option<String>,
-    log_path: Option<String>,
-    /// When true, kill/remove will terminate running sessions.
-    /// When false (default), kill/remove refuse to act on running sessions.
-    #[serde(default)]
-    force: bool,
-}
-
-#[derive(Serialize)]
-struct Response {
-    ok: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pid: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    exit_code: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sessions: Option<Vec<SessionInfo>>,
-}
-
-#[derive(Serialize)]
-struct SessionInfo {
-    key: String,
-    pid: u32,
-    status: String,
-    exit_code: Option<i32>,
-}
-
-impl Response {
-    fn ok() -> Self {
-        Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: None }
-    }
-    fn ok_pid(pid: u32) -> Self {
-        Self { ok: true, error: None, pid: Some(pid), status: None, exit_code: None, sessions: None }
-    }
-    fn ok_status(status: String, exit_code: Option<i32>) -> Self {
-        Self { ok: true, error: None, pid: None, status: Some(status), exit_code, sessions: None }
-    }
-    fn ok_sessions(sessions: Vec<SessionInfo>) -> Self {
-        Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: Some(sessions) }
-    }
-    fn err(msg: impl Into<String>) -> Self {
-        Self { ok: false, error: Some(msg.into()), pid: None, status: None, exit_code: None, sessions: None }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Session management
@@ -303,53 +245,6 @@ fn handle_list(sessions: &Sessions) -> Response {
         })
         .collect();
     Response::ok_sessions(infos)
-}
-
-// ---------------------------------------------------------------------------
-// Escape sequence interpreter (same as manager.rs)
-// ---------------------------------------------------------------------------
-
-fn interpret_escapes(input: &str) -> Vec<u8> {
-    let mut out = Vec::with_capacity(input.len());
-    let bytes = input.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'\\' && i + 1 < bytes.len() {
-            match bytes[i + 1] {
-                b'n' => { out.push(0x0A); i += 2; }
-                b'r' => { out.push(0x0D); i += 2; }
-                b't' => { out.push(0x09); i += 2; }
-                b'\\' => { out.push(b'\\'); i += 2; }
-                b'e' => { out.push(0x1B); i += 2; }
-                b'0' => { out.push(0x00); i += 2; }
-                b'x' if i + 3 < bytes.len() => {
-                    let hi = bytes[i + 2];
-                    let lo = bytes[i + 3];
-                    if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
-                        out.push(h << 4 | l);
-                        i += 4;
-                    } else {
-                        out.push(b'\\');
-                        i += 1;
-                    }
-                }
-                _ => { out.push(b'\\'); i += 1; }
-            }
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-    out
-}
-
-fn hex_digit(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 mod manager;
 mod panel;
+mod pollers;
 pub mod ring_buffer;
 pub mod tools;
 pub mod types;
