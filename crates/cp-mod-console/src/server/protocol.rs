@@ -8,10 +8,6 @@ pub struct Request {
     pub cwd: Option<String>,
     pub input: Option<String>,
     pub log_path: Option<String>,
-    /// When true, kill/remove will terminate running sessions.
-    /// When false (default), kill/remove refuse to act on running sessions.
-    #[serde(default)]
-    pub force: bool,
 }
 
 #[derive(Serialize)]
