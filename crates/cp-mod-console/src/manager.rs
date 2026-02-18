@@ -21,7 +21,8 @@ pub struct SessionHandle {
     pub status: Arc<Mutex<ProcessStatus>>,
     pub buffer: RingBuffer,
     pub log_path: String,
-    pub input_path: String,
+    /// Piped stdin handle — None after reconnect (pipe lost).
+    stdin_handle: Arc<Mutex<Option<std::process::ChildStdin>>>,
     child_id: Arc<Mutex<Option<u32>>>,
     pub started_at: u64,
     pub finished_at: Arc<Mutex<Option<u64>>>,
@@ -40,17 +41,12 @@ pub fn log_file_path(key: &str) -> PathBuf {
     if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
-/// Build the input file path for a given session key (always absolute).
-pub fn input_file_path(key: &str) -> PathBuf {
-    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.in", key));
-    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
-}
-
 impl SessionHandle {
-    /// Spawn a new child process with file-based I/O.
+    /// Spawn a new child process using `script` for PTY emulation.
     ///
-    /// Stdin uses `tail -f {input_file} | command` so the process survives parent death.
-    /// Stdout/stderr redirect to `{log_file}` and are polled into the ring buffer.
+    /// Uses `script -q -f -c` to create a PTY so the child sees a real terminal.
+    /// Output is captured to a log file and polled into the ring buffer.
+    /// Stdin is piped directly to `script` which forwards to the PTY.
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
         // Ensure console directory exists
         let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
@@ -58,31 +54,20 @@ impl SessionHandle {
 
         let log_path = log_file_path(&name);
         let log_path_str = log_path.to_string_lossy().to_string();
-        let input_path = input_file_path(&name);
-        let input_path_str = input_path.to_string_lossy().to_string();
 
-        // Create/truncate both files
+        // Create/truncate log file
         fs::write(&log_path, b"").map_err(|e| format!("Failed to create log file: {}", e))?;
-        fs::write(&input_path, b"").map_err(|e| format!("Failed to create input file: {}", e))?;
 
-        // Wrap command: tail -f feeds stdin from file, output redirected to log
-        let wrapped_cmd = format!(
-            "tail -f {} | ({}) >> {} 2>&1",
-            input_path_str, command, log_path_str
-        );
+        // Use `script` for PTY emulation:
+        //   -q: quiet (no "Script started" header)
+        //   -f: flush after each write (real-time output)
+        //   -c: run command instead of interactive shell
+        let mut cmd = Command::new("script");
+        cmd.args(["-q", "-f", "-c", &command, &log_path_str]);
 
-        let mut cmd = if cfg!(target_os = "windows") {
-            let mut c = Command::new("cmd");
-            c.args(["/C", &wrapped_cmd]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", &wrapped_cmd]);
-            c
-        };
-
-        // All I/O handled by the wrapper — no pipes needed
-        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        // Pipe stdin so we can send input via send_keys()
+        // Stdout/stderr null — all output captured by script to the log file
+        cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
 
         if let Some(ref dir) = cwd {
             cmd.current_dir(dir);
@@ -95,9 +80,10 @@ impl SessionHandle {
             cmd.process_group(0);
         }
 
-        let child = cmd.spawn().map_err(|e| format!("Failed to spawn '{}': {}", command, e))?;
+        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn '{}': {}", command, e))?;
 
         let pid = child.id();
+        let stdin_handle = child.stdin.take();
 
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
         let buffer = RingBuffer::new();
@@ -132,7 +118,7 @@ impl SessionHandle {
             status,
             buffer,
             log_path: log_path_str,
-            input_path: input_path_str,
+            stdin_handle: Arc::new(Mutex::new(stdin_handle)),
             child_id,
             started_at: now_ms(),
             finished_at,
@@ -142,14 +128,13 @@ impl SessionHandle {
 
     /// Reconnect to a previously-running session after TUI reload.
     /// Loads log file contents into ring buffer and monitors the PID.
-    /// `send_input` works identically to fresh sessions (appends to .in file).
+    /// `send_input` will fail — stdin pipe is lost after reload.
     pub fn reconnect(
         name: String,
         command: String,
         cwd: Option<String>,
         pid: u32,
         log_path_str: String,
-        input_path_str: String,
         started_at: u64,
     ) -> Self {
         let log_path = PathBuf::from(&log_path_str);
@@ -208,7 +193,7 @@ impl SessionHandle {
             status,
             buffer,
             log_path: log_path_str,
-            input_path: input_path_str,
+            stdin_handle: Arc::new(Mutex::new(None)), // No stdin after reconnect
             child_id,
             started_at,
             finished_at,
@@ -216,18 +201,30 @@ impl SessionHandle {
         }
     }
 
-    /// Send input to the process by appending to the .in file.
-    /// Works identically for fresh and reconnected sessions.
+    /// Send input to the process via the piped stdin.
+    /// Escape sequences are interpreted before sending:
+    ///   \n \r \t \\ → standard escapes
+    ///   \xHH        → arbitrary hex byte (e.g. \x03 for Ctrl+C)
+    ///   \e          → ESC (0x1B), for ANSI sequences like \e[A (up arrow)
+    /// Fails after reconnect (stdin pipe is lost).
     pub fn send_input(&self, input: &str) -> Result<(), String> {
-        let mut f = fs::OpenOptions::new()
-            .append(true)
-            .open(&self.input_path)
-            .map_err(|e| format!("stdin write failed: {}", e))?;
-        f.write_all(input.as_bytes()).map_err(|e| format!("stdin write failed: {}", e))?;
-        Ok(())
+        let bytes = interpret_escapes(input);
+        let mut guard = self.stdin_handle.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(ref mut stdin) = *guard {
+            stdin.write_all(&bytes).map_err(|e| format!("stdin write failed: {}", e))?;
+            stdin.flush().map_err(|e| format!("stdin flush failed: {}", e))?;
+            Ok(())
+        } else {
+            Err("stdin unavailable (reconnected session — stdin pipe lost after reload)".to_string())
+        }
     }
 
-    /// Kill the process (and its process group).
+    /// Kill the process.
+    ///
+    /// Sends SIGTERM to the `script` process only (not the process group).
+    /// When `script` dies, its PTY master fd closes, which sends SIGHUP to
+    /// all child processes via the PTY — this is the clean shutdown path.
+    /// Falls back to SIGKILL after a brief delay if SIGTERM doesn't work.
     pub fn kill(&self) {
         // Signal polling thread to stop
         self.stop_polling.store(true, Ordering::Relaxed);
@@ -240,9 +237,14 @@ impl SessionHandle {
             if cfg!(target_os = "windows") {
                 let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).output();
             } else {
-                // Kill the entire process group (negative PID).
-                // process_group(0) makes PID == PGID.
-                let _ = Command::new("kill").args(["-9", &format!("-{}", pid)]).output();
+                // Send SIGTERM to just the script process (NOT the group).
+                // script's PTY cleanup will propagate SIGHUP to children.
+                let _ = Command::new("kill").args([&pid.to_string()]).output();
+                // Brief wait, then SIGKILL if still alive
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                if is_pid_alive(pid) {
+                    let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+                }
             }
         }
         // Update status
@@ -269,6 +271,88 @@ impl SessionHandle {
     /// Get the PID if available.
     pub fn pid(&self) -> Option<u32> {
         *self.child_id.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+/// Interpret escape sequences in input text, converting them to raw bytes.
+///
+/// Supported sequences:
+///   \n      → 0x0A (newline)
+///   \r      → 0x0D (carriage return)
+///   \t      → 0x09 (tab)
+///   \\      → 0x5C (literal backslash)
+///   \e      → 0x1B (ESC, for ANSI sequences like \e[A)
+///   \xHH    → arbitrary hex byte (e.g. \x03 = Ctrl+C, \x04 = Ctrl+D)
+///   \0      → 0x00 (null)
+///
+/// Unrecognized sequences pass through as-is (backslash + char).
+fn interpret_escapes(input: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i] == b'\\' && i + 1 < bytes.len() {
+            match bytes[i + 1] {
+                b'n' => {
+                    out.push(0x0A);
+                    i += 2;
+                }
+                b'r' => {
+                    out.push(0x0D);
+                    i += 2;
+                }
+                b't' => {
+                    out.push(0x09);
+                    i += 2;
+                }
+                b'\\' => {
+                    out.push(b'\\');
+                    i += 2;
+                }
+                b'e' => {
+                    out.push(0x1B);
+                    i += 2;
+                }
+                b'0' => {
+                    out.push(0x00);
+                    i += 2;
+                }
+                b'x' if i + 3 < bytes.len() => {
+                    // Parse \xHH
+                    let hi = bytes[i + 2];
+                    let lo = bytes[i + 3];
+                    if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
+                        out.push(h << 4 | l);
+                        i += 4;
+                    } else {
+                        // Invalid hex, pass through as-is
+                        out.push(b'\\');
+                        i += 1;
+                    }
+                }
+                _ => {
+                    // Unrecognized escape, pass through
+                    out.push(b'\\');
+                    i += 1;
+                }
+            }
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+
+    out
+}
+
+/// Convert an ASCII hex digit to its numeric value (0-15).
+fn hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
     }
 }
 

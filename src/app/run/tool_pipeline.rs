@@ -4,9 +4,8 @@ use crate::app::actions::clean_llm_id_prefix;
 use crate::app::background::{TlDrResult, generate_tldr};
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
-use crate::state::cache::process_cache_request;
 use crate::state::persistence::build_message_op;
-use crate::state::{ContextType, Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
+use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
 use crate::infra::tools::{execute_tool, perform_reload};
 
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
@@ -187,14 +186,12 @@ impl App {
 
         self.save_state_async();
 
-        // Check if any tool requested a sleep (e.g., console_sleep)
+        // Check if any tool requested a sleep (e.g., console send_keys delay)
         if self.state.tool_sleep_until_ms > 0 {
             // Defer everything — main loop will check timer and continue
             self.deferred_tool_sleeping = true;
             self.deferred_tool_sleep_until_ms = self.state.tool_sleep_until_ms;
-            self.deferred_sleep_needs_tmux_refresh = self.state.tool_sleep_needs_tmux_refresh;
             self.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
-            self.state.tool_sleep_needs_tmux_refresh = false;
             return;
         }
 
@@ -241,42 +238,12 @@ impl App {
             return; // Still sleeping — keep processing input normally
         }
 
-        let needs_tmux = self.deferred_sleep_needs_tmux_refresh;
         self.deferred_tool_sleeping = false;
         self.deferred_tool_sleep_until_ms = 0;
-        self.deferred_sleep_needs_tmux_refresh = false;
         self.state.dirty = true;
 
-        if needs_tmux {
-            // send_keys: deprecate tmux panels and wait for refresh
-            crate::app::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
-            // Trigger tmux panel refreshes
-            for ctx in &self.state.context {
-                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated && !ctx.cache_in_flight {
-                    let panel = crate::app::panels::get_panel(&ctx.context_type);
-                    if let Some(request) = panel.build_cache_request(ctx, &self.state) {
-                        process_cache_request(request, self.cache_tx.clone());
-                    }
-                }
-            }
-            for ctx in &mut self.state.context {
-                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated {
-                    ctx.cache_in_flight = true;
-                }
-            }
-            // Also check file panels
-            super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
-
-            if super::wait::has_dirty_panels(&self.state) {
-                self.state.waiting_for_panels = true;
-                self.wait_started_ms = now_ms();
-            } else {
-                self.continue_streaming(tx);
-            }
-        } else {
-            // Pure sleep (console_sleep): just continue, no refresh needed
-            self.continue_streaming(tx);
-        }
+        // Deferred sleep expired — continue streaming
+        self.continue_streaming(tx);
     }
 
     /// Non-blocking check: if the user has resolved a pending question form,
@@ -539,5 +506,69 @@ impl App {
         } else {
             self.continue_streaming(tx);
         }
+    }
+
+    /// When the user interrupts streaming (Esc), any pending blocking tool calls
+    /// (cp_console_wait, ask_user_question, or tools mid-execution) have their
+    /// tool_use messages already saved but no matching tool_result. This creates
+    /// orphaned tool_use blocks that cause API 400 errors on the next stream.
+    ///
+    /// This method creates fake tool_result messages for all pending tools so
+    /// every tool_use is properly paired.
+    pub(super) fn flush_pending_tool_results_as_interrupted(&mut self) {
+        let interrupted_msg = "Tool execution interrupted by user.";
+
+        // Collect all pending tool results from both blocking paths
+        let mut all_pending: Vec<crate::infra::tools::ToolResult> = Vec::new();
+
+        if let Some(results) = self.pending_console_wait_tool_results.take() {
+            all_pending.extend(results);
+        }
+        if let Some(results) = self.pending_question_tool_results.take() {
+            all_pending.extend(results);
+        }
+
+        // Also clean up the question form state if it was pending
+        self.state
+            .module_data
+            .remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>());
+
+        if all_pending.is_empty() {
+            return;
+        }
+
+        // Create a tool_result message pairing each pending tool_use
+        let result_id = format!("R{}", self.state.next_result_id);
+        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        self.state.next_result_id += 1;
+        self.state.global_next_uid += 1;
+
+        let tool_result_records: Vec<ToolResultRecord> = all_pending
+            .iter()
+            .map(|r| ToolResultRecord {
+                tool_use_id: r.tool_use_id.clone(),
+                content: interrupted_msg.to_string(),
+                is_error: true,
+                tool_name: r.tool_name.clone(),
+            })
+            .collect();
+
+        let result_msg = Message {
+            id: result_id,
+            uid: Some(result_uid),
+            role: "user".to_string(),
+            message_type: MessageType::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: tool_result_records,
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.save_message_async(&result_msg);
+        self.state.messages.push(result_msg);
     }
 }

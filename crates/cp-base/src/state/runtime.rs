@@ -116,8 +116,6 @@ pub struct State {
     pub previous_panel_hash_list: Vec<String>,
     /// Sleep timer: if nonzero, tool pipeline should wait until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
-    /// Whether to refresh tmux panels after tool_sleep_until_ms expires (set by send_keys, not by sleep)
-    pub tool_sleep_needs_tmux_refresh: bool,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width (for pre-wrapping text)
@@ -198,7 +196,6 @@ impl Default for State {
             waiting_for_panels: false,
             previous_panel_hash_list: vec![],
             tool_sleep_until_ms: 0,
-            tool_sleep_needs_tmux_refresh: false,
             last_viewport_width: 0,
             message_cache: HashMap::new(),
             input_cache: None,

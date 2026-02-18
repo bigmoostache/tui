@@ -7,6 +7,10 @@ use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, es
 
 use crate::types::ConsoleState;
 
+/// Maximum characters of console output to include in context sent to the LLM.
+/// Keeps only the tail (most recent output). ~2000 tokens at ~4 chars/token.
+const MAX_CONTEXT_CHARS: usize = 8_000;
+
 /// Cache request payload: pre-read ring buffer data on the main thread.
 struct ConsoleCacheRequest {
     context_id: String,
@@ -53,8 +57,22 @@ impl Panel for ConsolePanel {
             return Some(CacheUpdate::Unchanged { context_id });
         }
 
-        let token_count = estimate_tokens(&buffer_content);
-        Some(CacheUpdate::Content { context_id, content: buffer_content, token_count })
+        // Truncate to tail — keep only the most recent output for context
+        let truncated = if buffer_content.len() > MAX_CONTEXT_CHARS {
+            let cut = buffer_content.len() - MAX_CONTEXT_CHARS;
+            let start = buffer_content[cut..].find('\n').map(|p| cut + p + 1).unwrap_or(cut);
+            format!(
+                "[...truncated, showing last {}B of {}B...]\n{}",
+                buffer_content.len() - start,
+                buffer_content.len(),
+                &buffer_content[start..]
+            )
+        } else {
+            buffer_content
+        };
+
+        let token_count = estimate_tokens(&truncated);
+        Some(CacheUpdate::Content { context_id, content: truncated, token_count })
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, state: &mut State) -> bool {
@@ -151,9 +169,11 @@ impl Panel for ConsolePanel {
                     .or_else(|| c.get_meta_str("console_command"))
                     .unwrap_or("?");
                 let content = c.cached_content.as_ref()?;
-                let output = paginate_content(content, c.current_page, c.total_pages);
                 let status = c.get_meta_str("console_status").unwrap_or("?");
                 let header = format!("Console: {} ({})", desc, status);
+
+                // Content is already truncated to MAX_CONTEXT_CHARS in refresh_cache
+                let output = paginate_content(content, c.current_page, c.total_pages);
                 Some(ContextItem::new(&c.id, header, output, c.last_refresh_ms))
             })
             .collect()

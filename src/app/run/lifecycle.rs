@@ -190,6 +190,13 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 self.pending_tools.clear();
+
+                // Flush any pending blocking tool results as "interrupted" so their
+                // tool_use messages are properly paired with a tool_result.
+                // Without this, the orphaned tool_use causes API 400 errors on
+                // the next stream (tool_use without matching tool_result).
+                self.flush_pending_tool_results_as_interrupted();
+
                 // Pause auto-continuation when user explicitly cancels streaming.
                 // Without this, the spine would immediately relaunch a new stream
                 // (e.g., due to continue_until_todos_done), making the system

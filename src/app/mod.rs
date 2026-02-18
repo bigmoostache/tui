@@ -55,8 +55,6 @@ pub struct App {
     deferred_tool_sleep_until_ms: u64,
     /// Whether we're in a deferred sleep state (waiting for timer before continuing tool pipeline)
     deferred_tool_sleeping: bool,
-    /// Whether to refresh tmux panels when deferred sleep expires (set by send_keys)
-    deferred_sleep_needs_tmux_refresh: bool,
     /// Background persistence writer — offloads file I/O to a dedicated thread
     writer: PersistenceWriter,
     /// Last poll time per panel ID — tracks when we last submitted a cache request
@@ -96,7 +94,6 @@ impl App {
             wait_started_ms: 0,
             deferred_tool_sleep_until_ms: 0,
             deferred_tool_sleeping: false,
-            deferred_sleep_needs_tmux_refresh: false,
             writer: PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
             pending_question_tool_results: None,

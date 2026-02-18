@@ -241,14 +241,7 @@ pub(crate) fn execute_load(
         }
     }
 
-    // 5. Remove existing dynamic panels (kill tmux panes first)
-    for ctx in &state.context {
-        if ctx.context_type == ContextType::TMUX
-            && let Some(pane_id) = ctx.get_meta_str("tmux_pane_id")
-        {
-            let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane_id]).output();
-        }
-    }
+    // 5. Remove existing dynamic panels
     state.context.retain(|ctx| ctx.context_type.is_fixed());
 
     // 6. Recreate dynamic panels from preset config
