@@ -21,12 +21,13 @@
 //! ```
 //!
 //! The TUI's `find_or_create_server()` will spawn the new binary automatically
-//! on next launch or module reload. Note: killing the server does NOT kill its
-//! child processes — `script` sessions are detached into their own process groups.
+//! on next launch or module reload. Children receive SIGHUP when the server dies
+//! (via `prctl(PR_SET_PDEATHSIG)`), so killing the server tears down all sessions.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -173,9 +174,14 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
         cmd.current_dir(dir);
     }
 
-    // Children inherit the server's session and process group.
-    // When the server dies, they get SIGHUP and exit.
-    // No process_group(0) — we want them in the server's group.
+    // When the server dies, children get SIGHUP via prctl(PR_SET_PDEATHSIG).
+    // This ensures script processes (and their PTY children) are cleaned up.
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGHUP);
+            Ok(())
+        });
+    }
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,

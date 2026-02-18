@@ -12,8 +12,8 @@ When the TUI reloads (hot-reload, crash recovery, `reload_tui`), its process exi
 graph TD
     TUI["TUI binary<br/>(cp-mod-console client)"]
     SRV["cp-console-server<br/>(daemon, own session via setsid)"]
-    S1["script -q -f -c 'cmd1' log1<br/>(own process group)"]
-    S2["script -q -f -c 'cmd2' log2<br/>(own process group)"]
+    S1["script -q -f -c 'cmd1' log1<br/>(PR_SET_PDEATHSIG → SIGHUP)"]
+    S2["script -q -f -c 'cmd2' log2<br/>(PR_SET_PDEATHSIG → SIGHUP)"]
     C1["child process<br/>(e.g. ssh, cargo build)"]
     C2["child process<br/>(e.g. npm run dev)"]
     LOG1[".context-pilot/console/c_1.log"]
@@ -32,7 +32,7 @@ graph TD
 
 Key points:
 - The server calls `setsid()` so it is not a child of the TUI.
-- Each `script` process runs in its own process group (`process_group(0)`).
+- Each `script` process uses `prctl(PR_SET_PDEATHSIG, SIGHUP)` so it receives SIGHUP when the server dies. This cascades: server dies → script gets SIGHUP → script dies → PTY master closes → child process gets terminal hangup → child dies.
 - Output capture: `script -q -f` writes all PTY output to a log file. The TUI polls that file into a `RingBuffer` for display.
 - Input: the server holds each session's `ChildStdin`. The TUI sends keystrokes via the `send` command, and the server writes them to stdin.
 
@@ -151,6 +151,6 @@ The client (`manager.rs:server_binary_path()`) looks for `cp-console-server` in:
 
 So `cargo build --release -p cp-mod-console` puts the binary where `cargo run --release` will find it. For debug builds, use `cargo build -p cp-mod-console`.
 
-### Gotcha: killing the server does NOT kill child processes
+### Process cleanup on server death
 
-`script` sessions are detached into their own process groups (`process_group(0)`). Killing the server orphans them — they keep running but become unmanageable (no stdin, no status tracking). To kill everything cleanly, send `shutdown` instead of raw `kill`, or kill individual sessions via `remove` first.
+Each `script` child is spawned with `prctl(PR_SET_PDEATHSIG, SIGHUP)`, so killing the server automatically sends SIGHUP to all `script` processes. When `script` dies, its PTY master closes, which delivers a terminal hangup to the child shell — so the entire tree is cleaned up. No orphaned processes.

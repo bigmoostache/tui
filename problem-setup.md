@@ -95,3 +95,83 @@ The root cause is two interacting design decisions:
 - **We never kill process groups.** All kill commands target individual PIDs (`kill {pid}`), never group IDs (`kill -{pgid}`). A child's death cannot affect siblings, the server, or SSH.
 - **Children die with the server.** Since children are in the server's session, kernel sends SIGHUP to all of them when the session leader (server) dies. No orphans in any failure mode.
 - **Standard pattern.** This is the same isolation model used by systemd, supervisord, and other process managers.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 1. Basic sanity — consoles still work
+
+  - Launch TUI, create a console (cp_console_create)
+  - Run a command (e.g. ls, echo hello)
+  - Verify output appears in the console panel
+  - Kill the console, verify it shows exited
+
+  2. Server death kills children
+
+  This is the main thing to verify.
+
+  # In TUI: create a console running a long-lived process
+  # e.g. "sleep 9999" or "tail -f /dev/null"
+
+  # In a separate terminal:
+  ps aux | grep sleep          # note the sleep PID
+  cat .context-pilot/console/server.pid   # note server PID
+
+  kill <server-pid>
+
+  # Wait 1-2 seconds, then:
+  ps aux | grep sleep          # should be gone
+  kill -0 <sleep-pid>          # should say "No such process"
+
+  If the sleep process is gone, the fix works.
+
+  3. Server death kills multiple sessions
+
+  - Create 2-3 consoles with different long-lived commands (sleep 111, sleep 222, sleep 333)
+  - Note all PIDs
+  - Kill the server
+  - Verify all child processes are gone
+
+  4. Normal TUI exit does NOT kill children
+
+  - Create a console with sleep 9999
+  - Exit the TUI normally (quit)
+  - ps aux | grep sleep — should still be running (server survives TUI exit)
+  - Relaunch TUI — console should reconnect
+
+  5. Graceful shutdown still works
+
+  - Create a console
+  - Send shutdown command (or trigger it from TUI if there's a path)
+  - Verify sessions are cleaned up (the explicit kill loop in handle_shutdown still runs)
+
+  What "pass" looks like
+
+  ┌─────┬─────────────────────────────┬─────────────────────────────────────────────────────────────┐
+  │  #  │            Test             │                       Pass condition                        │
+  ├─────┼─────────────────────────────┼─────────────────────────────────────────────────────────────┤
+  │ 1   │ Basic sanity                │ Console creates, runs commands, kills cleanly               │
+  ├─────┼─────────────────────────────┼─────────────────────────────────────────────────────────────┤
+  │ 2   │ Server death → children die │ kill <server-pid> makes all child processes exit within ~1s │
+  ├─────┼─────────────────────────────┼─────────────────────────────────────────────────────────────┤
+  │ 3   │ Multiple sessions           │ All children from all sessions die on server kill           │
+  ├─────┼─────────────────────────────┼─────────────────────────────────────────────────────────────┤
+  │ 4   │ TUI exit                    │ Children survive TUI exit, server stays alive               │
+  ├─────┼─────────────────────────────┼─────────────────────────────────────────────────────────────┤
+  │ 5   │ Graceful shutdown           │ shutdown command still kills sessions and exits server      │
+  └─────┴─────────────────────────────┴─────────────────────────────────────────────────────────────┘
+
+  Test #2 is the critical one — that's the bug this commit fixes.
