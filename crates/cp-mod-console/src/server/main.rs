@@ -3,6 +3,26 @@
 //! Spawns `script -q -f -c` processes and holds their stdin pipes.
 //! TUI communicates via JSON lines over a Unix socket.
 //! Survives TUI exit/reload — processes stay alive.
+//!
+//! # Rebuilding after changes
+//!
+//! The server is a standalone binary (`cp-console-server`) built from this file.
+//! Since it runs as a long-lived daemon, code changes require a manual restart:
+//!
+//! ```sh
+//! # 1. Build the new binary
+//! cargo build --release -p cp-mod-console
+//!
+//! # 2. Kill the running server (TUI auto-restarts it on next launch)
+//! kill $(cat .context-pilot/console/server.pid)
+//!
+//! # 3. Clean stale socket/pid files
+//! rm -f .context-pilot/console/server.sock .context-pilot/console/server.pid
+//! ```
+//!
+//! The TUI's `find_or_create_server()` will spawn the new binary automatically
+//! on next launch or module reload. Note: killing the server does NOT kill its
+//! child processes — `script` sessions are detached into their own process groups.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -153,11 +173,9 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
         cmd.current_dir(dir);
     }
 
-    // Detach into own process group
-    unsafe {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    // Children inherit the server's session and process group.
+    // When the server dies, they get SIGHUP and exit.
+    // No process_group(0) — we want them in the server's group.
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -417,10 +435,8 @@ fn main() {
     // Remove stale socket
     let _ = std::fs::remove_file(&socket_path);
 
-    // Daemonize: new session, close stdio
-    unsafe {
-        libc_setsid();
-    }
+    // Note: setsid() is called by the TUI at spawn time (pre_exec hook).
+    // The server is already a session leader when it reaches main().
 
     // Write PID file
     let _ = std::fs::write(&pid_path, format!("{}", std::process::id()));
@@ -448,19 +464,4 @@ fn main() {
             Err(_) => continue,
         }
     }
-}
-
-/// Minimal setsid() without libc crate dependency.
-unsafe fn libc_setsid() {
-    // setsid() syscall number on x86_64 Linux = 112
-    #[cfg(target_arch = "x86_64")]
-    {
-        std::arch::asm!(
-            "syscall",
-            in("rax") 112u64,
-            out("rcx") _,
-            out("r11") _,
-        );
-    }
-    // On other architectures, skip silently
 }

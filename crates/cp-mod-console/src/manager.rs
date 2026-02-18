@@ -129,7 +129,17 @@ pub fn find_or_create_server() -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
+        // setsid() makes the server a session leader with its own process group.
+        // Children inherit this session — when the server dies, they get SIGHUP.
+        // Must be done in pre_exec (before exec), not after spawn.
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
     }
 
     cmd.spawn().map_err(|e| format!("Failed to spawn console server: {}", e))?;
@@ -204,7 +214,14 @@ impl SessionHandle {
             req["cwd"] = serde_json::Value::String(dir.clone());
         }
 
-        let resp = server_request(&req)?;
+        let resp = match server_request(&req) {
+            Ok(r) => r,
+            Err(_) => {
+                // Server may have died — try to respawn
+                find_or_create_server()?;
+                server_request(&req)?
+            }
+        };
         let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
@@ -348,8 +365,15 @@ impl SessionHandle {
             "key": self.name,
             "input": input,
         });
-        server_request(&req)?;
-        Ok(())
+        match server_request(&req) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                // Server may have died — try to respawn
+                find_or_create_server()?;
+                server_request(&req)?;
+                Ok(())
+            }
+        }
     }
 
     /// Kill the process via the server.

@@ -14,3 +14,4 @@ crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex.workspace = true
+libc = "0.2"
