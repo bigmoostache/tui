@@ -323,6 +323,10 @@ mod tests {
 
     #[test]
     fn test_file_edit_with_callback() {
+        // Note: This test verifies the file edit operation works correctly with or without
+        // a callback registered. Testing the actual callback invocation requires integration
+        // tests since callbacks must be function pointers (not closures) due to the State
+        // field type constraints.
         use std::fs;
         use tempfile::TempDir;
         
