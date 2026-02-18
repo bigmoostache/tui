@@ -22,7 +22,6 @@ pub use cp_mod_prompt::PromptModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
 pub use cp_mod_console::ConsoleModule;
-pub use cp_mod_tmux::TmuxModule;
 pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
 
@@ -83,7 +82,6 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(GithubModule),
         Box::new(GlobModule),
         Box::new(GrepModule),
-        Box::new(TmuxModule),
         Box::new(ConsoleModule),
         Box::new(TodoModule),
         Box::new(MemoryModule),
@@ -358,8 +356,8 @@ mod tests {
     #[test]
     fn can_deactivate_independent_module() {
         let active = all_active();
-        // tmux has no dependents
-        let result = check_can_deactivate("tmux", &active);
+        // memory has no dependents
+        let result = check_can_deactivate("memory", &active);
         assert!(result.is_ok());
     }
 

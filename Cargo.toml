@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cp-base", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-glob", "crates/cp-mod-grep", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-tmux", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset"]
+members = [".", "crates/cp-base", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-glob", "crates/cp-mod-grep", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset"]
 
 [workspace.dependencies]
 cp-base = { path = "crates/cp-base" }
@@ -31,7 +31,6 @@ cp-mod-tree = { path = "crates/cp-mod-tree" }
 cp-mod-git = { path = "crates/cp-mod-git" }
 cp-mod-logs = { path = "crates/cp-mod-logs" }
 cp-mod-github = { path = "crates/cp-mod-github" }
-cp-mod-tmux = { path = "crates/cp-mod-tmux" }
 cp-mod-files = { path = "crates/cp-mod-files" }
 cp-mod-spine = { path = "crates/cp-mod-spine" }
 cp-mod-preset = { path = "crates/cp-mod-preset" }

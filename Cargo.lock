@@ -377,16 +377,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cp-mod-tmux"
-version = "0.1.0"
-dependencies = [
- "cp-base",
- "crossterm",
- "ratatui",
- "serde_json",
-]
-
-[[package]]
 name = "cp-mod-todo"
 version = "0.1.0"
 dependencies = [
@@ -2706,7 +2696,6 @@ dependencies = [
  "cp-mod-prompt",
  "cp-mod-scratchpad",
  "cp-mod-spine",
- "cp-mod-tmux",
  "cp-mod-todo",
  "cp-mod-tree",
  "crossterm",
