@@ -197,7 +197,7 @@ impl Module for ConsoleModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         vec![
             ToolDefinition {
-                id: "cp_console_create".to_string(),
+                id: "console_create".to_string(),
                 name: "Create Console".to_string(),
                 short_desc: "Spawn a new process".to_string(),
                 description: "Spawns a child process and creates a console panel to monitor its output. \
@@ -205,8 +205,8 @@ impl Module for ConsoleModule {
                     Close the panel to kill the process. \
                     For one-shot commands (e.g. 'cargo build'), pass the full command directly — \
                     the panel shows output and exits when done. \
-                    For interactive shells, pass 'bash' and use cp_console_send_keys to run commands. \
-                    For long-running servers (e.g. 'npm run dev'), combine with cp_console_wait \
+                    For interactive shells, pass 'bash' and use console_send_keys to run commands. \
+                    For long-running servers (e.g. 'npm run dev'), combine with console_wait \
                     (block=false, mode='pattern') to get notified when ready."
                     .to_string(),
                 params: vec![
@@ -222,7 +222,7 @@ impl Module for ConsoleModule {
                 category: "Console".to_string(),
             },
             ToolDefinition {
-                id: "cp_console_send_keys".to_string(),
+                id: "console_send_keys".to_string(),
                 name: "Console Send Keys".to_string(),
                 short_desc: "Send input to process".to_string(),
                 description: "Sends input text to a running console's stdin. Use for interactive processes. \
@@ -246,7 +246,7 @@ impl Module for ConsoleModule {
                 category: "Console".to_string(),
             },
             ToolDefinition {
-                id: "cp_console_wait".to_string(),
+                id: "console_wait".to_string(),
                 name: "Console Wait".to_string(),
                 short_desc: "Wait for process event".to_string(),
                 description: "Registers a waiter for a console event. Two modes: \
@@ -292,7 +292,7 @@ impl Module for ConsoleModule {
                     No server, no background process — just exec and return. \
                     Use for debugging and quick one-off commands. \
                     BLOCKING: freezes tool execution until command completes (max 10s, then killed). \
-                    Do NOT use for long-running or interactive commands — use cp_console_create instead."
+                    Do NOT use for long-running or interactive commands — use console_create instead."
                     .to_string(),
                 params: vec![
                     ToolParam::new("command", ParamType::String)
@@ -309,9 +309,9 @@ impl Module for ConsoleModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "cp_console_create" => Some(tools::execute_create(tool, state)),
-            "cp_console_send_keys" => Some(tools::execute_send_keys(tool, state)),
-            "cp_console_wait" => Some(tools::execute_wait(tool, state)),
+            "console_create" => Some(tools::execute_create(tool, state)),
+            "console_send_keys" => Some(tools::execute_send_keys(tool, state)),
+            "console_wait" => Some(tools::execute_wait(tool, state)),
             "console_easy_bash" => Some(tools::execute_debug_bash(tool, state)),
             _ => None,
         }
@@ -319,9 +319,9 @@ impl Module for ConsoleModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("cp_console_create", visualize_console_output as ToolVisualizer),
-            ("cp_console_send_keys", visualize_console_output as ToolVisualizer),
-            ("cp_console_wait", visualize_console_output as ToolVisualizer),
+            ("console_create", visualize_console_output as ToolVisualizer),
+            ("console_send_keys", visualize_console_output as ToolVisualizer),
+            ("console_wait", visualize_console_output as ToolVisualizer),
         ]
     }
 

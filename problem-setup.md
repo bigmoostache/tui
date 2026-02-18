@@ -114,7 +114,7 @@ The root cause is two interacting design decisions:
 
  1. Basic sanity — consoles still work
 
-  - Launch TUI, create a console (cp_console_create)
+  - Launch TUI, create a console (console_create)
   - Run a command (e.g. ls, echo hello)
   - Verify output appears in the console panel
   - Kill the console, verify it shows exited

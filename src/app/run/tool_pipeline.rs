@@ -509,7 +509,7 @@ impl App {
     }
 
     /// When the user interrupts streaming (Esc), any pending blocking tool calls
-    /// (cp_console_wait, ask_user_question, or tools mid-execution) have their
+    /// (console_wait, ask_user_question, or tools mid-execution) have their
     /// tool_use messages already saved but no matching tool_result. This creates
     /// orphaned tool_use blocks that cause API 400 errors on the next stream.
     ///
