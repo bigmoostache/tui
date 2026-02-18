@@ -2,6 +2,7 @@ pub mod refresh;
 mod list;
 mod panel;
 pub(crate) mod render;
+mod render_input;
 
 use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};

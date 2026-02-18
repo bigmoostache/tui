@@ -1,6 +1,7 @@
 mod context;
 mod panel;
 mod render;
+mod render_details;
 mod tools;
 
 use serde_json::json;

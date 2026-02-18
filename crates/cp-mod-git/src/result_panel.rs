@@ -1,0 +1,170 @@
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::prelude::*;
+
+use cp_base::state::Action;
+use cp_base::panels::{CacheRequest, CacheUpdate};
+use cp_base::config::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::config::theme;
+use cp_base::modules::{run_with_timeout, truncate_output};
+use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
+use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+
+use super::GIT_CMD_TIMEOUT_SECS;
+use super::GIT_STATUS_REFRESH_MS;
+use crate::types::GitResultRequest;
+
+pub(crate) struct GitResultPanel;
+
+impl Panel for GitResultPanel {
+    fn needs_cache(&self) -> bool {
+        true
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GIT_STATUS_REFRESH_MS)
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let command = ctx.get_meta_str("result_command")?;
+        Some(CacheRequest {
+            context_type: ContextType::new(ContextType::GIT_RESULT),
+            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_string() }),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        match update {
+            CacheUpdate::Content { content, token_count, .. } => {
+                ctx.cached_content = Some(content);
+                ctx.full_token_count = token_count;
+                ctx.total_pages = compute_total_pages(token_count);
+                ctx.current_page = 0;
+                if ctx.total_pages > 1 {
+                    let page_content = paginate_content(
+                        ctx.cached_content.as_deref().unwrap_or(""),
+                        ctx.current_page,
+                        ctx.total_pages,
+                    );
+                    ctx.token_count = estimate_tokens(&page_content);
+                } else {
+                    ctx.token_count = token_count;
+                }
+                ctx.cache_deprecated = false;
+                let content_ref = ctx.cached_content.clone().unwrap_or_default();
+                update_if_changed(ctx, &content_ref);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let req = request.data.downcast::<GitResultRequest>().ok()?;
+        let GitResultRequest { context_id, command } = *req;
+
+        // Parse and execute the command with timeout
+        let args = super::classify::validate_git_command(&command).ok()?;
+
+        let mut cmd = std::process::Command::new("git");
+        cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let content = if stderr.trim().is_empty() {
+                    stdout.to_string()
+                } else if stdout.trim().is_empty() {
+                    stderr.to_string()
+                } else {
+                    format!("{}\n{}", stdout, stderr)
+                };
+                let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                let token_count = estimate_tokens(&content);
+                Some(CacheUpdate::Content { context_id, content, token_count })
+            }
+            Err(e) => {
+                let content = format!("Error executing git: {}", e);
+                let token_count = estimate_tokens(&content);
+                Some(CacheUpdate::Content { context_id, content, token_count })
+            }
+        }
+    }
+
+    fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
+        match key.code {
+            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
+            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
+            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
+            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
+            _ => None,
+        }
+    }
+
+    fn title(&self, state: &State) -> String {
+        if let Some(ctx) = state.context.get(state.selected_context)
+            && ctx.context_type == ContextType::GIT_RESULT
+            && let Some(cmd) = ctx.get_meta_str("result_command")
+        {
+            let short =
+                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.to_string() };
+            return short;
+        }
+        "Git Result".to_string()
+    }
+
+    fn context(&self, state: &State) -> Vec<ContextItem> {
+        let mut items = Vec::new();
+        for ctx in &state.context {
+            if ctx.context_type != ContextType::GIT_RESULT {
+                continue;
+            }
+            let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
+            let header = ctx.get_meta_str("result_command").unwrap_or("Git Result");
+            let output = paginate_content(content, ctx.current_page, ctx.total_pages);
+            items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
+        }
+        items
+    }
+
+    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let mut text: Vec<Line> = Vec::new();
+
+        // Find the selected GitResult panel
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GIT_RESULT);
+
+        let Some(ctx) = ctx else {
+            text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));
+            return text;
+        };
+
+        if let Some(content) = &ctx.cached_content {
+            // Render with diff-aware highlighting
+            for line in content.lines() {
+                let (style, display_line) = if line.starts_with('+') && !line.starts_with("+++") {
+                    (Style::default().fg(theme::success()), line.to_string())
+                } else if line.starts_with('-') && !line.starts_with("---") {
+                    (Style::default().fg(theme::error()), line.to_string())
+                } else if line.starts_with("@@") {
+                    (Style::default().fg(theme::accent()), line.to_string())
+                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
+                    (Style::default().fg(theme::text_secondary()).bold(), line.to_string())
+                } else if line.starts_with("commit ") {
+                    (Style::default().fg(theme::accent()).bold(), line.to_string())
+                } else {
+                    (Style::default().fg(theme::text()), line.to_string())
+                };
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(display_line, style),
+                ]));
+            }
+        } else {
+            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
+        }
+
+        text
+    }
+}
