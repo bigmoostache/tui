@@ -36,6 +36,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file '{}': {}", path_str, e), true);
     }
 
+    // Invoke file edit callback if registered
+    if let Some(callback) = state.file_edit_callback {
+        callback(path_str, is_new, state);
+    }
+
     let token_count = estimate_tokens(contents);
     let line_count = contents.lines().count();
 

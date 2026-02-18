@@ -12,6 +12,11 @@ use crate::tools::ToolDefinition;
 /// Takes (file_path, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
+/// Type alias for file edit callback function.
+/// Called after a file is successfully edited or written.
+/// Takes (file_path, is_new_file, &mut State) where is_new_file indicates if this was a file creation.
+pub type FileEditCallback = fn(&str, bool, &mut State);
+
 /// Runtime state (messages loaded in memory)
 pub struct State {
     pub context: Vec<ContextElement>,
@@ -131,6 +136,9 @@ pub struct State {
     /// Syntax highlighting function (provided by binary's highlight module)
     /// Takes (file_path, content) and returns highlighted spans per line
     pub highlight_fn: Option<HighlightFn>,
+    /// File edit callback (provided by binary)
+    /// Called after a file is successfully edited or written
+    pub file_edit_callback: Option<FileEditCallback>,
 
     // === Module extension data (TypeMap pattern) ===
     /// Module-owned state stored by TypeId. Each module registers its own state struct
@@ -201,6 +209,7 @@ impl Default for State {
             input_cache: None,
             full_content_cache: None,
             highlight_fn: None,
+            file_edit_callback: None,
             module_data: HashMap::new(),
         }
     }

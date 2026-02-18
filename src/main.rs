@@ -1,4 +1,5 @@
 mod app;
+mod callbacks;
 mod infra;
 mod llms;
 mod modules;
@@ -62,6 +63,7 @@ fn main() -> io::Result<()> {
 
     // Set callback hooks for extracted module crates
     state.highlight_fn = Some(ui::helpers::highlight_file);
+    state.file_edit_callback = Some(callbacks::on_file_edit);
 
     // Validate module dependencies at startup
     modules::validate_dependencies(&state.active_modules);
