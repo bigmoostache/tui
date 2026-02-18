@@ -12,71 +12,6 @@ use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use crate::CONSOLE_DIR;
 
-/// Environment variable set on all spawned processes to tag them as TUI-launched.
-/// Value is a hash of the working directory so multiple TUI instances don't collide.
-pub const ENV_TAG: &str = "CONTEXT_PILOT_SESSION";
-
-/// Compute the session tag for the current working directory.
-pub fn session_tag() -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let cwd = std::env::current_dir().unwrap_or_default();
-    let mut hasher = DefaultHasher::new();
-    cwd.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
-/// Kill orphaned processes from previous TUI sessions that weren't cleaned up.
-/// Scans /proc for processes with our CONTEXT_PILOT_SESSION env var and kills
-/// any that aren't in the provided set of known PIDs.
-pub fn kill_orphaned_processes(known_pids: &std::collections::HashSet<u32>) {
-    let tag = session_tag();
-
-    // Scan /proc/*/environ for our tag
-    let proc_dir = match std::fs::read_dir("/proc") {
-        Ok(d) => d,
-        Err(_) => return, // Not on Linux or no /proc access
-    };
-
-    for entry in proc_dir.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-
-        // Only look at numeric dirs (PIDs)
-        let pid: u32 = match name_str.parse() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-
-        // Skip our own PID and known live sessions
-        if pid == std::process::id() || known_pids.contains(&pid) {
-            continue;
-        }
-
-        // Read environ (null-separated key=value pairs)
-        let environ_path = format!("/proc/{}/environ", pid);
-        let environ = match std::fs::read(&environ_path) {
-            Ok(data) => data,
-            Err(_) => continue, // Permission denied or process gone
-        };
-
-        // Check if our tag is present
-        let needle = format!("{}={}", ENV_TAG, tag);
-        let needle_bytes = needle.as_bytes();
-
-        let found = environ
-            .split(|&b| b == 0)
-            .any(|entry| entry == needle_bytes);
-
-        if found {
-            // Orphan found — kill its process group
-            let _ = Command::new("kill").args(["-9", &format!("-{}", pid)]).output();
-            // Fallback: kill just the PID if group kill fails
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
-        }
-    }
-}
-
 /// A managed child process session.
 /// All fields are Send + Sync via Arc wrappers.
 pub struct SessionHandle {
@@ -129,9 +64,6 @@ impl SessionHandle {
         //   -c: run command instead of interactive shell
         let mut cmd = Command::new("script");
         cmd.args(["-q", "-f", "-c", &command, &log_path_str]);
-
-        // Tag the process so we can find orphans after crash/SIGKILL
-        cmd.env(ENV_TAG, session_tag());
 
         // Pipe stdin so we can send input via send_keys()
         // Stdout/stderr null — all output captured by script to the log file

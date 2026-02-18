@@ -101,16 +101,8 @@ impl Module for ConsoleModule {
         };
 
         if sessions_map.is_empty() {
-            // No known sessions — kill any orphans from previous crashes
-            manager::kill_orphaned_processes(&std::collections::HashSet::new());
             return;
         }
-
-        // Collect known PIDs before orphan scan
-        let known_pids: std::collections::HashSet<u32> = sessions_map.values().map(|m| m.pid).collect();
-
-        // Kill any orphaned processes from previous crashes that aren't in our saved sessions
-        manager::kill_orphaned_processes(&known_pids);
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
