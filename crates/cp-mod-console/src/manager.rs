@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::fs;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write as IoWrite};
+use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -11,74 +13,175 @@ use cp_base::panels::now_ms;
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use crate::CONSOLE_DIR;
+use crate::pollers::{file_poller, file_poller_from_offset, poll_server_status};
 
-/// Environment variable set on all spawned processes to tag them as TUI-launched.
-/// Value is a hash of the working directory so multiple TUI instances don't collide.
-pub const ENV_TAG: &str = "CONTEXT_PILOT_SESSION";
-
-/// Compute the session tag for the current working directory.
-pub fn session_tag() -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let cwd = std::env::current_dir().unwrap_or_default();
-    let mut hasher = DefaultHasher::new();
-    cwd.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+/// Socket path for the console server.
+fn server_socket_path() -> PathBuf {
+    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join("server.sock")
 }
 
-/// Kill orphaned processes from previous TUI sessions that weren't cleaned up.
-/// Scans /proc for processes with our CONTEXT_PILOT_SESSION env var and kills
-/// any that aren't in the provided set of known PIDs.
-pub fn kill_orphaned_processes(known_pids: &std::collections::HashSet<u32>) {
-    let tag = session_tag();
+/// PID file for the console server.
+fn server_pid_path() -> PathBuf {
+    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join("server.pid")
+}
 
-    // Scan /proc/*/environ for our tag
-    let proc_dir = match std::fs::read_dir("/proc") {
-        Ok(d) => d,
-        Err(_) => return, // Not on Linux or no /proc access
-    };
+/// Path to the server binary. Checks multiple locations:
+/// 1. Next to the current TUI binary (deployed)
+/// 2. In target/release/ (cargo run --release)
+/// 3. In target/debug/ (cargo run)
+fn server_binary_path() -> PathBuf {
+    let exe = std::env::current_exe().unwrap_or_default();
+    let next_to_exe = exe.parent().unwrap_or(std::path::Path::new(".")).join("cp-console-server");
+    if next_to_exe.exists() {
+        return next_to_exe;
+    }
 
-    for entry in proc_dir.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-
-        // Only look at numeric dirs (PIDs)
-        let pid: u32 = match name_str.parse() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-
-        // Skip our own PID and known live sessions
-        if pid == std::process::id() || known_pids.contains(&pid) {
-            continue;
+    // Try workspace target directories (when running via cargo run)
+    // Walk up from exe to find the workspace root (has Cargo.toml)
+    let mut dir = exe.parent();
+    while let Some(d) = dir {
+        let cargo_toml = d.join("Cargo.toml");
+        if cargo_toml.exists() {
+            // Check target/release and target/debug
+            for profile in &["release", "debug"] {
+                let candidate = d.join("target").join(profile).join("cp-console-server");
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
         }
+        dir = d.parent();
+    }
 
-        // Read environ (null-separated key=value pairs)
-        let environ_path = format!("/proc/{}/environ", pid);
-        let environ = match std::fs::read(&environ_path) {
-            Ok(data) => data,
-            Err(_) => continue, // Permission denied or process gone
-        };
+    // Fallback to next-to-exe (will fail with a clear error)
+    next_to_exe
+}
 
-        // Check if our tag is present
-        let needle = format!("{}={}", ENV_TAG, tag);
-        let needle_bytes = needle.as_bytes();
+/// Build the log file path for a given session key (always absolute).
+pub fn log_file_path(key: &str) -> PathBuf {
+    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key));
+    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
+}
 
-        let found = environ
-            .split(|&b| b == 0)
-            .any(|entry| entry == needle_bytes);
+// ---------------------------------------------------------------------------
+// Server client
+// ---------------------------------------------------------------------------
 
-        if found {
-            // Orphan found — kill its process group
-            let _ = Command::new("kill").args(["-9", &format!("-{}", pid)]).output();
-            // Fallback: kill just the PID if group kill fails
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+/// Send a JSON command to the server and read the response.
+pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let sock_path = server_socket_path();
+    let stream = UnixStream::connect(&sock_path)
+        .map_err(|e| format!("Failed to connect to console server: {}", e))?;
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
+    stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
+
+    let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {}", e))?;
+    let reader = BufReader::new(stream);
+
+    let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {}", e))?;
+    line.push('\n');
+    writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {}", e))?;
+    writer.flush().map_err(|e| format!("Flush failed: {}", e))?;
+
+    let mut resp_line = String::new();
+    let mut buf_reader = reader;
+    buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {}", e))?;
+
+    let resp: serde_json::Value = serde_json::from_str(resp_line.trim())
+        .map_err(|e| format!("Parse response failed: {}", e))?;
+
+    if resp.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+        Ok(resp)
+    } else {
+        let err = resp.get("error").and_then(|v| v.as_str()).unwrap_or("unknown error");
+        Err(err.to_string())
+    }
+}
+
+/// Find the running server or spawn a new one.
+pub fn find_or_create_server() -> Result<(), String> {
+    // Ensure console directory exists
+    let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
+    fs::create_dir_all(&console_dir).map_err(|e| format!("Failed to create console dir: {}", e))?;
+
+    // Try connecting to existing server
+    let ping = serde_json::json!({"cmd": "ping"});
+    if server_request(&ping).is_ok() {
+        return Ok(()); // Server already running
+    }
+
+    // Server not running — spawn it
+    let binary = server_binary_path();
+    if !binary.exists() {
+        return Err(format!("Console server binary not found at {:?}", binary));
+    }
+
+    let sock_path = server_socket_path();
+    let sock_str = sock_path.to_string_lossy().to_string();
+
+    // Remove stale socket/pid files
+    let _ = fs::remove_file(&sock_path);
+    let _ = fs::remove_file(server_pid_path());
+
+    let mut cmd = Command::new(&binary);
+    cmd.arg(&sock_str);
+    cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // setsid() makes the server a session leader with its own process group.
+        // Children inherit this session — when the server dies, they get SIGHUP.
+        // Must be done in pre_exec (before exec), not after spawn.
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+
+    cmd.spawn().map_err(|e| format!("Failed to spawn console server: {}", e))?;
+
+    // Wait for socket to appear (up to 3 seconds)
+    for _ in 0..30 {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if server_request(&ping).is_ok() {
+            return Ok(());
+        }
+    }
+
+    Err("Console server failed to start within 3 seconds".to_string())
+}
+
+/// Kill orphaned processes by asking the server for its session list and
+/// comparing against known session keys.
+pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
+    let list = serde_json::json!({"cmd": "list"});
+    if let Ok(resp) = server_request(&list) {
+        if let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array()) {
+            for session in sessions {
+                if let Some(key) = session.get("key").and_then(|v| v.as_str()) {
+                    if !known_keys.contains(key) {
+                        // Orphan — remove it from server (kills process)
+                        let remove = serde_json::json!({"cmd": "remove", "key": key});
+                        let _ = server_request(&remove);
+                    }
+                }
+            }
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// SessionHandle — TUI-side handle for a server-managed process
+// ---------------------------------------------------------------------------
+
 /// A managed child process session.
-/// All fields are Send + Sync via Arc wrappers.
+/// The process is owned by the console server.
+/// The TUI polls the log file for output into a RingBuffer.
 pub struct SessionHandle {
     pub name: String,
     pub command: String,
@@ -86,72 +189,41 @@ pub struct SessionHandle {
     pub status: Arc<Mutex<ProcessStatus>>,
     pub buffer: RingBuffer,
     pub log_path: String,
-    /// Piped stdin handle — None after reconnect (pipe lost).
-    stdin_handle: Arc<Mutex<Option<std::process::ChildStdin>>>,
     child_id: Arc<Mutex<Option<u32>>>,
     pub started_at: u64,
     pub finished_at: Arc<Mutex<Option<u64>>>,
     stop_polling: Arc<AtomicBool>,
 }
 
-// Safety: All Arc<Mutex<_>> fields are Send+Sync.
-// RingBuffer is Clone via Arc<Mutex<_>> so also Send+Sync.
 unsafe impl Send for SessionHandle {}
 unsafe impl Sync for SessionHandle {}
 
-/// Build the log file path for a given session key (always absolute).
-pub fn log_file_path(key: &str) -> PathBuf {
-    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key));
-    // Ensure absolute path so cwd doesn't break file resolution
-    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
-}
-
 impl SessionHandle {
-    /// Spawn a new child process using `script` for PTY emulation.
-    ///
-    /// Uses `script -q -f -c` to create a PTY so the child sees a real terminal.
-    /// Output is captured to a log file and polled into the ring buffer.
-    /// Stdin is piped directly to `script` which forwards to the PTY.
+    /// Spawn a new child process via the console server.
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
-        // Ensure console directory exists
-        let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
-        fs::create_dir_all(&console_dir).map_err(|e| format!("Failed to create console dir: {}", e))?;
-
         let log_path = log_file_path(&name);
         let log_path_str = log_path.to_string_lossy().to_string();
 
-        // Create/truncate log file
-        fs::write(&log_path, b"").map_err(|e| format!("Failed to create log file: {}", e))?;
-
-        // Use `script` for PTY emulation:
-        //   -q: quiet (no "Script started" header)
-        //   -f: flush after each write (real-time output)
-        //   -c: run command instead of interactive shell
-        let mut cmd = Command::new("script");
-        cmd.args(["-q", "-f", "-c", &command, &log_path_str]);
-
-        // Tag the process so we can find orphans after crash/SIGKILL
-        cmd.env(ENV_TAG, session_tag());
-
-        // Pipe stdin so we can send input via send_keys()
-        // Stdout/stderr null — all output captured by script to the log file
-        cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
-
+        // Ask server to create the process
+        let mut req = serde_json::json!({
+            "cmd": "create",
+            "key": name,
+            "command": command,
+            "log_path": log_path_str,
+        });
         if let Some(ref dir) = cwd {
-            cmd.current_dir(dir);
+            req["cwd"] = serde_json::Value::String(dir.clone());
         }
 
-        // Detach child into its own process group so it survives parent death
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            cmd.process_group(0);
-        }
-
-        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn '{}': {}", command, e))?;
-
-        let pid = child.id();
-        let stdin_handle = child.stdin.take();
+        let resp = match server_request(&req) {
+            Ok(r) => r,
+            Err(_) => {
+                // Server may have died — try to respawn
+                find_or_create_server()?;
+                server_request(&req)?
+            }
+        };
+        let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
         let buffer = RingBuffer::new();
@@ -159,7 +231,7 @@ impl SessionHandle {
         let finished_at = Arc::new(Mutex::new(None));
         let stop_polling = Arc::new(AtomicBool::new(false));
 
-        // File poller thread: reads new bytes from log file into ring buffer
+        // File poller thread
         {
             let buf = buffer.clone();
             let stop = Arc::clone(&stop_polling);
@@ -169,13 +241,14 @@ impl SessionHandle {
             });
         }
 
-        // Waiter thread: wait for child to exit
+        // Status poller thread — periodically ask server for status
         {
             let status_clone = Arc::clone(&status);
             let finished_clone = Arc::clone(&finished_at);
             let stop_clone = Arc::clone(&stop_polling);
+            let key = name.clone();
             std::thread::spawn(move || {
-                wait_for_child(child, status_clone, finished_clone, stop_clone);
+                poll_server_status(key, status_clone, finished_clone, stop_clone);
             });
         }
 
@@ -186,7 +259,6 @@ impl SessionHandle {
             status,
             buffer,
             log_path: log_path_str,
-            stdin_handle: Arc::new(Mutex::new(stdin_handle)),
             child_id,
             started_at: now_ms(),
             finished_at,
@@ -194,9 +266,7 @@ impl SessionHandle {
         })
     }
 
-    /// Reconnect to a previously-running session after TUI reload.
-    /// Loads log file contents into ring buffer and monitors the PID.
-    /// `send_input` will fail — stdin pipe is lost after reload.
+    /// Reconnect to a server-managed session after TUI reload.
     pub fn reconnect(
         name: String,
         command: String,
@@ -222,11 +292,38 @@ impl SessionHandle {
             0
         };
 
-        // Check if PID is still alive
-        let pid_alive = is_pid_alive(pid);
+        // Check if server knows about this session
+        let server_alive = {
+            let req = serde_json::json!({"cmd": "status", "key": name});
+            match server_request(&req) {
+                Ok(resp) => {
+                    let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    if st.starts_with("exited") {
+                        let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
+                        let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                        *s = ProcessStatus::Finished(code);
+                        let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                        *fin = Some(now_ms());
+                        stop_polling.store(true, Ordering::Relaxed);
+                        false
+                    } else {
+                        true // running
+                    }
+                }
+                Err(_) => {
+                    // Server doesn't know about this session — mark dead
+                    let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                    *s = ProcessStatus::Finished(-1);
+                    let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                    *fin = Some(now_ms());
+                    stop_polling.store(true, Ordering::Relaxed);
+                    false
+                }
+            }
+        };
 
-        if pid_alive {
-            // Start file poller at current offset
+        if server_alive {
+            // File poller from offset
             {
                 let buf = buffer.clone();
                 let stop = Arc::clone(&stop_polling);
@@ -236,22 +333,16 @@ impl SessionHandle {
                 });
             }
 
-            // Start PID monitor thread
+            // Status poller
             {
                 let status_clone = Arc::clone(&status);
                 let finished_clone = Arc::clone(&finished_at);
                 let stop_clone = Arc::clone(&stop_polling);
+                let key = name.clone();
                 std::thread::spawn(move || {
-                    wait_for_pid(pid, status_clone, finished_clone, stop_clone);
+                    poll_server_status(key, status_clone, finished_clone, stop_clone);
                 });
             }
-        } else {
-            // Process already dead
-            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-            *s = ProcessStatus::Finished(-1);
-            let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
-            *fin = Some(now_ms());
-            stop_polling.store(true, Ordering::Relaxed);
         }
 
         Self {
@@ -261,7 +352,6 @@ impl SessionHandle {
             status,
             buffer,
             log_path: log_path_str,
-            stdin_handle: Arc::new(Mutex::new(None)), // No stdin after reconnect
             child_id,
             started_at,
             finished_at,
@@ -269,53 +359,31 @@ impl SessionHandle {
         }
     }
 
-    /// Send input to the process via the piped stdin.
-    /// Escape sequences are interpreted before sending:
-    ///   \n \r \t \\ → standard escapes
-    ///   \xHH        → arbitrary hex byte (e.g. \x03 for Ctrl+C)
-    ///   \e          → ESC (0x1B), for ANSI sequences like \e[A (up arrow)
-    /// Fails after reconnect (stdin pipe is lost).
+    /// Send input to the process via the server.
     pub fn send_input(&self, input: &str) -> Result<(), String> {
-        let bytes = interpret_escapes(input);
-        let mut guard = self.stdin_handle.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(ref mut stdin) = *guard {
-            stdin.write_all(&bytes).map_err(|e| format!("stdin write failed: {}", e))?;
-            stdin.flush().map_err(|e| format!("stdin flush failed: {}", e))?;
-            Ok(())
-        } else {
-            Err("stdin unavailable (reconnected session — stdin pipe lost after reload)".to_string())
+        let req = serde_json::json!({
+            "cmd": "send",
+            "key": self.name,
+            "input": input,
+        });
+        match server_request(&req) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                // Server may have died — try to respawn
+                find_or_create_server()?;
+                server_request(&req)?;
+                Ok(())
+            }
         }
     }
 
-    /// Kill the process.
-    ///
-    /// Sends SIGTERM to the `script` process only (not the process group).
-    /// When `script` dies, its PTY master fd closes, which sends SIGHUP to
-    /// all child processes via the PTY — this is the clean shutdown path.
-    /// Falls back to SIGKILL after a brief delay if SIGTERM doesn't work.
+    /// Kill the process via the server.
     pub fn kill(&self) {
-        // Signal polling thread to stop
         self.stop_polling.store(true, Ordering::Relaxed);
 
-        let pid = {
-            let guard = self.child_id.lock().unwrap_or_else(|e| e.into_inner());
-            *guard
-        };
-        if let Some(pid) = pid {
-            if cfg!(target_os = "windows") {
-                let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).output();
-            } else {
-                // Send SIGTERM to just the script process (NOT the group).
-                // script's PTY cleanup will propagate SIGHUP to children.
-                let _ = Command::new("kill").args([&pid.to_string()]).output();
-                // Brief wait, then SIGKILL if still alive
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                if is_pid_alive(pid) {
-                    let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
-                }
-            }
-        }
-        // Update status
+        let req = serde_json::json!({"cmd": "kill", "key": self.name});
+        let _ = server_request(&req);
+
         let mut status = self.status.lock().unwrap_or_else(|e| e.into_inner());
         if !status.is_terminal() {
             *status = ProcessStatus::Killed;
@@ -340,201 +408,7 @@ impl SessionHandle {
     pub fn pid(&self) -> Option<u32> {
         *self.child_id.lock().unwrap_or_else(|e| e.into_inner())
     }
-}
 
-/// Interpret escape sequences in input text, converting them to raw bytes.
-///
-/// Supported sequences:
-///   \n      → 0x0A (newline)
-///   \r      → 0x0D (carriage return)
-///   \t      → 0x09 (tab)
-///   \\      → 0x5C (literal backslash)
-///   \e      → 0x1B (ESC, for ANSI sequences like \e[A)
-///   \xHH    → arbitrary hex byte (e.g. \x03 = Ctrl+C, \x04 = Ctrl+D)
-///   \0      → 0x00 (null)
-///
-/// Unrecognized sequences pass through as-is (backslash + char).
-fn interpret_escapes(input: &str) -> Vec<u8> {
-    let mut out = Vec::with_capacity(input.len());
-    let bytes = input.as_bytes();
-    let mut i = 0;
-
-    while i < bytes.len() {
-        if bytes[i] == b'\\' && i + 1 < bytes.len() {
-            match bytes[i + 1] {
-                b'n' => {
-                    out.push(0x0A);
-                    i += 2;
-                }
-                b'r' => {
-                    out.push(0x0D);
-                    i += 2;
-                }
-                b't' => {
-                    out.push(0x09);
-                    i += 2;
-                }
-                b'\\' => {
-                    out.push(b'\\');
-                    i += 2;
-                }
-                b'e' => {
-                    out.push(0x1B);
-                    i += 2;
-                }
-                b'0' => {
-                    out.push(0x00);
-                    i += 2;
-                }
-                b'x' if i + 3 < bytes.len() => {
-                    // Parse \xHH
-                    let hi = bytes[i + 2];
-                    let lo = bytes[i + 3];
-                    if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
-                        out.push(h << 4 | l);
-                        i += 4;
-                    } else {
-                        // Invalid hex, pass through as-is
-                        out.push(b'\\');
-                        i += 1;
-                    }
-                }
-                _ => {
-                    // Unrecognized escape, pass through
-                    out.push(b'\\');
-                    i += 1;
-                }
-            }
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-
-    out
-}
-
-/// Convert an ASCII hex digit to its numeric value (0-15).
-fn hex_digit(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
-}
-
-/// Check if a PID is alive via `kill -0`.
-fn is_pid_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-/// File poller: reads new bytes from a log file into a ring buffer.
-fn file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>) {
-    file_poller_from_offset(path, buffer, stop, 0);
-}
-
-/// File poller starting from a given offset.
-fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>, mut offset: u64) {
-    use std::io::{Read, Seek, SeekFrom};
-
-    loop {
-        if stop.load(Ordering::Relaxed) {
-            // Grace period: read any final bytes after process exit
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            if let Ok(mut f) = fs::File::open(&path)
-                && f.seek(SeekFrom::Start(offset)).is_ok()
-            {
-                let mut buf = vec![0u8; 64 * 1024];
-                while let Ok(n) = f.read(&mut buf) {
-                    if n == 0 {
-                        break;
-                    }
-                    buffer.write(&buf[..n]);
-                }
-            }
-            break;
-        }
-
-        if let Ok(mut f) = fs::File::open(&path)
-            && f.seek(SeekFrom::Start(offset)).is_ok()
-        {
-            let mut buf = vec![0u8; 64 * 1024];
-            loop {
-                match f.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        buffer.write(&buf[..n]);
-                        offset += n as u64;
-                    }
-                    Err(_) => break,
-                }
-            }
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-}
-
-/// Background thread: wait for child to exit and update status.
-fn wait_for_child(
-    mut child: Child,
-    status: Arc<Mutex<ProcessStatus>>,
-    finished_at: Arc<Mutex<Option<u64>>>,
-    stop_polling: Arc<AtomicBool>,
-) {
-    match child.wait() {
-        Ok(exit_status) => {
-            let code = exit_status.code().unwrap_or(-1);
-            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-            if !s.is_terminal() {
-                *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
-            }
-        }
-        Err(_) => {
-            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-            if !s.is_terminal() {
-                *s = ProcessStatus::Failed(-1);
-            }
-        }
-    }
-    let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
-    if fin.is_none() {
-        *fin = Some(now_ms());
-    }
-    // Signal file poller to do final read and stop
-    stop_polling.store(true, Ordering::Relaxed);
-}
-
-/// Background thread: poll `kill -0` to detect when a PID exits (used for reconnected sessions).
-fn wait_for_pid(
-    pid: u32,
-    status: Arc<Mutex<ProcessStatus>>,
-    finished_at: Arc<Mutex<Option<u64>>>,
-    stop_polling: Arc<AtomicBool>,
-) {
-    loop {
-        if stop_polling.load(Ordering::Relaxed) {
-            break;
-        }
-        if !is_pid_alive(pid) {
-            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-            if !s.is_terminal() {
-                *s = ProcessStatus::Finished(-1);
-            }
-            let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
-            if fin.is_none() {
-                *fin = Some(now_ms());
-            }
-            stop_polling.store(true, Ordering::Relaxed);
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
+    /// No-op for backward compat — server holds the stdin, not us.
+    pub fn leak_stdin(&self) {}
 }

@@ -11,5 +11,5 @@ while IFS= read -r f; do
     echo "FAIL: $f has $lines lines (max 500)" >&2
     exit_code=1
   fi
-done < <(find . -name '*.rs' -not -path './target/*')
+done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
 exit $exit_code

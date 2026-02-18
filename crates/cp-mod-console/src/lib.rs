@@ -1,5 +1,6 @@
 mod manager;
 mod panel;
+mod pollers;
 pub mod ring_buffer;
 pub mod tools;
 pub mod types;
@@ -39,6 +40,10 @@ impl Module for ConsoleModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(ConsoleState::new());
+        // Ensure the console server is running
+        if let Err(e) = manager::find_or_create_server() {
+            eprintln!("Console server startup failed: {}", e);
+        }
     }
 
     fn reset_state(&self, state: &mut State) {
@@ -63,6 +68,11 @@ impl Module for ConsoleModule {
             if !handle.get_status().is_terminal()
                 && let Some(pid) = handle.pid()
             {
+                // Leak stdin so script doesn't see EOF when TUI exits for reload.
+                // This keeps the pipe fd open (no EOF → script stays alive).
+                // After reload, send_keys already fails with "stdin unavailable".
+                handle.leak_stdin();
+
                 sessions_map.insert(
                     name.clone(),
                     SessionMeta {
@@ -86,6 +96,11 @@ impl Module for ConsoleModule {
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        // Ensure the console server is running
+        if let Err(e) = manager::find_or_create_server() {
+            eprintln!("Console server startup failed: {}", e);
+        }
+
         // Restore counter
         if let Some(v) = data.get("next_session_id").and_then(|v| v.as_u64()) {
             let cs = ConsoleState::get_mut(state);
@@ -101,16 +116,16 @@ impl Module for ConsoleModule {
         };
 
         if sessions_map.is_empty() {
-            // No known sessions — kill any orphans from previous crashes
+            // No known sessions — kill any orphans on the server
             manager::kill_orphaned_processes(&std::collections::HashSet::new());
             return;
         }
 
-        // Collect known PIDs before orphan scan
-        let known_pids: std::collections::HashSet<u32> = sessions_map.values().map(|m| m.pid).collect();
+        // Collect known session keys for orphan cleanup
+        let known_keys: std::collections::HashSet<String> = sessions_map.keys().cloned().collect();
 
-        // Kill any orphaned processes from previous crashes that aren't in our saved sessions
-        manager::kill_orphaned_processes(&known_pids);
+        // Kill any server-managed sessions that aren't in our saved state
+        manager::kill_orphaned_processes(&known_keys);
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
@@ -183,7 +198,7 @@ impl Module for ConsoleModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         vec![
             ToolDefinition {
-                id: "cp_console_create".to_string(),
+                id: "console_create".to_string(),
                 name: "Create Console".to_string(),
                 short_desc: "Spawn a new process".to_string(),
                 description: "Spawns a child process and creates a console panel to monitor its output. \
@@ -191,8 +206,8 @@ impl Module for ConsoleModule {
                     Close the panel to kill the process. \
                     For one-shot commands (e.g. 'cargo build'), pass the full command directly — \
                     the panel shows output and exits when done. \
-                    For interactive shells, pass 'bash' and use cp_console_send_keys to run commands. \
-                    For long-running servers (e.g. 'npm run dev'), combine with cp_console_wait \
+                    For interactive shells, pass 'bash' and use console_send_keys to run commands. \
+                    For long-running servers (e.g. 'npm run dev'), combine with console_wait \
                     (block=false, mode='pattern') to get notified when ready."
                     .to_string(),
                 params: vec![
@@ -208,7 +223,7 @@ impl Module for ConsoleModule {
                 category: "Console".to_string(),
             },
             ToolDefinition {
-                id: "cp_console_send_keys".to_string(),
+                id: "console_send_keys".to_string(),
                 name: "Console Send Keys".to_string(),
                 short_desc: "Send input to process".to_string(),
                 description: "Sends input text to a running console's stdin. Use for interactive processes. \
@@ -232,7 +247,7 @@ impl Module for ConsoleModule {
                 category: "Console".to_string(),
             },
             ToolDefinition {
-                id: "cp_console_wait".to_string(),
+                id: "console_wait".to_string(),
                 name: "Console Wait".to_string(),
                 short_desc: "Wait for process event".to_string(),
                 description: "Registers a waiter for a console event. Two modes: \
@@ -240,6 +255,8 @@ impl Module for ConsoleModule {
                     mode='pattern': waits for a regex pattern to match in output (use for server ready messages, specific log lines). \
                     Patterns are full regex — e.g. 'Listening on port \\d+', 'error|warning', 'Finished.*target'. \
                     Falls back to literal substring match if the regex is invalid. \
+                    IMPORTANT: Include both success AND failure patterns using regex alternation (|) so you \
+                    catch errors early instead of waiting for timeout. E.g. 'ready to accept|error|panic|failed'. \
                     Two blocking modes: \
                     block=true (default): pauses tool execution until condition is met or max_wait expires. \
                     Best for sequential workflows (build then test). \
@@ -255,13 +272,35 @@ impl Module for ConsoleModule {
                         .enum_vals(&["exit", "pattern"])
                         .required(),
                     ToolParam::new("pattern", ParamType::String)
-                        .desc("Regex pattern to match in output (required when mode='pattern'). E.g. 'Finished.*target', 'error|warning', 'port \\d+'. Falls back to literal match if invalid regex."),
+                        .desc("Regex pattern to match in output (required when mode='pattern'). \
+                            Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
+                            Falls back to literal match if invalid regex."),
                     ToolParam::new("block", ParamType::Boolean)
-                        .desc("true (default): block until condition met. false: async notification via spine.")
+                        .desc("true (default): blocks tool execution until matched or timeout. false: async — spine notification on match.")
                         .default_val("true"),
                     ToolParam::new("max_wait", ParamType::Integer)
                         .desc("Max wait in seconds, 1-30 (default: 30). Only applies when block=true. On timeout, returns last output lines.")
                         .default_val("30"),
+                ],
+                enabled: true,
+                category: "Console".to_string(),
+            },
+            ToolDefinition {
+                id: "console_easy_bash".to_string(),
+                name: "Console Easy Bash".to_string(),
+                short_desc: "Run a command and return output".to_string(),
+                description: "Runs a shell command synchronously and returns stdout+stderr directly. \
+                    No server, no background process — just exec and return. \
+                    Use for debugging and quick one-off commands. \
+                    BLOCKING: freezes tool execution until command completes (max 10s, then killed). \
+                    Do NOT use for long-running or interactive commands — use console_create instead."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("command", ParamType::String)
+                        .desc("Shell command to execute (e.g., 'ls -la', 'cat /tmp/foo')")
+                        .required(),
+                    ToolParam::new("cwd", ParamType::String)
+                        .desc("Working directory (defaults to project root)"),
                 ],
                 enabled: true,
                 category: "Console".to_string(),
@@ -271,18 +310,19 @@ impl Module for ConsoleModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "cp_console_create" => Some(tools::execute_create(tool, state)),
-            "cp_console_send_keys" => Some(tools::execute_send_keys(tool, state)),
-            "cp_console_wait" => Some(tools::execute_wait(tool, state)),
+            "console_create" => Some(tools::execute_create(tool, state)),
+            "console_send_keys" => Some(tools::execute_send_keys(tool, state)),
+            "console_wait" => Some(tools::execute_wait(tool, state)),
+            "console_easy_bash" => Some(tools::execute_debug_bash(tool, state)),
             _ => None,
         }
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("cp_console_create", visualize_console_output as ToolVisualizer),
-            ("cp_console_send_keys", visualize_console_output as ToolVisualizer),
-            ("cp_console_wait", visualize_console_output as ToolVisualizer),
+            ("console_create", visualize_console_output as ToolVisualizer),
+            ("console_send_keys", visualize_console_output as ToolVisualizer),
+            ("console_wait", visualize_console_output as ToolVisualizer),
         ]
     }
 

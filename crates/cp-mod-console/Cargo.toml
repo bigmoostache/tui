@@ -3,6 +3,10 @@ name = "cp-mod-console"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "cp-console-server"
+path = "src/server/main.rs"
+
 [dependencies]
 cp-base.workspace = true
 ratatui.workspace = true
@@ -10,3 +14,4 @@ crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex.workspace = true
+libc = "0.2"

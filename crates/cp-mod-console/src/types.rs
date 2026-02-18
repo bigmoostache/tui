@@ -58,6 +58,8 @@ pub struct ConsoleWaiter {
     pub registered_ms: u64,
     /// Deadline for blocking waiters (ms since epoch). None for async waiters.
     pub deadline_ms: Option<u64>,
+    /// If true, this waiter was created by debug_bash — clean up session after completion.
+    pub is_debug_bash: bool,
 }
 
 /// Result of a completed async wait (ready for spine notification).
@@ -136,13 +138,33 @@ impl ConsoleState {
         // Check blocking waiters (now cs is dropped, we can borrow state freely)
         let now = now_ms();
         let mut remaining_blocking = Vec::new();
+        let mut debug_bash_cleanup = Vec::new();
         for waiter in blocking_waiters {
             // Check if condition is satisfied FIRST (before timeout check)
             // to avoid race where pattern arrives in the same poll cycle as deadline
             let cs = Self::get(state);
             if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
                 if let Some(ref id) = waiter.tool_use_id {
-                    satisfied_blocking.push((id.clone(), result));
+                    if waiter.is_debug_bash {
+                        // For easy_bash: read log file directly (buffer may lag behind)
+                        let output = cs.sessions.get(&waiter.session_name)
+                            .map(|h| std::fs::read_to_string(&h.log_path).unwrap_or_default())
+                            .unwrap_or_default();
+                        let exit_code = cs.sessions.get(&waiter.session_name)
+                            .and_then(|h| h.get_status().exit_code())
+                            .unwrap_or(-1);
+                        let trimmed = output.trim();
+                        if trimmed.is_empty() {
+                            satisfied_blocking.push((id.clone(), format!("exit_code: {}\n(no output)", exit_code)));
+                        } else {
+                            satisfied_blocking.push((id.clone(), format!("{}", trimmed)));
+                        }
+                    } else {
+                        satisfied_blocking.push((id.clone(), result));
+                    }
+                }
+                if waiter.is_debug_bash {
+                    debug_bash_cleanup.push(waiter.session_name.clone());
                 }
                 continue;
             }
@@ -166,6 +188,9 @@ impl ConsoleState {
                                 waiter.session_name, elapsed_s, panel_id, last_lines
                             ),
                         ));
+                    }
+                    if waiter.is_debug_bash {
+                        debug_bash_cleanup.push(waiter.session_name.clone());
                     }
                     continue;
                 }
@@ -221,6 +246,16 @@ impl ConsoleState {
         cs.blocking_waiters = remaining_blocking;
         cs.async_waiters = remaining_async;
         cs.completed_async.extend(new_completed);
+
+        // Clean up debug_bash sessions (no panel, no persistence needed)
+        for key in debug_bash_cleanup {
+            let cs = Self::get_mut(state);
+            if let Some(handle) = cs.sessions.remove(&key) {
+                handle.kill();
+                let log = handle.log_path.clone();
+                let _ = std::fs::remove_file(&log);
+            }
+        }
 
         satisfied_blocking
     }

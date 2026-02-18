@@ -9,6 +9,9 @@ use crate::types::{ConsoleState, ConsoleWaiter, format_wait_result};
 /// The binary's event loop replaces this with the real result when satisfied.
 pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 
+/// Maximum execution time for debug_bash (blocking tool — must be short).
+const BASH_MAX_EXECUTION_SECS: u64 = 10;
+
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
 /// Returns (session_key, panel_id) or an error.
 fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
@@ -190,6 +193,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         tool_use_id: Some(tool.id.clone()),
         registered_ms: now,
         deadline_ms: if block { Some(now + max_wait * 1000) } else { None },
+        is_debug_bash: false,
     };
 
     if block {
@@ -201,4 +205,46 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         cs.async_waiters.push(waiter);
         ToolResult::new(tool.id.clone(), format!("Watcher registered for '{}'", panel_id), false)
     }
+}
+
+pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let command = match tool.input.get("command").and_then(|v| v.as_str()) {
+        Some(c) => c.to_string(),
+        None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
+    };
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+    // Spawn via the console server (non-blocking to the main loop)
+    let session_key = {
+        let cs = ConsoleState::get_mut(state);
+        let key = format!("c_{}", cs.next_session_id);
+        cs.next_session_id += 1;
+        key
+    };
+
+    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd) {
+        Ok(h) => h,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
+    };
+
+    // Store the handle (needed for waiter to check status + read buffer)
+    let cs = ConsoleState::get_mut(state);
+    cs.sessions.insert(session_key.clone(), handle);
+
+    // Register a blocking exit waiter with BASH_MAX_EXECUTION_SECS timeout
+    let now = now_ms();
+    let waiter = ConsoleWaiter {
+        session_name: session_key,
+        mode: "exit".to_string(),
+        pattern: None,
+        blocking: true,
+        tool_use_id: Some(tool.id.clone()),
+        registered_ms: now,
+        deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
+        is_debug_bash: true,
+    };
+    let cs = ConsoleState::get_mut(state);
+    cs.blocking_waiters.push(waiter);
+
+    ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
 }

@@ -241,6 +241,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "crossterm",
+ "libc",
  "ratatui",
  "regex",
  "serde",

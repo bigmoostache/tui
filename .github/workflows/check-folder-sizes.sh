@@ -13,6 +13,7 @@ while IFS= read -r dir; do
   fi
 done < <(find . -mindepth 1 -type d \
   -not -path './target/*' \
+  -not -path '*/target/*' \
   -not -path './.git' \
   -not -path './.git/*' \
   -not -path './crates' \
