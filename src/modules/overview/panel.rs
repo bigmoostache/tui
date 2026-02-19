@@ -45,6 +45,9 @@ impl Panel for OverviewPanel {
     }
 
     fn refresh(&self, state: &mut State) {
+        // Refresh git status (branch, file changes) before generating context
+        cp_mod_git::refresh_git_status(state);
+
         let content = self.generate_context_content(state);
         let token_count = crate::state::estimate_tokens(&content);
 

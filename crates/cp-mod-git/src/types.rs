@@ -1,11 +1,31 @@
 use cp_base::state::State;
 
+// === Git change types ===
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitChangeType {
+    Modified,
+    Added,
+    Untracked,
+    Deleted,
+    Renamed,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitFileChange {
+    pub path: String,
+    pub additions: i32,
+    pub deletions: i32,
+    pub change_type: GitChangeType,
+}
+
 // === Module-owned state ===
 
 pub struct GitState {
     pub git_branch: Option<String>,
     pub git_branches: Vec<(String, bool)>,
     pub git_is_repo: bool,
+    pub git_file_changes: Vec<GitFileChange>,
     pub git_diff_base: Option<String>,
 }
 
@@ -21,6 +41,7 @@ impl GitState {
             git_branch: None,
             git_branches: vec![],
             git_is_repo: false,
+            git_file_changes: vec![],
             git_diff_base: None,
         }
     }

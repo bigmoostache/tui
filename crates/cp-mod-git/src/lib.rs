@@ -4,7 +4,134 @@ mod result_panel;
 mod tools;
 pub mod types;
 
-pub use types::{GitState};
+pub use types::{GitChangeType, GitFileChange, GitState};
+
+/// Refresh git status (branch, file changes) into GitState.
+/// Called periodically by the overview panel to keep stats up to date.
+pub fn refresh_git_status(state: &mut State) {
+    use std::process::Command;
+    use types::GitChangeType;
+
+    // Check if git repo
+    let is_repo = Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let gs = GitState::get_mut(state);
+    gs.git_is_repo = is_repo;
+
+    if !is_repo {
+        gs.git_branch = None;
+        gs.git_branches = vec![];
+        gs.git_file_changes = vec![];
+        return;
+    }
+
+    // Get current branch
+    if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output() {
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if branch.is_empty() {
+            // Detached HEAD
+            if let Ok(o2) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
+                gs.git_branch = Some(format!("detached:{}", String::from_utf8_lossy(&o2.stdout).trim()));
+            }
+        } else {
+            gs.git_branch = Some(branch);
+        }
+    }
+
+    // Get file changes with numstat
+    let diff_base = gs.git_diff_base.clone();
+    let diff_args = if let Some(ref base) = diff_base {
+        vec!["diff", "--numstat", base.as_str()]
+    } else {
+        vec!["diff", "--numstat", "HEAD"]
+    };
+
+    let mut file_changes: Vec<GitFileChange> = Vec::new();
+
+    // Tracked changes (diff against HEAD or base)
+    if let Ok(output) = Command::new("git").args(&diff_args).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() >= 3 {
+                    let additions = parts[0].parse::<i32>().unwrap_or(0);
+                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                    let path = parts[2].to_string();
+
+                    // Check if file exists to determine if deleted
+                    let change_type = if !std::path::Path::new(&path).exists() {
+                        GitChangeType::Deleted
+                    } else {
+                        GitChangeType::Modified
+                    };
+
+                    file_changes.push(GitFileChange {
+                        path,
+                        additions,
+                        deletions,
+                        change_type,
+                    });
+                }
+            }
+        }
+    }
+
+    // Staged changes (diff --cached)
+    if let Ok(output) = Command::new("git").args(["diff", "--numstat", "--cached"]).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() >= 3 {
+                    let additions = parts[0].parse::<i32>().unwrap_or(0);
+                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                    let path = parts[2].to_string();
+
+                    // Skip if already in the list
+                    if file_changes.iter().any(|f| f.path == path) {
+                        continue;
+                    }
+
+                    file_changes.push(GitFileChange {
+                        path,
+                        additions,
+                        deletions,
+                        change_type: GitChangeType::Added,
+                    });
+                }
+            }
+        }
+    }
+
+    // Untracked files
+    if let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let path = line.trim().to_string();
+                if path.is_empty() {
+                    continue;
+                }
+                // Count lines for untracked files
+                let line_count = std::fs::read_to_string(&path)
+                    .map(|c| c.lines().count() as i32)
+                    .unwrap_or(0);
+
+                file_changes.push(GitFileChange {
+                    path,
+                    additions: line_count,
+                    deletions: 0,
+                    change_type: GitChangeType::Untracked,
+                });
+            }
+        }
+    }
+
+    let gs = GitState::get_mut(state);
+    gs.git_file_changes = file_changes;
+}
 
 
 /// Timeout for git commands (seconds)
@@ -143,6 +270,31 @@ impl Module for GitModule {
         let mut output = String::new();
         if let Some(branch) = &gs.git_branch {
             output.push_str(&format!("\nGit Branch: {}\n", branch));
+        }
+        if gs.git_file_changes.is_empty() {
+            output.push_str("Git Status: Working tree clean\n");
+        } else {
+            output.push_str("\nGit Changes:\n\n");
+            output.push_str("| File | + | - | Net |\n");
+            output.push_str("|------|---|---|-----|\n");
+            let mut total_add: i32 = 0;
+            let mut total_del: i32 = 0;
+            for file in &gs.git_file_changes {
+                total_add += file.additions;
+                total_del += file.deletions;
+                let net = file.additions - file.deletions;
+                let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+                output.push_str(&format!(
+                    "| {} | +{} | -{} | {} |\n",
+                    file.path, file.additions, file.deletions, net_str
+                ));
+            }
+            let total_net = total_add - total_del;
+            let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+            output.push_str(&format!(
+                "| **Total** | **+{}** | **-{}** | **{}** |\n",
+                total_add, total_del, total_net_str
+            ));
         }
         Some(output)
     }

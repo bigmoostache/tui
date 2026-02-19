@@ -128,6 +128,81 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
+    // Git change stats (if there are any changes)
+    if !gs.git_file_changes.is_empty() {
+        use cp_mod_git::GitChangeType;
+
+        let mut total_additions: i32 = 0;
+        let mut total_deletions: i32 = 0;
+        let mut untracked_count = 0;
+        let mut modified_count = 0;
+        let mut deleted_count = 0;
+
+        for file in &gs.git_file_changes {
+            total_additions += file.additions;
+            total_deletions += file.deletions;
+            match file.change_type {
+                GitChangeType::Untracked => untracked_count += 1,
+                GitChangeType::Modified => modified_count += 1,
+                GitChangeType::Deleted => deleted_count += 1,
+                GitChangeType::Added => modified_count += 1,
+                GitChangeType::Renamed => modified_count += 1,
+            }
+        }
+
+        let net_change = total_additions - total_deletions;
+
+        // Line changes card: +N/-N/net
+        let (net_prefix, net_value) = if net_change >= 0 { ("+", net_change) } else { ("", net_change) };
+
+        spans.push(Span::styled(" +", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            format!("{}", total_additions),
+            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
+        ));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("-", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            format!("{}", total_deletions),
+            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
+        ));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            net_prefix,
+            Style::default()
+                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
+                .bg(theme::bg_elevated()),
+        ));
+        spans.push(Span::styled(
+            format!("{} ", net_value.abs()),
+            Style::default()
+                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
+                .bg(theme::bg_elevated())
+                .bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+
+        // File changes card: U/M/D
+        spans.push(Span::styled(" U", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            format!("{}", untracked_count),
+            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
+        ));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("M", Style::default().fg(theme::warning()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            format!("{}", modified_count),
+            Style::default().fg(theme::warning()).bg(theme::bg_elevated()).bold(),
+        ));
+        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
+        spans.push(Span::styled("D", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(
+            format!("{} ", deleted_count),
+            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     // Auto-continuation status card (always visible)
     {
         use crate::infra::config::normalize_icon;

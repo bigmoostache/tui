@@ -89,7 +89,7 @@ pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>
     text
 }
 
-/// Render the GIT STATUS section (branch only).
+/// Render the GIT STATUS section (branch + file changes summary table).
 pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
     let gs = cp_mod_git::GitState::get(state);
@@ -112,6 +112,86 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
             Span::styled("Branch: ".to_string(), Style::default().fg(theme::text_secondary())),
             Span::styled(branch.clone(), Style::default().fg(branch_color).bold()),
         ]));
+    }
+
+    if gs.git_file_changes.is_empty() {
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
+        ]));
+    } else {
+        text.push(Line::from(""));
+
+        use cp_mod_git::GitChangeType;
+
+        let mut total_add: i32 = 0;
+        let mut total_del: i32 = 0;
+
+        let header = [
+            Cell::new("File", Style::default()),
+            Cell::right("+", Style::default()),
+            Cell::right("-", Style::default()),
+            Cell::right("Net", Style::default()),
+        ];
+
+        let rows: Vec<Vec<Cell>> = gs
+            .git_file_changes
+            .iter()
+            .map(|file| {
+                total_add += file.additions;
+                total_del += file.deletions;
+                let net = file.additions - file.deletions;
+
+                let type_char = match file.change_type {
+                    GitChangeType::Added => "A",
+                    GitChangeType::Untracked => "U",
+                    GitChangeType::Deleted => "D",
+                    GitChangeType::Modified => "M",
+                    GitChangeType::Renamed => "R",
+                };
+
+                let display_path = if file.path.len() > 38 {
+                    format!("{}...{}", type_char, &file.path[file.path.len() - 35..])
+                } else {
+                    format!("{} {}", type_char, file.path)
+                };
+
+                let net_color = if net > 0 {
+                    theme::success()
+                } else if net < 0 {
+                    theme::error()
+                } else {
+                    theme::text_muted()
+                };
+                let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
+
+                vec![
+                    Cell::new(display_path, Style::default().fg(theme::text())),
+                    Cell::right(format!("+{}", file.additions), Style::default().fg(theme::success())),
+                    Cell::right(format!("-{}", file.deletions), Style::default().fg(theme::error())),
+                    Cell::right(net_str, Style::default().fg(net_color)),
+                ]
+            })
+            .collect();
+
+        let total_net = total_add - total_del;
+        let total_net_color = if total_net > 0 {
+            theme::success()
+        } else if total_net < 0 {
+            theme::error()
+        } else {
+            theme::text_muted()
+        };
+        let total_net_str = if total_net > 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+
+        let footer = [
+            Cell::new("Total", Style::default().fg(theme::text())),
+            Cell::right(format!("+{}", total_add), Style::default().fg(theme::success())),
+            Cell::right(format!("-{}", total_del), Style::default().fg(theme::error())),
+            Cell::right(total_net_str, Style::default().fg(total_net_color)),
+        ];
+
+        text.extend(render_table(&header, &rows, Some(&footer), 1));
     }
 
     text
