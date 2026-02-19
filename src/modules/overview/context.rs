@@ -2,7 +2,7 @@ use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
 
 /// Estimate tokens for all enabled tool definitions as they'd appear in the API request.
-fn estimate_tool_definitions_tokens(state: &State) -> usize {
+pub fn estimate_tool_definitions_tokens(state: &State) -> usize {
     let mut total = 0;
     for tool in &state.tools {
         if !tool.enabled {
