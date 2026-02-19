@@ -158,10 +158,11 @@ impl Module for FilesModule {
     }
 }
 
-/// Visualizer for file_edit and Write tool results.
+/// Visualizer for Edit and Write tool results.
+/// Also reused by cp-mod-prompt for Edit_prompt.
 /// Parses ```diff blocks and renders deleted lines in red, added lines in green.
 /// Non-diff content is rendered in secondary text color.
-fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
 
     let error_color = Color::Rgb(255, 85, 85);

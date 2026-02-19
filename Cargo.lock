@@ -347,6 +347,7 @@ name = "cp-mod-prompt"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-mod-files",
  "crossterm",
  "ratatui",
  "serde",
