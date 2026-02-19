@@ -36,7 +36,9 @@ pub struct PromptState {
     pub skills: Vec<PromptItem>,
     pub loaded_skill_ids: Vec<String>,
     pub commands: Vec<PromptItem>,
-    pub library_preview: Option<(PromptType, String)>,
+    /// ID of the prompt currently open in the Library editor (for editing).
+    /// Max one at a time. Edit_prompt requires this to be set.
+    pub open_prompt_id: Option<String>,
 }
 
 impl Default for PromptState {
@@ -53,7 +55,7 @@ impl PromptState {
             skills: vec![],
             loaded_skill_ids: vec![],
             commands: vec![],
-            library_preview: None,
+            open_prompt_id: None,
         }
     }
     pub fn get(state: &State) -> &Self {

@@ -50,7 +50,6 @@ impl Module for PromptModule {
         json!({
             "active_agent_id": ps.active_agent_id,
             "loaded_skill_ids": ps.loaded_skill_ids,
-            "library_preview": ps.library_preview,
         })
     }
 
@@ -69,11 +68,6 @@ impl Module for PromptModule {
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ps.loaded_skill_ids = v;
-        }
-        if let Some(v) = data.get("library_preview")
-            && let Ok(lp) = serde_json::from_value(v.clone())
-        {
-            ps.library_preview = lp;
         }
     }
 
@@ -197,6 +191,31 @@ impl Module for PromptModule {
                 enabled: true,
                 category: "Skill".to_string(),
             },
+            // === Library editor tools ===
+            ToolDefinition {
+                id: "Library_open_prompt_editor".to_string(),
+                name: "Open Prompt Editor".to_string(),
+                short_desc: "Open prompt in editor".to_string(),
+                description: "Opens a prompt's content in the Library panel for reading and editing. \
+                    Required before using Edit_prompt. Max one prompt open at a time — opening a new one \
+                    closes the previous. The Library panel will show the prompt content with a warning banner."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID to open").required(),
+                ],
+                enabled: true,
+                category: "Agent".to_string(),
+            },
+            ToolDefinition {
+                id: "Library_close_prompt_editor".to_string(),
+                name: "Close Prompt Editor".to_string(),
+                short_desc: "Close prompt editor".to_string(),
+                description: "Closes the prompt editor in the Library panel, restoring the normal library view."
+                    .to_string(),
+                params: vec![],
+                enabled: true,
+                category: "Agent".to_string(),
+            },
             // === Command tools ===
             ToolDefinition {
                 id: "command_create".to_string(),
@@ -233,6 +252,8 @@ impl Module for PromptModule {
         vec![
             ("agent_create", visualize_prompt_output as ToolVisualizer),
             ("Edit_prompt", cp_mod_files::visualize_diff as ToolVisualizer),
+            ("Library_open_prompt_editor", visualize_prompt_output as ToolVisualizer),
+            ("Library_close_prompt_editor", visualize_prompt_output as ToolVisualizer),
             ("agent_delete", visualize_prompt_output as ToolVisualizer),
             ("agent_load", visualize_prompt_output as ToolVisualizer),
             ("skill_create", visualize_prompt_output as ToolVisualizer),

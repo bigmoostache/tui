@@ -41,6 +41,24 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         );
     };
 
+    // Check that the prompt is open in the Library editor
+    let is_open = PromptState::get(state).open_prompt_id.as_deref() == Some(id);
+    if !is_open {
+        // Auto-open the prompt and fail with a helpful message
+        PromptState::get_mut(state).open_prompt_id = Some(id.to_string());
+        state.touch_panel(ContextType::new(ContextType::LIBRARY));
+        return ToolResult::new(
+            tool.id.clone(),
+            format!(
+                "Cannot edit '{}': prompt was not open in the Library editor.\n\
+                 I've automatically opened it for you — its content is now visible in the Library panel.\n\
+                 Please review the content and retry your Edit_prompt call.",
+                id
+            ),
+            true,
+        );
+    }
+
     // Get the item and check if builtin
     let ps = PromptState::get(state);
     let (is_builtin, current_content) = match entity_type {

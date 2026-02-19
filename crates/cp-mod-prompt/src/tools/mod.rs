@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod command;
 pub mod edit_prompt;
+pub mod library_editor;
 pub mod skill;
 
 use cp_base::state::State;
@@ -18,6 +19,8 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         "command_create" => Some(command::create(tool, state)),
         "command_delete" => Some(command::delete(tool, state)),
         "Edit_prompt" => Some(edit_prompt::execute(tool, state)),
+        "Library_open_prompt_editor" => Some(library_editor::open_editor(tool, state)),
+        "Library_close_prompt_editor" => Some(library_editor::close_editor(tool, state)),
         _ => None,
     }
 }
