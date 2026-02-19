@@ -12,6 +12,45 @@ pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 /// Maximum execution time for debug_bash (blocking tool — must be short).
 const BASH_MAX_EXECUTION_SECS: u64 = 10;
 
+/// Check if a command string contains git or gh commands.
+/// Returns Some(error_message) if blocked, None if allowed.
+fn check_git_gh_guardrail(input: &str) -> Option<String> {
+    // Split on shell operators to handle chained commands
+    let segments: Vec<&str> = input.split(|c| c == '|' || c == ';' || c == '&' || c == '\n')
+        .collect();
+
+    for segment in &segments {
+        let trimmed = segment.trim();
+        // Skip empty segments
+        if trimmed.is_empty() {
+            continue;
+        }
+        // Strip leading env vars (KEY=VAL) to find the actual command
+        let cmd_part = trimmed.split_whitespace()
+            .skip_while(|w| w.contains('=') && !w.starts_with('='))
+            .next()
+            .unwrap_or("");
+
+        // Check the actual binary name (could be a path like /usr/bin/git)
+        let binary = cmd_part.rsplit('/').next().unwrap_or(cmd_part);
+
+        if binary == "git" {
+            return Some(
+                "Blocked: use the `git_execute` tool instead of running git through console.\n\
+                 Example: git_execute with command=\"git status\"".to_string()
+            );
+        }
+        if binary == "gh" {
+            return Some(
+                "Blocked: use the `gh_execute` tool instead of running gh through console.\n\
+                 Example: gh_execute with command=\"gh pr list\"".to_string()
+            );
+        }
+    }
+
+    None
+}
+
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
 /// Returns (session_key, panel_id) or an error.
 fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
@@ -28,6 +67,12 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(c) => c.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
     };
+
+    // Guardrail: block git/gh commands
+    if let Some(msg) = check_git_gh_guardrail(&command) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
+
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
     let description = tool.input.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
 
@@ -84,6 +129,11 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(i) => i.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'input' parameter".to_string(), true),
     };
+
+    // Guardrail: block git/gh commands sent to interactive shells
+    if let Some(msg) = check_git_gh_guardrail(&input) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
 
     let session_key = match resolve_session_key(state, &panel_id) {
         Ok(k) => k,
@@ -212,6 +262,12 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(c) => c.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
     };
+
+    // Guardrail: block git/gh commands
+    if let Some(msg) = check_git_gh_guardrail(&command) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
+
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     // Spawn via the console server (non-blocking to the main loop)

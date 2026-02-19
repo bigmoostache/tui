@@ -283,31 +283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cp-mod-glob"
-version = "0.1.0"
-dependencies = [
- "cp-base",
- "crossterm",
- "globset",
- "ignore",
- "ratatui",
- "serde_json",
-]
-
-[[package]]
-name = "cp-mod-grep"
-version = "0.1.0"
-dependencies = [
- "cp-base",
- "crossterm",
- "globset",
- "ignore",
- "ratatui",
- "regex",
- "serde_json",
-]
-
-[[package]]
 name = "cp-mod-logs"
 version = "0.1.0"
 dependencies = [
@@ -2690,8 +2665,6 @@ dependencies = [
  "cp-mod-files",
  "cp-mod-git",
  "cp-mod-github",
- "cp-mod-glob",
- "cp-mod-grep",
  "cp-mod-logs",
  "cp-mod-memory",
  "cp-mod-preset",

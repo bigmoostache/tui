@@ -13,8 +13,6 @@ use crate::infra::tools::{ToolResult, ToolUse};
 pub use cp_mod_files::FilesModule;
 pub use cp_mod_git::GitModule;
 pub use cp_mod_github::GithubModule;
-pub use cp_mod_glob::GlobModule;
-pub use cp_mod_grep::GrepModule;
 pub use cp_mod_logs::LogsModule;
 pub use cp_mod_memory::MemoryModule;
 pub use cp_mod_preset::PresetModule;
@@ -80,8 +78,6 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(TreeModule),
         Box::new(GitModule),
         Box::new(GithubModule),
-        Box::new(GlobModule),
-        Box::new(GrepModule),
         Box::new(ConsoleModule),
         Box::new(TodoModule),
         Box::new(MemoryModule),
