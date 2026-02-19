@@ -1,4 +1,4 @@
-mod context;
+pub mod context;
 mod panel;
 mod render;
 mod render_details;
