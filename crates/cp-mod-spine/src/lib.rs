@@ -56,10 +56,14 @@ impl Module for SpineModule {
         // Sort by ID number to maintain order
         to_save.sort_by_key(|n| n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0));
 
+        // Collect pending coucou watchers for persistence
+        let pending_coucous = coucou::collect_pending_coucous(state);
+
         json!({
             "notifications": to_save,
             "next_notification_id": ss.next_notification_id,
             "spine_config": ss.config,
+            "pending_coucous": pending_coucous,
         })
     }
 
@@ -79,6 +83,25 @@ impl Module for SpineModule {
         }
         // Prune stale processed notifications on load too
         prune_notifications(&mut SpineState::get_mut(state).notifications);
+
+        // Restore pending coucou watchers into the WatcherRegistry
+        if let Some(coucous) = data.get("pending_coucous")
+            && let Ok(coucou_list) = serde_json::from_value::<Vec<coucou::CoucouData>>(coucous.clone())
+        {
+            let now = cp_base::panels::now_ms();
+            let registry = cp_base::watchers::WatcherRegistry::get_mut(state);
+            for cd in coucou_list {
+                // Only re-register if the coucou hasn't already expired
+                if cd.fire_at_ms > now {
+                    registry.register(Box::new(cd.into_watcher()));
+                }
+                // If it expired during reload, it will fire on next poll_all
+                // and create a notification — which is the desired behavior
+                else {
+                    registry.register(Box::new(cd.into_watcher()));
+                }
+            }
+        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

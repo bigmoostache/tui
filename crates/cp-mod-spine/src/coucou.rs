@@ -4,10 +4,59 @@
 //! - `timer`: fire after a delay (e.g. "5m", "1h30m", "90s")
 //! - `datetime`: fire at a specific time (ISO 8601)
 
+use serde::{Deserialize, Serialize};
+
 use cp_base::panels::now_ms;
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_base::watchers::{Watcher, WatcherRegistry, WatcherResult};
+
+// ============================================================
+// Persistable coucou data — saved in worker JSON via SpineState
+// ============================================================
+
+/// Serializable coucou record. Stored in SpineState.pending_coucous
+/// and re-registered into WatcherRegistry on load.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoucouData {
+    pub watcher_id: String,
+    pub message: String,
+    pub registered_at_ms: u64,
+    pub fire_at_ms: u64,
+}
+
+impl CoucouData {
+    /// Convert into a live CoucouWatcher and register in WatcherRegistry.
+    pub fn into_watcher(self) -> CoucouWatcher {
+        let desc = format!("🔔 Coucou: \"{}\"", self.message);
+        CoucouWatcher {
+            watcher_id: self.watcher_id,
+            message: self.message,
+            registered_at_ms: self.registered_at_ms,
+            fire_at_ms: self.fire_at_ms,
+            desc,
+        }
+    }
+}
+
+/// Collect all active CoucouWatcher data from the WatcherRegistry
+/// for persistence. Filters by source_tag == "coucou".
+pub fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
+    let registry = WatcherRegistry::get(state);
+    registry
+        .active_watchers()
+        .iter()
+        .filter(|w| w.source_tag() == "coucou")
+        .filter_map(|w| {
+            Some(CoucouData {
+                watcher_id: w.id().to_string(),
+                message: w.message()?.to_string(),
+                registered_at_ms: w.registered_ms(),
+                fire_at_ms: w.fire_at_ms()?,
+            })
+        })
+        .collect()
+}
 
 /// Parse a human-friendly duration string into milliseconds.
 /// Supports: "30s", "5m", "1h", "1h30m", "2h15m30s", "90s", "120"
@@ -194,6 +243,14 @@ impl Watcher for CoucouWatcher {
 
     fn source_tag(&self) -> &str {
         "coucou"
+    }
+
+    fn fire_at_ms(&self) -> Option<u64> {
+        Some(self.fire_at_ms)
+    }
+
+    fn message(&self) -> Option<&str> {
+        Some(&self.message)
     }
 }
 

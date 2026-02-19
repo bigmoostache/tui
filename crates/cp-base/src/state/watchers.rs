@@ -60,6 +60,19 @@ pub trait Watcher: Send + Sync {
     fn is_easy_bash(&self) -> bool {
         false
     }
+
+    /// Target fire time in ms since epoch (for time-based watchers like coucou).
+    /// Returns None for condition-based watchers (console exit/pattern).
+    /// Used for persistence across reloads.
+    fn fire_at_ms(&self) -> Option<u64> {
+        None
+    }
+
+    /// Human-readable message payload (for watchers that carry a message).
+    /// Used for persistence across reloads.
+    fn message(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Registry holding active watchers. Stored in State via TypeMap.
