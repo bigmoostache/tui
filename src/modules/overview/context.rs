@@ -53,22 +53,11 @@ pub fn generate_context_content(state: &State) -> String {
         assistant_msgs
     ));
 
-    // Module-specific overview sections (todos, memories, presets, git, etc.)
+    // Module-specific overview sections (todos, memories, git status, etc.)
     for module in &modules {
         if let Some(section) = module.overview_context_section(state) {
             output.push_str(&section);
         }
-    }
-
-    // Tools table (markdown format for LLM)
-    let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
-    output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
-    output.push_str("| Category | Tool | Status | Description |\n");
-    output.push_str("|----------|------|--------|-------------|\n");
-    for tool in &state.tools {
-        let status = if tool.enabled { "\u{2713}" } else { "\u{2717}" };
-        output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc));
     }
 
     output

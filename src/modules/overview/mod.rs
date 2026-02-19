@@ -3,6 +3,7 @@ mod panel;
 mod render;
 mod render_details;
 mod tools;
+mod tools_panel;
 
 use serde_json::json;
 
@@ -13,6 +14,7 @@ use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
 
 use self::panel::OverviewPanel;
+use self::tools_panel::ToolsPanel;
 use super::Module;
 
 pub struct OverviewModule;
@@ -141,11 +143,14 @@ impl Module for OverviewModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::OVERVIEW)]
+        vec![ContextType::new(ContextType::OVERVIEW), ContextType::new(ContextType::TOOLS)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
+        vec![
+            (ContextType::new(ContextType::OVERVIEW), "Statistics", false),
+            (ContextType::new(ContextType::TOOLS), "Configuration", false),
+        ]
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -167,12 +172,23 @@ impl Module for OverviewModule {
                 short_name: "world",
                 needs_async_wait: false,
             },
+            ContextTypeMeta {
+                context_type: "tools",
+                icon_id: "overview",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(3),
+                display_name: "tools",
+                short_name: "tools",
+                needs_async_wait: false,
+            },
         ]
     }
 
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
             ContextType::OVERVIEW => Some(Box::new(OverviewPanel)),
+            ContextType::TOOLS => Some(Box::new(ToolsPanel)),
             _ => None,
         }
     }

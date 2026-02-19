@@ -222,10 +222,27 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd) {
+    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
         Ok(h) => h,
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
     };
+
+    // Create a panel so output goes there instead of flooding the conversation
+    let display_name = if command.len() > 30 { &command[..30] } else { &command };
+    let panel_id = state.next_available_context_id();
+    let uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid += 1;
+    let mut ctx =
+        make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    ctx.uid = Some(uid);
+    ctx.set_meta("console_name", &session_key);
+    ctx.set_meta("console_command", &command);
+    ctx.set_meta("console_status", &handle.get_status().label());
+    ctx.set_meta("console_is_easy_bash", &"true".to_string());
+    if let Some(ref dir) = cwd {
+        ctx.set_meta("console_cwd", dir);
+    }
+    state.context.push(ctx);
 
     // Store the handle (needed for waiter to check status + read buffer)
     let cs = ConsoleState::get_mut(state);

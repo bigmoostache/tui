@@ -138,7 +138,6 @@ impl ConsoleState {
         // Check blocking waiters (now cs is dropped, we can borrow state freely)
         let now = now_ms();
         let mut remaining_blocking = Vec::new();
-        let mut debug_bash_cleanup = Vec::new();
         for waiter in blocking_waiters {
             // Check if condition is satisfied FIRST (before timeout check)
             // to avoid race where pattern arrives in the same poll cycle as deadline
@@ -153,19 +152,18 @@ impl ConsoleState {
                         let exit_code = cs.sessions.get(&waiter.session_name)
                             .and_then(|h| h.get_status().exit_code())
                             .unwrap_or(-1);
-                        let trimmed = output.trim();
-                        if trimmed.is_empty() {
-                            satisfied_blocking.push((id.clone(), format!("exit_code: {}\n(no output)", exit_code)));
-                        } else {
-                            satisfied_blocking.push((id.clone(), format!("{}", trimmed)));
-                        }
+                        let line_count = output.lines().count();
+                        let panel_id = find_panel_id_for_session(&waiter.session_name, &state.context);
+                        // Return a short summary pointing to the panel instead of full output
+                        satisfied_blocking.push((id.clone(), format!(
+                            "Output in {} ({} lines, exit_code={})",
+                            panel_id, line_count, exit_code
+                        )));
                     } else {
                         satisfied_blocking.push((id.clone(), result));
                     }
                 }
-                if waiter.is_debug_bash {
-                    debug_bash_cleanup.push(waiter.session_name.clone());
-                }
+                // debug_bash panels are kept alive (output visible in panel)
                 continue;
             }
 
@@ -174,23 +172,31 @@ impl ConsoleState {
                 if now >= deadline {
                     if let Some(ref id) = waiter.tool_use_id {
                         let panel_id = find_panel_id_for_session(&waiter.session_name, &state.context);
-                        let cs = Self::get(state);
-                        let last_lines = cs
-                            .sessions
-                            .get(&waiter.session_name)
-                            .map(|h| h.buffer.last_n_lines(5))
-                            .unwrap_or_default();
-                        let elapsed_s = (now - waiter.registered_ms) / 1000;
-                        satisfied_blocking.push((
-                            id.clone(),
-                            format!(
-                                "Console '{}' wait TIMED OUT after {}s (panel={})\nLast output:\n{}",
-                                waiter.session_name, elapsed_s, panel_id, last_lines
-                            ),
-                        ));
-                    }
-                    if waiter.is_debug_bash {
-                        debug_bash_cleanup.push(waiter.session_name.clone());
+                        if waiter.is_debug_bash {
+                            let elapsed_s = (now - waiter.registered_ms) / 1000;
+                            satisfied_blocking.push((
+                                id.clone(),
+                                format!(
+                                    "Output in {} (TIMED OUT after {}s, process may still be running)",
+                                    panel_id, elapsed_s
+                                ),
+                            ));
+                        } else {
+                            let cs = Self::get(state);
+                            let last_lines = cs
+                                .sessions
+                                .get(&waiter.session_name)
+                                .map(|h| h.buffer.last_n_lines(5))
+                                .unwrap_or_default();
+                            let elapsed_s = (now - waiter.registered_ms) / 1000;
+                            satisfied_blocking.push((
+                                id.clone(),
+                                format!(
+                                    "Console '{}' wait TIMED OUT after {}s (panel={})\nLast output:\n{}",
+                                    waiter.session_name, elapsed_s, panel_id, last_lines
+                                ),
+                            ));
+                        }
                     }
                     continue;
                 }
@@ -246,16 +252,6 @@ impl ConsoleState {
         cs.blocking_waiters = remaining_blocking;
         cs.async_waiters = remaining_async;
         cs.completed_async.extend(new_completed);
-
-        // Clean up debug_bash sessions (no panel, no persistence needed)
-        for key in debug_bash_cleanup {
-            let cs = Self::get_mut(state);
-            if let Some(handle) = cs.sessions.remove(&key) {
-                handle.kill();
-                let log = handle.log_path.clone();
-                let _ = std::fs::remove_file(&log);
-            }
-        }
 
         satisfied_blocking
     }

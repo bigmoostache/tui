@@ -275,4 +275,4 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
     text
 }
 
-pub use super::render_details::{render_presets, render_seeds, render_statistics, render_tools};
+pub use super::render_details::render_statistics;
