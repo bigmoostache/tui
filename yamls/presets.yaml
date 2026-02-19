@@ -56,7 +56,7 @@ presets:
       - tree
       - memory
     disabled_tools:
-      - file_edit
+      - Edit
       - file_create
       - file_batch_create
       - git_commit
@@ -95,7 +95,7 @@ presets:
       - memory
       - scratchpad
     disabled_tools:
-      - file_edit
+      - Edit
       - file_create
       - file_batch_create
       - git_commit

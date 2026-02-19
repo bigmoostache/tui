@@ -197,7 +197,7 @@ impl Module for OverviewModule {
         let mut defs = vec![
             // Context tools
             ToolDefinition {
-                id: "context_close".to_string(),
+                id: "Close_panel".to_string(),
                 name: "Close Contexts".to_string(),
                 short_desc: "Remove items from context".to_string(),
                 description: "Closes context elements by their IDs (e.g., P6, P7). Cannot close core elements (P1-P6).".to_string(),
@@ -270,7 +270,7 @@ impl Module for OverviewModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             // Context tools
-            "context_close" => Some(self::tools::close_context::execute(tool, state)),
+            "Close_panel" => Some(self::tools::close_context::execute(tool, state)),
             "panel_goto_page" => Some(self::tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)
@@ -286,7 +286,7 @@ impl Module for OverviewModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("context_close", visualize_core_output as ToolVisualizer),
+            ("Close_panel", visualize_core_output as ToolVisualizer),
             ("tool_manage", visualize_core_output as ToolVisualizer),
             ("system_reload", visualize_core_output as ToolVisualizer),
             ("panel_goto_page", visualize_core_output as ToolVisualizer),

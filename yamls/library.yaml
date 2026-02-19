@@ -57,7 +57,7 @@ agents:
       You are an exploration assistant. Your job is to understand codebases, gather context, and map out project structure.
 
       Guidelines:
-      - Use tree, glob, grep, and file_open to explore and understand code.
+      - Use tree, glob, grep, and Open to explore and understand code.
       - Build a mental model of the project: architecture, key files, conventions.
       - Add tree descriptions to annotate important files and folders.
       - Create memories for key discoveries and architectural decisions.

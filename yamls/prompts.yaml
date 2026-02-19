@@ -22,7 +22,7 @@ panel:
 context_threshold_notification: |
   Context usage has crossed the cleaning threshold ({usage_pct}% of budget, {used_tokens}/{budget_tokens} tokens).
   You should proactively manage your context to stay under the threshold:
-  - Close file panels you no longer need (context_close)
+  - Close file panels you no longer need (Close_panel)
   - Close grep/glob results that have served their purpose
   - Summarize logs if there are many top-level entries (log_summarize)
   - Close conversation history panels after extracting key information
