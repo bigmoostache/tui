@@ -6,7 +6,8 @@ use ratatui::{
 use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
-use cp_mod_git::GitChangeType;
+
+
 use cp_mod_prompt::PromptState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
@@ -124,80 +125,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let gs = cp_mod_git::GitState::get(state);
     if let Some(branch) = &gs.git_branch {
         spans.push(Span::styled(format!(" {} ", branch), Style::default().fg(Color::White).bg(Color::Blue)));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // Git change stats (if there are any changes)
-    if !gs.git_file_changes.is_empty() {
-        // Calculate line change statistics
-        let mut total_additions = 0;
-        let mut total_deletions = 0;
-        let mut untracked_count = 0;
-        let mut modified_count = 0;
-        let mut deleted_count = 0;
-
-        for file in &gs.git_file_changes {
-            total_additions += file.additions;
-            total_deletions += file.deletions;
-            match file.change_type {
-                GitChangeType::Untracked => untracked_count += 1,
-                GitChangeType::Modified => modified_count += 1,
-                GitChangeType::Deleted => deleted_count += 1,
-                GitChangeType::Added => modified_count += 1, // Added files count as modified for UI
-                GitChangeType::Renamed => modified_count += 1, // Renamed files count as modified
-            }
-        }
-
-        let net_change = total_additions - total_deletions;
-
-        // Card 1: Line changes with slashes between counts on gray bg
-        let (net_prefix, net_value) = if net_change >= 0 { ("+", net_change) } else { ("", net_change) };
-
-        spans.push(Span::styled(" +", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", total_additions),
-            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("-", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", total_deletions),
-            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            net_prefix,
-            Style::default()
-                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
-                .bg(theme::bg_elevated()),
-        ));
-        spans.push(Span::styled(
-            format!("{} ", net_value.abs()),
-            Style::default()
-                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
-                .bg(theme::bg_elevated())
-                .bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-
-        // Card 2: File changes with slashes between counts on gray bg
-        spans.push(Span::styled(" U", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", untracked_count),
-            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("M", Style::default().fg(theme::warning()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", modified_count),
-            Style::default().fg(theme::warning()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("D", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{} ", deleted_count),
-            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
-        ));
         spans.push(Span::styled(" ", base_style));
     }
 
