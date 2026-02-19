@@ -1,4 +1,5 @@
 pub(crate) mod continuation;
+pub(crate) mod coucou;
 pub mod engine;
 pub(crate) mod guard_rail;
 mod panel;
@@ -136,6 +137,26 @@ impl Module for SpineModule {
                 enabled: true,
                 category: "Spine".to_string(),
             },
+            ToolDefinition {
+                id: "coucou".to_string(),
+                name: "Coucou".to_string(),
+                short_desc: "Schedule a reminder notification".to_string(),
+                description: "Schedules a notification to fire after a delay (timer mode) or at a specific time (datetime mode). The notification appears in the Spine panel and triggers auto-continuation. Use for reminders, delayed checks, or timed follow-ups.".to_string(),
+                params: vec![
+                    ToolParam::new("mode", ParamType::String)
+                        .desc("Scheduling mode: 'timer' for relative delay, 'datetime' for absolute time")
+                        .required(),
+                    ToolParam::new("message", ParamType::String)
+                        .desc("Message to deliver when the notification fires")
+                        .required(),
+                    ToolParam::new("delay", ParamType::String)
+                        .desc("Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"),
+                    ToolParam::new("datetime", ParamType::String)
+                        .desc("When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"),
+                ],
+                enabled: true,
+                category: "Spine".to_string(),
+            },
         ]
     }
 
@@ -143,6 +164,7 @@ impl Module for SpineModule {
         match tool.name.as_str() {
             "notification_mark_processed" => Some(self::tools::execute_mark_processed(tool, state)),
             "spine_configure" => Some(self::tools::execute_configure(tool, state)),
+            "coucou" => Some(self::coucou::execute_coucou(tool, state)),
             _ => None,
         }
     }
