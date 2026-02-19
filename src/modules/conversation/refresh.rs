@@ -1,16 +1,34 @@
 use crate::state::{ContextType, MessageStatus, State, estimate_tokens};
 
+/// Estimate total tokens for a single message, including content, tool uses, and tool results.
+pub fn estimate_message_tokens(m: &crate::state::Message) -> usize {
+    let content_tokens = match m.status {
+        MessageStatus::Summarized => m.tl_dr_token_count.max(estimate_tokens(m.tl_dr.as_deref().unwrap_or(""))),
+        _ => m.content_token_count.max(estimate_tokens(&m.content)),
+    };
+
+    // Count tool uses (tool call name + JSON input)
+    let tool_use_tokens: usize = m.tool_uses.iter().map(|tu| {
+        let input_str = serde_json::to_string(&tu.input).unwrap_or_default();
+        estimate_tokens(&tu.name) + estimate_tokens(&input_str)
+    }).sum();
+
+    // Count tool results
+    let tool_result_tokens: usize = m.tool_results.iter().map(|tr| {
+        estimate_tokens(&tr.content)
+    }).sum();
+
+    content_tokens + tool_use_tokens + tool_result_tokens
+}
+
 /// Refresh token count for the Conversation context element
 pub fn refresh_conversation_context(state: &mut State) {
-    // Calculate total tokens from all active messages
+    // Calculate total tokens from all active messages (content + tool uses + tool results)
     let total_tokens: usize = state
         .messages
         .iter()
         .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-        .map(|m| match m.status {
-            MessageStatus::Summarized => m.tl_dr_token_count.max(estimate_tokens(m.tl_dr.as_deref().unwrap_or(""))),
-            _ => m.content_token_count.max(estimate_tokens(&m.content)),
-        })
+        .map(|m| estimate_message_tokens(m))
         .sum();
 
     // Update the Conversation context element's token count
