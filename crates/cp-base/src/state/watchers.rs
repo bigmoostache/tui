@@ -1,0 +1,145 @@
+//! Watcher trait and registry for asynchronous condition monitoring.
+//!
+//! Modules register watchers (via WatcherRegistry in State) to monitor
+//! conditions like process exit, pattern matching, or timers.
+//! The spine module polls the registry and fires notifications when
+//! conditions are met.
+
+use crate::state::State;
+
+/// Result of a satisfied watcher condition.
+pub struct WatcherResult {
+    /// Human-readable description of what happened.
+    pub description: String,
+    /// Panel ID associated with this watcher (if any).
+    pub panel_id: Option<String>,
+    /// Tool use ID for blocking watchers that need sentinel replacement.
+    pub tool_use_id: Option<String>,
+}
+
+/// A watcher monitors a condition and reports when it's satisfied.
+///
+/// Watchers are polled periodically by the app event loop.
+/// When `check()` returns `Some(WatcherResult)`, the watcher is removed
+/// and either:
+/// - Blocking: the sentinel tool result is replaced with the real result
+/// - Async: a spine notification is created
+pub trait Watcher: Send + Sync {
+    /// Unique identifier for this watcher instance (e.g., "console_c_42_exit").
+    fn id(&self) -> &str;
+
+    /// Human-readable description shown in the Spine panel (e.g., "Waiting for cargo build to exit").
+    fn description(&self) -> &str;
+
+    /// Whether this watcher blocks tool execution (sentinel replacement)
+    /// or is async (spine notification).
+    fn is_blocking(&self) -> bool;
+
+    /// Tool use ID for blocking watchers. Used to replace the sentinel
+    /// in pending tool results.
+    fn tool_use_id(&self) -> Option<&str>;
+
+    /// Check if the condition is met. Returns Some(result) when satisfied.
+    /// Called every poll cycle (~50ms). Must be non-blocking.
+    ///
+    /// The `state` reference is read-only. Watchers should read from
+    /// module_data (e.g., ConsoleState session buffers) to check conditions.
+    fn check(&self, state: &State) -> Option<WatcherResult>;
+
+    /// Check if this watcher has timed out. Returns Some(result) with
+    /// a timeout message if deadline has passed.
+    fn check_timeout(&self) -> Option<WatcherResult>;
+
+    /// Timestamp (ms since epoch) when this watcher was registered.
+    fn registered_ms(&self) -> u64;
+
+    /// Source tag for categorizing notifications (e.g., "console").
+    fn source_tag(&self) -> &str;
+
+    /// Whether this watcher was created by easy_bash (needs special result formatting).
+    fn is_easy_bash(&self) -> bool {
+        false
+    }
+}
+
+/// Registry holding active watchers. Stored in State via TypeMap.
+/// Initialized by the spine module, accessed by any module that
+/// registers watchers.
+pub struct WatcherRegistry {
+    pub watchers: Vec<Box<dyn Watcher>>,
+}
+
+impl Default for WatcherRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WatcherRegistry {
+    pub fn new() -> Self {
+        Self {
+            watchers: Vec::new(),
+        }
+    }
+
+    /// Register a new watcher.
+    pub fn register(&mut self, watcher: Box<dyn Watcher>) {
+        self.watchers.push(watcher);
+    }
+
+    /// Poll all watchers and return satisfied results.
+    /// Satisfied watchers are removed from the registry.
+    /// Returns (blocking_results, async_results).
+    pub fn poll_all(&mut self, state: &State) -> (Vec<WatcherResult>, Vec<WatcherResult>) {
+        let mut blocking = Vec::new();
+        let mut async_results = Vec::new();
+        let mut remaining = Vec::new();
+
+        for watcher in self.watchers.drain(..) {
+            // Check condition first (before timeout) to avoid race
+            if let Some(result) = watcher.check(state) {
+                if watcher.is_blocking() {
+                    blocking.push(result);
+                } else {
+                    async_results.push(result);
+                }
+                continue;
+            }
+
+            // Then check timeout
+            if let Some(result) = watcher.check_timeout() {
+                if watcher.is_blocking() {
+                    blocking.push(result);
+                } else {
+                    async_results.push(result);
+                }
+                continue;
+            }
+
+            remaining.push(watcher);
+        }
+
+        self.watchers = remaining;
+        (blocking, async_results)
+    }
+
+    /// Get a read-only view of active watchers (for rendering in Spine panel).
+    pub fn active_watchers(&self) -> &[Box<dyn Watcher>] {
+        &self.watchers
+    }
+
+    /// Check if any blocking watchers are active.
+    pub fn has_blocking_watchers(&self) -> bool {
+        self.watchers.iter().any(|w| w.is_blocking())
+    }
+
+    /// Get from State via TypeMap.
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("WatcherRegistry not initialized")
+    }
+
+    /// Get mutable from State via TypeMap.
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("WatcherRegistry not initialized")
+    }
+}

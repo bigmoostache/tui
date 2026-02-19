@@ -4,8 +4,9 @@ use ratatui::prelude::*;
 use cp_base::state::Action;
 use cp_base::config::SCROLL_ARROW_AMOUNT;
 use cp_base::config::theme;
-use cp_base::panels::{ContextItem, Panel};
+use cp_base::panels::{ContextItem, Panel, now_ms};
 use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::watchers::WatcherRegistry;
 
 use crate::types::{NotificationType, SpineState};
 
@@ -60,6 +61,20 @@ impl SpinePanel {
             .push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
             output.push_str(&format!("max_auto_retries: {}\n", v));
+        }
+
+        // Show active watchers
+        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
+            let watchers = registry.active_watchers();
+            if !watchers.is_empty() {
+                output.push_str("\n=== Active Watchers ===\n");
+                let now = now_ms();
+                for w in watchers {
+                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let mode = if w.is_blocking() { "blocking" } else { "async" };
+                    output.push_str(&format!("[{}] {} ({}, {}s ago)\n", w.id(), w.description(), mode, age_s));
+                }
+            }
         }
 
         output.trim_end().to_string()
@@ -175,6 +190,29 @@ impl Panel for SpinePanel {
                 Span::styled(": ".to_string(), Style::default().fg(theme::text_muted())),
                 Span::styled(val, Style::default().fg(theme::text())),
             ]));
+        }
+
+        // === Active Watchers ===
+        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
+            let watchers = registry.active_watchers();
+            if !watchers.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![Span::styled(
+                    format!("Active Watchers ({})", watchers.len()),
+                    Style::default().fg(theme::accent()),
+                )]));
+                let now = now_ms();
+                for w in watchers {
+                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let mode_color = if w.is_blocking() { theme::warning() } else { theme::text_secondary() };
+                    let mode_label = if w.is_blocking() { "⏳" } else { "👁" };
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {} ", mode_label), Style::default().fg(mode_color)),
+                        Span::styled(w.description().to_string(), Style::default().fg(theme::text())),
+                        Span::styled(format!(" ({}s)", age_s), Style::default().fg(theme::text_muted())),
+                    ]));
+                }
+            }
         }
 
         lines

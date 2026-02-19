@@ -4,45 +4,50 @@ use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
 use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord};
 
+use cp_base::watchers::WatcherRegistry;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
-use cp_mod_console::types::ConsoleState;
+use cp_mod_spine::{NotificationType, SpineState};
 
 use crate::app::App;
 
 impl App {
-    /// Non-blocking check: poll console waiters for satisfied conditions.
-    /// - Blocking path: replace `__CONSOLE_WAIT_BLOCKING__` sentinel and resume pipeline.
-    /// - Async path: drain completed_async and create spine notifications.
-    pub(super) fn check_console_waiters(&mut self, tx: &Sender<StreamEvent>) {
-        // Always poll — this checks both blocking and async waiters
-        let satisfied_blocking = ConsoleState::check_waiters(&mut self.state);
+    /// Non-blocking check: poll WatcherRegistry for satisfied conditions.
+    /// - Blocking watchers: replace sentinel tool results and resume pipeline.
+    /// - Async watchers: create spine notifications.
+    pub(super) fn check_watchers(&mut self, tx: &Sender<StreamEvent>) {
+        // Take the registry out of state to avoid borrow conflict
+        // (poll_all needs &mut registry + &state simultaneously)
+        let mut registry = match self.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {
+            Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
+                Ok(r) => *r,
+                Err(boxed) => {
+                    self.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), boxed);
+                    return;
+                }
+            },
+            None => return,
+        };
+
+        let (blocking_results, async_results) = registry.poll_all(&self.state);
+
+        // Put registry back
+        self.state.set_ext(registry);
 
         // --- Async completions → spine notifications ---
-        let completed: Vec<cp_mod_console::CompletedWait> = {
-            let cs = ConsoleState::get_mut(&mut self.state);
-            cs.completed_async.drain(..).collect()
-        };
-        if !completed.is_empty() {
-            use cp_mod_spine::{NotificationType, SpineState};
-            for cw in completed {
-                let content = cp_mod_console::types::format_wait_result(
-                    &cw.session_name,
-                    cw.exit_code,
-                    &cw.panel_id,
-                    &cw.last_lines,
-                );
+        if !async_results.is_empty() {
+            for result in async_results {
                 SpineState::create_notification(
                     &mut self.state,
                     NotificationType::Custom,
-                    "console".to_string(),
-                    content,
+                    "watcher".to_string(),
+                    result.description,
                 );
             }
             self.save_state_async();
         }
 
         // --- Blocking sentinel replacement ---
-        if self.pending_console_wait_tool_results.is_none() || satisfied_blocking.is_empty() {
+        if self.pending_console_wait_tool_results.is_none() || blocking_results.is_empty() {
             return;
         }
 
@@ -51,8 +56,10 @@ impl App {
         // Replace sentinels with real results
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
-                if let Some((_, result)) = satisfied_blocking.iter().find(|(id, _)| *id == tr.tool_use_id) {
-                    tr.content = result.clone();
+                if let Some(result) = blocking_results.iter().find(|r| {
+                    r.tool_use_id.as_deref() == Some(&tr.tool_use_id)
+                }) {
+                    tr.content = result.description.clone();
                 }
             }
         }

@@ -23,7 +23,6 @@ use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
-pub use self::types::{CompletedWait, ConsoleWaiter};
 
 pub struct ConsoleModule;
 
@@ -257,11 +256,9 @@ impl Module for ConsoleModule {
                     Falls back to literal substring match if the regex is invalid. \
                     IMPORTANT: Include both success AND failure patterns using regex alternation (|) so you \
                     catch errors early instead of waiting for timeout. E.g. 'ready to accept|error|panic|failed'. \
-                    Two blocking modes: \
-                    block=true (default): pauses tool execution until condition is met or max_wait expires. \
+                    BLOCKING: pauses tool execution until condition is met or max_wait expires. \
                     Best for sequential workflows (build then test). \
-                    block=false: registers an async watcher — you continue working and get a spine notification \
-                    when the condition is satisfied. Best for long-running processes where you don't want to block."
+                    For async monitoring (long-running servers), use console_watch instead."
                     .to_string(),
                 params: vec![
                     ToolParam::new("id", ParamType::String)
@@ -275,12 +272,37 @@ impl Module for ConsoleModule {
                         .desc("Regex pattern to match in output (required when mode='pattern'). \
                             Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
                             Falls back to literal match if invalid regex."),
-                    ToolParam::new("block", ParamType::Boolean)
-                        .desc("true (default): blocks tool execution until matched or timeout. false: async — spine notification on match.")
-                        .default_val("true"),
                     ToolParam::new("max_wait", ParamType::Integer)
-                        .desc("Max wait in seconds, 1-30 (default: 30). Only applies when block=true. On timeout, returns last output lines.")
+                        .desc("Max wait in seconds, 1-30 (default: 30). On timeout, returns last output lines.")
                         .default_val("30"),
+                ],
+                enabled: true,
+                category: "Console".to_string(),
+            },
+            ToolDefinition {
+                id: "console_watch".to_string(),
+                name: "Console Watch".to_string(),
+                short_desc: "Async watch for process event".to_string(),
+                description: "Registers an async watcher for a console event. You continue working and get a spine \
+                    notification when the condition is satisfied. Best for long-running processes where you don't \
+                    want to block (e.g. dev servers, background tasks). Two modes: \
+                    mode='exit': notifies when the process exits. \
+                    mode='pattern': notifies when a regex pattern matches in output. \
+                    If the condition is already met, returns immediately instead of registering a watcher. \
+                    For blocking waits (sequential workflows), use console_wait instead."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String)
+                        .desc("Console panel ID (e.g., 'P11')")
+                        .required(),
+                    ToolParam::new("mode", ParamType::String)
+                        .desc("Watch mode: 'exit' for process completion, 'pattern' for regex match in output")
+                        .enum_vals(&["exit", "pattern"])
+                        .required(),
+                    ToolParam::new("pattern", ParamType::String)
+                        .desc("Regex pattern to match in output (required when mode='pattern'). \
+                            Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
+                            Falls back to literal match if invalid regex."),
                 ],
                 enabled: true,
                 category: "Console".to_string(),
@@ -313,6 +335,7 @@ impl Module for ConsoleModule {
             "console_create" => Some(tools::execute_create(tool, state)),
             "console_send_keys" => Some(tools::execute_send_keys(tool, state)),
             "console_wait" => Some(tools::execute_wait(tool, state)),
+            "console_watch" => Some(tools::execute_watch(tool, state)),
             "console_easy_bash" => Some(tools::execute_debug_bash(tool, state)),
             _ => None,
         }
@@ -323,6 +346,7 @@ impl Module for ConsoleModule {
             ("console_create", visualize_console_output as ToolVisualizer),
             ("console_send_keys", visualize_console_output as ToolVisualizer),
             ("console_wait", visualize_console_output as ToolVisualizer),
+            ("console_watch", visualize_console_output as ToolVisualizer),
         ]
     }
 

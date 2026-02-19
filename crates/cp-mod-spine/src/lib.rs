@@ -33,10 +33,13 @@ impl Module for SpineModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
+        // Initialize the watcher registry (cross-cutting concern managed by spine)
+        state.set_ext(cp_base::watchers::WatcherRegistry::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
+        state.set_ext(cp_base::watchers::WatcherRegistry::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {

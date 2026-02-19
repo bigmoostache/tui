@@ -4,6 +4,7 @@ pub mod context;
 pub mod message;
 pub mod render_cache;
 pub mod runtime;
+pub mod watchers;
 
 // Re-exports for convenience
 pub use actions::{Action, ActionResult};
