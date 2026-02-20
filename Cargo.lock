@@ -286,6 +286,7 @@ dependencies = [
 name = "cp-mod-logs"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cp-base",
  "cp-mod-memory",
  "crossterm",
