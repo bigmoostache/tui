@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
+use unicode_width::UnicodeWidthStr;
 
 use cp_base::state::Action;
 use cp_base::config::SCROLL_ARROW_AMOUNT;
@@ -127,18 +128,34 @@ impl Panel for SpinePanel {
                 Style::default().fg(theme::text_muted()).italic(),
             )]));
         } else {
+            // Calculate wrap width: viewport minus the prefix "N999 HH:MM:SS TYPE — "
+            let viewport = state.last_viewport_width as usize;
             for n in &unprocessed {
                 let type_color = notification_type_color(&n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
+                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let wrapped = wrap_text_simple(&n.content, content_max);
+
+                // First line with full prefix
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color).bold()),
                     Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color)),
                     Span::styled(
-                        format!(" — {}", truncate_content(&n.content, 80)),
+                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
                         Style::default().fg(theme::text()),
                     ),
                 ]));
+                // Continuation lines indented to align with content
+                for line in wrapped.iter().skip(1) {
+                    let indent = " ".repeat(prefix_width);
+                    lines.push(Line::from(vec![
+                        Span::styled(indent, Style::default()),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text())),
+                    ]));
+                }
             }
         }
 
@@ -154,18 +171,33 @@ impl Panel for SpinePanel {
                 Style::default().fg(theme::text_muted()),
             )]));
 
+            let viewport = state.last_viewport_width as usize;
             for n in &recent_processed {
                 let type_color = notification_type_color(&n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
+                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let wrapped = wrap_text_simple(&n.content, content_max);
+
+                // First line with full prefix
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
                     Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(
-                        format!(" — {}", truncate_content(&n.content, 60)),
+                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
                         Style::default().fg(theme::text_muted()),
                     ),
                 ]));
+                // Continuation lines indented
+                for line in wrapped.iter().skip(1) {
+                    let indent = " ".repeat(prefix_width);
+                    lines.push(Line::from(vec![
+                        Span::styled(indent, Style::default()),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text_muted())),
+                    ]));
+                }
             }
         }
 
@@ -222,14 +254,40 @@ fn notification_type_color(nt: &NotificationType) -> Color {
     }
 }
 
-/// Truncate content for display, appending "..." if truncated.
-/// Uses char boundaries to avoid panicking on multi-byte UTF-8 (emojis etc).
-fn truncate_content(s: &str, max_chars: usize) -> String {
-    let first_line = s.lines().next().unwrap_or(s);
-    if first_line.chars().count() > max_chars {
-        let byte_end = first_line.char_indices().nth(max_chars).map(|(i, _)| i).unwrap_or(first_line.len());
-        format!("{}...", &first_line[..byte_end])
-    } else {
-        first_line.to_string()
+/// Simple word-wrap: break text at word boundaries to fit within max_width.
+/// Uses UnicodeWidthStr for correct display width measurement.
+fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
     }
+    if UnicodeWidthStr::width(text) <= max_width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0usize;
+
+    for word in text.split_whitespace() {
+        let word_width = UnicodeWidthStr::width(word);
+        if current_width == 0 {
+            current_line.push_str(word);
+            current_width = word_width;
+        } else if current_width + 1 + word_width <= max_width {
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+            current_width = word_width;
+        }
+    }
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
