@@ -121,11 +121,18 @@ impl App {
                 if let Some(result) = matched_result {
                     let sentinel_id = result.tool_use_id.as_ref().unwrap();
                     let original_content = &after_sentinel[sentinel_id.len()..];
-                    // Format callback result as compact summary line
-                    tr.content = format!(
-                        "{}\nCallbacks:\n{}",
-                        original_content, result.description,
-                    );
+                    // Append to existing Callbacks block if present, else create new one
+                    if original_content.contains("\nCallbacks:\n") {
+                        tr.content = format!(
+                            "{}\n{}",
+                            original_content, result.description,
+                        );
+                    } else {
+                        tr.content = format!(
+                            "{}\nCallbacks:\n{}",
+                            original_content, result.description,
+                        );
+                    }
                 }
             }
         }

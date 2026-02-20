@@ -1,2 +1,1 @@
-Captain's log: Testing the new compact callback display format.
-No emojis. Just clean words with color.
+Captain's log: Testing callback name display - should show full names now.
