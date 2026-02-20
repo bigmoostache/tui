@@ -28,27 +28,42 @@ impl App {
             None => return,
         };
 
-        let (blocking_results, async_results) = registry.poll_all(&self.state);
+        let (blocking_results, mut async_results) = registry.poll_all(&self.state);
 
         // Put registry back
         self.state.set_ext(registry);
 
         // --- Async completions → spine notifications ---
         if !async_results.is_empty() {
-            for result in &async_results {
-                SpineState::create_notification(
-                    &mut self.state,
-                    NotificationType::Custom,
-                    "watcher".to_string(),
-                    result.description.clone(),
-                );
-            }
+            // Handle deferred panel creation FIRST (so we have panel IDs for notifications)
+            for result in &mut async_results {
+                if let Some(ref dp) = result.create_panel {
+                    let panel_id = self.state.next_available_context_id();
+                    let uid = format!("UID_{}_P", self.state.global_next_uid);
+                    self.state.global_next_uid += 1;
 
-            // Auto-close panels for async watchers that request it (e.g. callback success)
-            for result in &async_results {
+                    let mut ctx = crate::state::make_default_context_element(
+                        &panel_id,
+                        cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
+                        &dp.display_name,
+                        true,
+                    );
+                    ctx.uid = Some(uid);
+                    ctx.set_meta("console_name", &dp.session_key);
+                    ctx.set_meta("console_command", &dp.command);
+                    ctx.set_meta("console_description", &dp.description);
+                    ctx.set_meta("callback_id", &dp.callback_id);
+                    ctx.set_meta("callback_name", &dp.callback_name);
+                    if let Some(ref dir) = dp.cwd {
+                        ctx.set_meta("console_cwd", dir);
+                    }
+                    self.state.context.push(ctx);
+                    // Enrich the result description with the panel reference
+                    result.description.push_str(&format!("\nSee panel {} for full output.", panel_id));
+                }
+                // Auto-close panels for watchers that request it
                 if result.close_panel {
                     if let Some(ref panel_id) = result.panel_id {
-                        // Kill the console session first
                         if let Some(ctx) = self.state.context.iter().find(|c| c.id == *panel_id) {
                             if let Some(name) = ctx.get_meta::<String>("console_name") {
                                 cp_mod_console::types::ConsoleState::kill_session(&mut self.state, &name);
@@ -57,6 +72,16 @@ impl App {
                         self.state.context.retain(|c| c.id != *panel_id);
                     }
                 }
+            }
+
+            // Now create notifications (after panel creation, so descriptions include panel refs)
+            for result in &async_results {
+                SpineState::create_notification(
+                    &mut self.state,
+                    NotificationType::Custom,
+                    "watcher".to_string(),
+                    result.description.clone(),
+                );
             }
 
             self.save_state_async();
@@ -72,16 +97,63 @@ impl App {
         // Replace sentinels with real results
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
+                // Console wait sentinel: replace entirely with watcher result
                 if let Some(result) = blocking_results.iter().find(|r| {
                     r.tool_use_id.as_deref() == Some(&tr.tool_use_id)
                 }) {
                     tr.content = result.description.clone();
                 }
+            } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
+                // Callback blocking sentinel: format is "SENTINEL{sentinel_id}{original_content}"
+                // Extract sentinel_id and original content, then merge with callback result
+                let after_sentinel = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
+                // Find matching watcher result by sentinel_id prefix
+                let matched_result = blocking_results.iter().find(|r| {
+                    if let Some(ref tid) = r.tool_use_id {
+                        after_sentinel.starts_with(tid.as_str())
+                    } else {
+                        false
+                    }
+                });
+                if let Some(result) = matched_result {
+                    let sentinel_id = result.tool_use_id.as_ref().unwrap();
+                    let original_content = &after_sentinel[sentinel_id.len()..];
+                    tr.content = format!(
+                        "{}\n\n[Callback result: {}]",
+                        original_content, result.description,
+                    );
+                }
+            }
+        }
+
+        // Handle deferred panel creation for blocking results too (e.g. failed blocking callbacks)
+        for result in &blocking_results {
+            if let Some(ref dp) = result.create_panel {
+                let panel_id = self.state.next_available_context_id();
+                let uid = format!("UID_{}_P", self.state.global_next_uid);
+                self.state.global_next_uid += 1;
+
+                let mut ctx = crate::state::make_default_context_element(
+                    &panel_id,
+                    cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
+                    &dp.display_name,
+                    true,
+                );
+                ctx.uid = Some(uid);
+                ctx.set_meta("console_name", &dp.session_key);
+                ctx.set_meta("console_command", &dp.command);
+                ctx.set_meta("console_description", &dp.description);
+                ctx.set_meta("callback_id", &dp.callback_id);
+                ctx.set_meta("callback_name", &dp.callback_name);
+                if let Some(ref dir) = dp.cwd {
+                    ctx.set_meta("console_cwd", dir);
+                }
+                self.state.context.push(ctx);
             }
         }
 
         // Check if any sentinels remain unresolved (multiple blocking waits in one batch)
-        let still_pending = tool_results.iter().any(|r| r.content == CONSOLE_WAIT_BLOCKING_SENTINEL);
+        let still_pending = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
         if still_pending {
             self.pending_console_wait_tool_results = Some(tool_results);
             return;
@@ -209,11 +281,21 @@ impl App {
 
         let tool_result_records: Vec<ToolResultRecord> = all_pending
             .iter()
-            .map(|r| ToolResultRecord {
-                tool_use_id: r.tool_use_id.clone(),
-                content: interrupted_msg.to_string(),
-                is_error: true,
-                tool_name: r.tool_name.clone(),
+            .map(|r| {
+                // Strip any callback blocking sentinel prefix from content
+                let content = if r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
+                    interrupted_msg.to_string()
+                } else if r.content == "__QUESTION_PENDING__" {
+                    interrupted_msg.to_string()
+                } else {
+                    interrupted_msg.to_string()
+                };
+                ToolResultRecord {
+                    tool_use_id: r.tool_use_id.clone(),
+                    content,
+                    is_error: true,
+                    tool_name: r.tool_name.clone(),
+                }
             })
             .collect();
 

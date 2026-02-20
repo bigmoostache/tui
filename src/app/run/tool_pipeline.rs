@@ -110,66 +110,54 @@ impl App {
 
                 // Fire non-blocking callbacks immediately (they run async via watchers)
                 if !async_cbs.is_empty() {
-                    let _summaries = callback_trigger::fire_async_callbacks(&mut self.state, &async_cbs);
-                    // Summaries logged but not blocking the pipeline
+                    let summaries = callback_trigger::fire_async_callbacks(&mut self.state, &async_cbs);
+                    // Append async callback notes to the Edit/Write tool results so the AI knows
+                    if !summaries.is_empty() {
+                        let note = format!("\n\n[Async callbacks triggered: {}]", summaries.join("; "));
+                        // Find the last Edit/Write tool result and append the note
+                        for tr in tool_results.iter_mut().rev() {
+                            if tr.tool_name == "Edit" || tr.tool_name == "Write" {
+                                tr.content.push_str(&note);
+                                break;
+                            }
+                        }
+                    }
                 }
 
-                // Fire blocking callbacks — these hold the pipeline
+                // Fire blocking callbacks — these hold the pipeline until completion.
+                // CONSTRAINT: each tool_call must have exactly 1 tool_result.
+                // We do NOT create a synthetic tool_use/tool_result pair.
+                // Instead, we tag the last Edit/Write tool result with a sentinel
+                // and defer all results until the callback watcher completes.
                 if !blocking_cbs.is_empty() {
-                    // Generate a unique synthetic tool_use_id for the blocking sentinel.
-                    // We also need a matching tool_call message so the API sees a proper
-                    // tool_use → tool_result pair (otherwise we get duplicate tool_result IDs).
+                    // Generate a unique sentinel ID for the blocking watcher
                     let sentinel_id = format!("cb_block_{}", self.state.next_tool_id);
-
-                    // Create a synthetic tool_call message for the blocking callback
-                    let tool_id = format!("T{}", self.state.next_tool_id);
-                    let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
                     self.state.next_tool_id += 1;
-                    self.state.global_next_uid += 1;
-
-                    let cb_names: Vec<&str> = blocking_cbs.iter().map(|cb| cb.definition.name.as_str()).collect();
-                    let tool_msg = Message {
-                        id: tool_id,
-                        uid: Some(tool_uid),
-                        role: "assistant".to_string(),
-                        message_type: MessageType::ToolCall,
-                        content: String::new(),
-                        content_token_count: 0,
-                        tl_dr: None,
-                        tl_dr_token_count: 0,
-                        status: MessageStatus::Full,
-                        tool_uses: vec![ToolUseRecord {
-                            id: sentinel_id.clone(),
-                            name: "callback_blocking".to_string(),
-                            input: serde_json::json!({
-                                "callbacks": cb_names,
-                            }),
-                        }],
-                        tool_results: Vec::new(),
-                        input_tokens: 0,
-                        timestamp_ms: now_ms(),
-                    };
-                    self.save_message_async(&tool_msg);
-                    self.state.messages.push(tool_msg);
 
                     let _summaries = callback_trigger::fire_blocking_callbacks(
                         &mut self.state, &blocking_cbs, &sentinel_id,
                     );
 
-                    // Insert a sentinel tool result so the pipeline knows to wait
-                    tool_results.push(crate::infra::tools::ToolResult {
-                        tool_use_id: sentinel_id,
-                        content: CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(),
-                        is_error: false,
-                        tool_name: "callback_blocking".to_string(),
-                    });
+                    // Tag the last Edit/Write tool result with sentinel so pipeline knows to wait.
+                    // Store original content so we can reconstruct: original + callback output.
+                    for tr in tool_results.iter_mut().rev() {
+                        if tr.tool_name == "Edit" || tr.tool_name == "Write" {
+                            tr.content = format!(
+                                "{}{}{}",
+                                CONSOLE_WAIT_BLOCKING_SENTINEL,
+                                sentinel_id,
+                                tr.content,
+                            );
+                            break;
+                        }
+                    }
                 }
             }
         }
 
         // Check if any tool triggered a console blocking wait
         let has_console_wait =
-            tool_results.iter().any(|r| r.content == CONSOLE_WAIT_BLOCKING_SENTINEL);
+            tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
         if has_console_wait {
             self.pending_console_wait_tool_results = Some(tool_results);
             self.save_state_async();

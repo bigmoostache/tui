@@ -8,8 +8,8 @@ use globset::Glob;
 
 use cp_base::config::STORE_DIR;
 use cp_base::panels::now_ms;
-use cp_base::state::{ContextType, State, make_default_context_element};
-use cp_base::watchers::{Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::State;
+use cp_base::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
 
 use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
@@ -29,14 +29,22 @@ pub struct MatchedCallback {
 /// Extracts `file_path` from Edit and Write tool inputs.
 pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<String> {
     let mut hull: Vec<String> = Vec::new();
+    let project_root = std::env::current_dir()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     for tool in tools {
         match tool.name.as_str() {
             "Edit" | "Write" => {
                 if let Some(path) = tool.input.get("file_path").and_then(|v| v.as_str()) {
-                    // Normalize: strip leading ./ if present
-                    let anchor_path = path.strip_prefix("./").unwrap_or(path).to_string();
-                    if !hull.contains(&anchor_path) {
-                        hull.push(anchor_path);
+                    // Normalize: strip leading ./ if present, strip absolute project root prefix
+                    let mut anchor_path = path.strip_prefix("./").unwrap_or(path);
+                    if let Some(relative) = anchor_path.strip_prefix(&project_root) {
+                        anchor_path = relative.strip_prefix('/').unwrap_or(relative);
+                    }
+                    let anchor_str = anchor_path.to_string();
+                    if !hull.contains(&anchor_str) {
+                        hull.push(anchor_str);
                     }
                 }
             }
@@ -48,9 +56,6 @@ pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<String> {
 
 /// Match changed files against active callback patterns.
 /// Returns a list of callbacks that matched, each with their matched files.
-///
-/// Respects `once_per_batch`: if true, the callback fires once with all matched files.
-/// If false (future), it would fire per-file (but V1 always uses once_per_batch=true).
 pub fn match_callbacks(state: &State, changed_files: &[String]) -> Vec<MatchedCallback> {
     if changed_files.is_empty() {
         return Vec::new();
@@ -183,34 +188,9 @@ pub fn fire_callback(
     };
 
     // Spawn the process
-    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?;
+    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone())?;
 
-    // Create a console panel
-    let display_name = format!("CB: {}", def.name);
-    let panel_id = state.next_available_context_id();
-    let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
-
-    let mut ctx = make_default_context_element(
-        &panel_id,
-        ContextType::new(ContextType::CONSOLE),
-        &display_name,
-        true,
-    );
-    ctx.uid = Some(uid);
-    ctx.set_meta("console_name", &session_key);
-    ctx.set_meta("console_command", &command);
-    ctx.set_meta("console_status", &handle.get_status().label());
-    ctx.set_meta("console_description", &format!("Callback: {}", def.name));
-    if let Some(ref dir) = def.cwd {
-        ctx.set_meta("console_cwd", dir);
-    }
-    // Mark as callback-owned for auto-close logic
-    ctx.set_meta("callback_id", &def.id);
-    ctx.set_meta("callback_name", &def.name);
-    state.context.push(ctx);
-
-    // Store handle in console state
+    // Store handle in console state (NO panel created — deferred until failure/timeout)
     let cs = ConsoleState::get_mut(state);
     cs.sessions.insert(session_key.clone(), handle);
 
@@ -227,7 +207,7 @@ pub fn fire_callback(
 
     let watcher = CallbackWatcher {
         watcher_id: format!("callback_{}_{}", def.id, session_key),
-        session_name: session_key,
+        session_name: session_key.clone(),
         callback_name: def.name.clone(),
         callback_tag: format!("callback_{}", def.id),
         success_message: def.success_message.clone(),
@@ -235,14 +215,23 @@ pub fn fire_callback(
         tool_use_id: blocking_tool_use_id.map(|s| s.to_string()),
         registered_at_ms: now,
         deadline_ms,
-        panel_id: panel_id.clone(),
         desc: watcher_desc,
+        matched_files: matched.matched_files.clone(),
+        deferred_panel: DeferredPanel {
+            session_key: session_key.clone(),
+            display_name: format!("CB: {}", def.name),
+            command: command.clone(),
+            description: format!("Callback: {}", def.name),
+            cwd: def.cwd.clone(),
+            callback_id: def.id.clone(),
+            callback_name: def.name.clone(),
+        },
     };
 
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    Ok(panel_id)
+    Ok(session_key)
 }
 
 /// Fire all matched non-blocking callbacks.
@@ -313,8 +302,9 @@ fn shell_escape(s: &str) -> String {
 // ============================================================
 
 /// A watcher that monitors a callback's console session.
-/// On exit 0: returns success_message + close_panel=true.
-/// On exit != 0: returns error output + close_panel=false.
+/// NO panel is created upfront — only on failure/timeout via `create_panel` in WatcherResult.
+/// On exit 0: returns success_message + log file path, kills session.
+/// On exit != 0: returns error output + deferred panel info for tool_cleanup to create.
 pub struct CallbackWatcher {
     pub watcher_id: String,
     pub session_name: String,
@@ -325,8 +315,9 @@ pub struct CallbackWatcher {
     pub tool_use_id: Option<String>,
     pub registered_at_ms: u64,
     pub deadline_ms: Option<u64>,
-    pub panel_id: String,
     pub desc: String,
+    pub matched_files: Vec<String>,
+    pub deferred_panel: DeferredPanel,
 }
 
 impl Watcher for CallbackWatcher {
@@ -355,32 +346,46 @@ impl Watcher for CallbackWatcher {
         }
 
         let exit_code = handle.get_status().exit_code().unwrap_or(-1);
-        let last_lines = handle.buffer.last_n_lines(10);
 
         if exit_code == 0 {
-            // Success — use success_message if set, auto-close the panel
+            // Success — no panel needed. Include log file path for AI to inspect if needed.
+            let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
+            let log_path_str = log_path.to_string_lossy();
             let msg = if let Some(ref sm) = self.success_message {
-                format!("Callback '{}': {} (exit 0)", self.callback_name, sm)
+                format!("Callback '{}': {} (exit 0). Files: [{}]. Log: {}",
+                    self.callback_name, sm, self.matched_files.join(", "), log_path_str)
             } else {
-                format!("Callback '{}' passed ✓ (exit 0)", self.callback_name)
+                format!("Callback '{}' passed ✓ (exit 0). Files: [{}]. Log: {}",
+                    self.callback_name, self.matched_files.join(", "), log_path_str)
             };
             Some(WatcherResult {
                 description: msg,
-                panel_id: Some(self.panel_id.clone()),
+                panel_id: None, // No panel was created
                 tool_use_id: self.tool_use_id.clone(),
-                close_panel: true, // Auto-close on success!
+                close_panel: false,
+                create_panel: None, // Success = no panel needed
             })
         } else {
-            // Failure — include last output lines, keep panel open
+            // Failure — request deferred panel creation so AI can inspect output
+            let last_lines = handle.buffer.last_n_lines(4);
             let msg = format!(
-                "Callback '{}' FAILED (exit {})\nLast output:\n{}",
-                self.callback_name, exit_code, last_lines,
+                "Callback '{}' FAILED (exit {}). Files: [{}]\nLast output:\n{}",
+                self.callback_name, exit_code, self.matched_files.join(", "), last_lines,
             );
             Some(WatcherResult {
                 description: msg,
-                panel_id: Some(self.panel_id.clone()),
+                panel_id: None, // Panel will be created by tool_cleanup
                 tool_use_id: self.tool_use_id.clone(),
-                close_panel: false, // Keep panel for inspection
+                close_panel: false,
+                create_panel: Some(DeferredPanel {
+                    session_key: self.deferred_panel.session_key.clone(),
+                    display_name: self.deferred_panel.display_name.clone(),
+                    command: self.deferred_panel.command.clone(),
+                    description: self.deferred_panel.description.clone(),
+                    cwd: self.deferred_panel.cwd.clone(),
+                    callback_id: self.deferred_panel.callback_id.clone(),
+                    callback_name: self.deferred_panel.callback_name.clone(),
+                }),
             })
         }
     }
@@ -394,12 +399,21 @@ impl Watcher for CallbackWatcher {
         let elapsed_s = (now - self.registered_at_ms) / 1000;
         Some(WatcherResult {
             description: format!(
-                "Callback '{}' TIMED OUT after {}s (panel={})",
-                self.callback_name, elapsed_s, self.panel_id,
+                "Callback '{}' TIMED OUT after {}s. Files: [{}]",
+                self.callback_name, elapsed_s, self.matched_files.join(", "),
             ),
-            panel_id: Some(self.panel_id.clone()),
+            panel_id: None,
             tool_use_id: self.tool_use_id.clone(),
-            close_panel: false, // Keep panel for inspection on timeout too
+            close_panel: false,
+            create_panel: Some(DeferredPanel {
+                session_key: self.deferred_panel.session_key.clone(),
+                display_name: self.deferred_panel.display_name.clone(),
+                command: self.deferred_panel.command.clone(),
+                description: self.deferred_panel.description.clone(),
+                cwd: self.deferred_panel.cwd.clone(),
+                callback_id: self.deferred_panel.callback_id.clone(),
+                callback_name: self.deferred_panel.callback_name.clone(),
+            }),
         })
     }
 
@@ -439,6 +453,15 @@ mod tests {
     #[test]
     fn test_collect_strips_dot_slash() {
         let tools = vec![make_tool("Edit", "./src/main.rs")];
+        let files = collect_changed_files(&tools);
+        assert_eq!(files, vec!["src/main.rs"]);
+    }
+
+    #[test]
+    fn test_collect_strips_absolute_project_root() {
+        let cwd = std::env::current_dir().unwrap().to_string_lossy().to_string();
+        let abs_path = format!("{}/src/main.rs", cwd);
+        let tools = vec![make_tool("Edit", &abs_path)];
         let files = collect_changed_files(&tools);
         assert_eq!(files, vec!["src/main.rs"]);
     }

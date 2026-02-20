@@ -143,13 +143,37 @@ impl Module for CallbackModule {
                         .desc("Working directory (defaults to project root)"),
                     ToolParam::new("one_at_a_time", ParamType::Boolean)
                         .desc("Don't run simultaneously with itself (default: false)"),
-                    ToolParam::new("once_per_batch", ParamType::Boolean)
-                        .desc("Fire once per tool batch with all files (default: true)"),
                     ToolParam::new("old_string", ParamType::String)
                         .desc("For diff-based script update: exact text to find"),
                     ToolParam::new("new_string", ParamType::String)
                         .desc("For diff-based script update: replacement text"),
                 ],
+                enabled: true,
+                category: "Callback".to_string(),
+            },
+            ToolDefinition {
+                id: "Callback_open_editor".to_string(),
+                name: "Callback Open Editor".to_string(),
+                short_desc: "Open callback script in editor".to_string(),
+                description: "Opens a callback's script content in the Callbacks panel for reading and editing. \
+                    Required before using diff-based script editing (old_string/new_string in Callback_upsert update). \
+                    Max one callback open at a time — opening a new one closes the previous."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String)
+                        .desc("Callback ID (e.g., 'CB1')")
+                        .required(),
+                ],
+                enabled: true,
+                category: "Callback".to_string(),
+            },
+            ToolDefinition {
+                id: "Callback_close_editor".to_string(),
+                name: "Callback Close Editor".to_string(),
+                short_desc: "Close callback script editor".to_string(),
+                description: "Closes the callback script editor in the Callbacks panel, restoring the normal table view."
+                    .to_string(),
+                params: vec![],
                 enabled: true,
                 category: "Callback".to_string(),
             },
@@ -178,6 +202,8 @@ impl Module for CallbackModule {
         match tool.name.as_str() {
             "Callback_upsert" => Some(self::tools::execute_upsert(tool, state)),
             "Callback_toggle" => Some(self::tools::execute_toggle(tool, state)),
+            "Callback_open_editor" => Some(self::tools::execute_open_editor(tool, state)),
+            "Callback_close_editor" => Some(self::tools::execute_close_editor(tool, state)),
             _ => None,
         }
     }

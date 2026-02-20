@@ -18,6 +18,21 @@ pub struct WatcherResult {
     /// If true, the panel should be auto-closed (removed from context).
     /// Used by callback watchers to clean up console panels on success.
     pub close_panel: bool,
+    /// If set, tool_cleanup should create a console panel for this session.
+    /// Used by callback watchers that defer panel creation until failure.
+    /// Contains (session_key, display_name, command, description, cwd).
+    pub create_panel: Option<DeferredPanel>,
+}
+
+/// Info needed to create a console panel after a watcher fires.
+pub struct DeferredPanel {
+    pub session_key: String,
+    pub display_name: String,
+    pub command: String,
+    pub description: String,
+    pub cwd: Option<String>,
+    pub callback_id: String,
+    pub callback_name: String,
 }
 
 /// A watcher monitors a condition and reports when it's satisfied.

@@ -190,6 +190,7 @@ impl Watcher for ConsoleWatcher {
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
+                create_panel: None,
             })
         } else {
             let exit_code = handle.get_status().exit_code();
@@ -204,6 +205,7 @@ impl Watcher for ConsoleWatcher {
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
+                create_panel: None,
             })
         }
     }
@@ -226,6 +228,7 @@ impl Watcher for ConsoleWatcher {
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
+                create_panel: None,
             })
         } else {
             Some(WatcherResult {
@@ -236,6 +239,7 @@ impl Watcher for ConsoleWatcher {
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
+                create_panel: None,
             })
         }
     }

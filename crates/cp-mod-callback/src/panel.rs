@@ -1,6 +1,9 @@
+use std::fs;
+use std::path::PathBuf;
+
 use ratatui::prelude::*;
 
-use cp_base::config::theme;
+use cp_base::config::{STORE_DIR, theme};
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, render_table};
@@ -18,8 +21,8 @@ impl CallbackPanel {
         }
 
         let mut lines = Vec::new();
-        lines.push("| ID | Name | Pattern | Description | Blocking | Timeout | Active | 1-at-a-time | Once/batch | Success Msg | CWD |".to_string());
-        lines.push("|------|------|---------|-------------|----------|---------|--------|-------------|------------|-------------|-----|".to_string());
+        lines.push("| ID | Name | Pattern | Description | Blocking | Timeout | Active | 1-at-a-time | Success Msg | CWD |".to_string());
+        lines.push("|------|------|---------|-------------|----------|---------|--------|-------------|-------------|-----|".to_string());
 
         for def in &cs.definitions {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
@@ -28,12 +31,39 @@ impl CallbackPanel {
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
-            let once_batch = if def.once_per_batch { "yes" } else { "no" };
 
             lines.push(format!(
-                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                def.id, def.name, def.pattern, def.description, blocking, timeout, active, one_at, once_batch, success, cwd
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                def.id, def.name, def.pattern, def.description, blocking, timeout, active, one_at, success, cwd
             ));
+        }
+
+        // If editor is open, append the script content below the table
+        if let Some(ref editor_id) = cs.editor_open {
+            if let Some(def) = cs.definitions.iter().find(|d| d.id == *editor_id) {
+                lines.push(String::new());
+                lines.push(format!("--- Editing: {} [{}] ---", def.name, def.id));
+                lines.push(format!("Pattern: {} | Blocking: {} | Timeout: {}",
+                    def.pattern,
+                    if def.blocking { "yes" } else { "no" },
+                    def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string()),
+                ));
+                lines.push(String::new());
+                lines.push("⚠ EDITING — If you are not editing, close with Callback_close_editor.".to_string());
+                lines.push(String::new());
+
+                let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+                match fs::read_to_string(&script_path) {
+                    Ok(content) => {
+                        lines.push("```bash".to_string());
+                        lines.push(content);
+                        lines.push("```".to_string());
+                    }
+                    Err(e) => {
+                        lines.push(format!("Error reading script: {}", e));
+                    }
+                }
+            }
         }
 
         lines.join("\n")
@@ -71,7 +101,6 @@ impl Panel for CallbackPanel {
             Cell::new("Timeout", normal),
             Cell::new("Active", normal),
             Cell::new("1-at-a-time", normal),
-            Cell::new("Once/batch", normal),
             Cell::new("Success Msg", normal),
             Cell::new("CWD", normal),
         ];
@@ -83,7 +112,6 @@ impl Panel for CallbackPanel {
             let success = def.success_message.as_deref().unwrap_or("—").to_string();
             let cwd = def.cwd.as_deref().unwrap_or("project root").to_string();
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
-            let once_batch = if def.once_per_batch { "yes" } else { "no" };
 
             vec![
                 Cell::new(&def.id, Style::default().fg(theme::accent())),
@@ -94,7 +122,6 @@ impl Panel for CallbackPanel {
                 Cell::new(timeout, normal),
                 Cell::new(active, normal),
                 Cell::new(one_at, muted),
-                Cell::new(once_batch, muted),
                 Cell::new(success, muted),
                 Cell::new(cwd, muted),
             ]

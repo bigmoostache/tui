@@ -84,7 +84,6 @@ fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(|s| s.to_string());
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
     let one_at_a_time = tool.input.get("one_at_a_time").and_then(|v| v.as_bool()).unwrap_or(false);
-    let once_per_batch = tool.input.get("once_per_batch").and_then(|v| v.as_bool()).unwrap_or(true);
 
     // Blocking callbacks require a timeout
     if blocking && timeout_secs.is_none() {
@@ -169,7 +168,6 @@ fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         success_message: success_message.clone(),
         cwd,
         one_at_a_time,
-        once_per_batch,
     };
 
     // Add to state and mark active
@@ -188,7 +186,6 @@ fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(t) = timeout_secs {
         msg.push_str(&format!("\n  Timeout: {}s", t));
     }
-    msg.push_str(&format!("\n  Once per batch: {}", once_per_batch));
     msg.push_str(&format!("\n  One at a time: {}", one_at_a_time));
     msg.push_str("\n  Status: active ✓");
 
@@ -230,6 +227,21 @@ fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other.".to_string(),
             true,
         );
+    }
+
+    // Diff-based edits require the editor to be open first (so the AI can see current content)
+    if has_diff {
+        let cs = CallbackState::get(state);
+        if cs.editor_open.as_deref() != Some(&anchor_id) {
+            return ToolResult::new(
+                tool.id.clone(),
+                format!(
+                    "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{}' first to view current script content.",
+                    anchor_id
+                ),
+                true,
+            );
+        }
     }
 
     let cs = CallbackState::get_mut(state);
@@ -276,10 +288,6 @@ fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(oaat) = tool.input.get("one_at_a_time").and_then(|v| v.as_bool()) {
         def.one_at_a_time = oaat;
         changes.push(format!("one_at_a_time → {}", oaat));
-    }
-    if let Some(opb) = tool.input.get("once_per_batch").and_then(|v| v.as_bool()) {
-        def.once_per_batch = opb;
-        changes.push(format!("once_per_batch → {}", opb));
     }
 
     // Handle script updates
@@ -420,6 +428,98 @@ fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(
         tool.id.clone(),
         format!("Callback {} [{}] deleted{}", anchor_id, sunken_def.name, script_msg),
+        false,
+    )
+}
+
+/// Open a callback's script in the panel editor for viewing/editing.
+pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
+        None => {
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'id'".to_string(), true);
+        }
+    };
+
+    let cs = CallbackState::get(state);
+    let def = match cs.definitions.iter().find(|d| d.id == anchor_id) {
+        Some(d) => d,
+        None => {
+            return ToolResult::new(
+                tool.id.clone(),
+                format!("Callback '{}' not found", anchor_id),
+                true,
+            );
+        }
+    };
+
+    // Read the script file so we can confirm it exists
+    let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+    if !script_path.exists() {
+        return ToolResult::new(
+            tool.id.clone(),
+            format!(
+                "Script file not found: .context-pilot/scripts/{}.sh — the callback definition exists but the script is missing.",
+                def.name
+            ),
+            true,
+        );
+    }
+
+    let previous = CallbackState::get(state).editor_open.clone();
+    CallbackState::get_mut(state).editor_open = Some(anchor_id.clone());
+
+    // Touch the callback panel to trigger re-render with editor content
+    for ctx in &mut state.context {
+        if ctx.context_type == cp_base::state::ContextType::CALLBACK {
+            ctx.last_refresh_ms = 0; // Force refresh
+            break;
+        }
+    }
+
+    let msg = if let Some(prev) = previous {
+        format!(
+            "Opened callback {} in editor (closed previous: {}). Script content is now visible in the Callbacks panel.",
+            anchor_id, prev
+        )
+    } else {
+        format!(
+            "Opened callback {} in editor. Script content is now visible in the Callbacks panel.",
+            anchor_id
+        )
+    };
+
+    ToolResult::new(tool.id.clone(), msg, false)
+}
+
+/// Close the callback editor, restoring the normal table view.
+pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let previous = CallbackState::get(state).editor_open.clone();
+
+    if previous.is_none() {
+        return ToolResult::new(
+            tool.id.clone(),
+            "No callback editor is currently open.".to_string(),
+            true,
+        );
+    }
+
+    CallbackState::get_mut(state).editor_open = None;
+
+    // Touch the callback panel to trigger re-render
+    for ctx in &mut state.context {
+        if ctx.context_type == cp_base::state::ContextType::CALLBACK {
+            ctx.last_refresh_ms = 0;
+            break;
+        }
+    }
+
+    ToolResult::new(
+        tool.id.clone(),
+        format!(
+            "Closed callback editor (was viewing '{}'). Callbacks panel restored to table view.",
+            previous.unwrap()
+        ),
         false,
     )
 }

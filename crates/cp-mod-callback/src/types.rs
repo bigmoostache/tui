@@ -24,8 +24,6 @@ pub struct CallbackDefinition {
     pub cwd: Option<String>,
     /// Won't run simultaneously with itself
     pub one_at_a_time: bool,
-    /// Fires once per tool batch with all matched files in $CP_CHANGED_FILES
-    pub once_per_batch: bool,
 }
 
 /// Module-owned state for the Callback module.
