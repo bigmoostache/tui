@@ -6,7 +6,7 @@ use cp_base::config::theme;
 use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
-use cp_base::ui::{Cell, render_table};
+use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
 use crate::types::{MemoryImportance, MemoryState};
 
@@ -36,59 +36,23 @@ impl MemoryPanel {
 
         let mut output = String::new();
 
-        // Closed memories as table
+        // Closed memories as table using shared renderer
         if !closed.is_empty() {
-            // Compute column widths
             let headers = ["ID", "Summary", "Importance", "Labels"];
-            let rows: Vec<[String; 4]> = closed
+            let rows: Vec<Vec<TextCell>> = closed
                 .iter()
                 .map(|m| {
                     let labels = if m.labels.is_empty() { String::new() } else { m.labels.join(", ") };
-                    [m.id.clone(), m.tl_dr.clone(), m.importance.as_str().to_string(), labels]
+                    vec![
+                        TextCell::left(&m.id),
+                        TextCell::left(&m.tl_dr),
+                        TextCell::left(m.importance.as_str()),
+                        TextCell::left(labels),
+                    ]
                 })
                 .collect();
 
-            let mut widths = headers.map(|h| h.len());
-            for row in &rows {
-                for (i, cell) in row.iter().enumerate() {
-                    widths[i] = widths[i].max(cell.len());
-                }
-            }
-
-            // Header
-            output.push_str(&format!(
-                "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
-                headers[0],
-                headers[1],
-                headers[2],
-                headers[3],
-                w0 = widths[0],
-                w1 = widths[1],
-                w2 = widths[2],
-                w3 = widths[3],
-            ));
-            // Separator
-            output.push_str(&format!(
-                "{}─┼─{}─┼─{}─┼─{}\n",
-                "─".repeat(widths[0]),
-                "─".repeat(widths[1]),
-                "─".repeat(widths[2]),
-                "─".repeat(widths[3]),
-            ));
-            // Rows
-            for row in &rows {
-                output.push_str(&format!(
-                    "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    w0 = widths[0],
-                    w1 = widths[1],
-                    w2 = widths[2],
-                    w3 = widths[3],
-                ));
-            }
+            output.push_str(&render_table_text(&headers, &rows));
         }
 
         // Open memories as YAML

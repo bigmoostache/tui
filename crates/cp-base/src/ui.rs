@@ -134,6 +134,95 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
     lines
 }
 
+/// Simple text-cell for `render_table_text`. Style-free, just text + alignment.
+pub struct TextCell {
+    pub text: String,
+    pub align: Align,
+}
+
+impl TextCell {
+    pub fn left(text: impl Into<String>) -> Self {
+        Self { text: text.into(), align: Align::Left }
+    }
+    pub fn right(text: impl Into<String>) -> Self {
+        Self { text: text.into(), align: Align::Right }
+    }
+}
+
+/// Render a table as a plain-text string for LLM context.
+///
+/// Uses ` │ ` column separators and `─┼─` header underline.
+/// Column widths computed via `UnicodeWidthStr` for correct alignment.
+///
+/// Example output:
+/// ```text
+/// ID  │ Summary          │ Importance │ Labels
+/// ────┼──────────────────┼────────────┼──────────
+/// M1  │ Some memory note │ high       │ arch, bug
+/// ```
+pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
+    let num_cols = header.len();
+
+    // Compute column widths using display width
+    let mut col_widths: Vec<usize> = header.iter().map(|h| UnicodeWidthStr::width(*h)).collect();
+    col_widths.resize(num_cols, 0);
+
+    for row in rows {
+        for (col, cell) in row.iter().enumerate() {
+            if col < num_cols {
+                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
+            }
+        }
+    }
+
+    let mut output = String::new();
+
+    // Helper to pad text to target display width
+    let pad = |text: &str, target: usize, align: Align| -> String {
+        let w = UnicodeWidthStr::width(text);
+        let deficit = target.saturating_sub(w);
+        match align {
+            Align::Left => format!("{}{}", text, " ".repeat(deficit)),
+            Align::Right => format!("{}{}", " ".repeat(deficit), text),
+        }
+    };
+
+    // Header
+    for (col, hdr) in header.iter().enumerate() {
+        if col > 0 {
+            output.push_str(" │ ");
+        }
+        output.push_str(&pad(hdr, col_widths[col], Align::Left));
+    }
+    output.push('\n');
+
+    // Separator
+    for (col, width) in col_widths.iter().enumerate() {
+        if col > 0 {
+            output.push_str("─┼─");
+        }
+        output.push_str(&"─".repeat(*width));
+    }
+    output.push('\n');
+
+    // Rows
+    for row in rows {
+        for (col, col_w) in col_widths.iter().enumerate().take(num_cols) {
+            if col > 0 {
+                output.push_str(" │ ");
+            }
+            if let Some(cell) = row.get(col) {
+                output.push_str(&pad(&cell.text, *col_w, cell.align));
+            } else {
+                output.push_str(&" ".repeat(*col_w));
+            }
+        }
+        output.push('\n');
+    }
+
+    output
+}
+
 /// Find size pattern in tree output (e.g., "123K" at end of line)
 pub fn find_size_pattern(line: &str) -> Option<usize> {
     let trimmed = line.trim_end();
