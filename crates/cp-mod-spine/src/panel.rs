@@ -229,8 +229,14 @@ fn notification_type_color(nt: &NotificationType) -> Color {
     }
 }
 
-/// Truncate content for display, appending "..." if truncated
+/// Truncate content for display, appending "..." if truncated.
+/// Uses char boundaries to avoid panicking on multi-byte UTF-8 (emojis etc).
 fn truncate_content(s: &str, max_chars: usize) -> String {
     let first_line = s.lines().next().unwrap_or(s);
-    if first_line.len() > max_chars { format!("{}...", &first_line[..max_chars]) } else { first_line.to_string() }
+    if first_line.chars().count() > max_chars {
+        let byte_end = first_line.char_indices().nth(max_chars).map(|(i, _)| i).unwrap_or(first_line.len());
+        format!("{}...", &first_line[..byte_end])
+    } else {
+        first_line.to_string()
+    }
 }
