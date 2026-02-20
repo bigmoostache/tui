@@ -258,12 +258,11 @@ pub fn detach_conversation_chunks(state: &mut State) {
             break; // Nothing useful to detach
         }
 
-        // 6. Get timestamp from first active message (for sort ordering — oldest first)
-        let chunk_timestamp = state.messages[..boundary]
-            .iter()
-            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.timestamp_ms)
-            .unwrap_or_else(now_ms);
+        // 6. Use current time as last_refresh_ms so the history panel sorts
+        //    to the end of the context. This preserves prompt cache hits for
+        //    all panels before it — history panels stack progressively like
+        //    icebergs calving off, instead of sinking deep and invalidating cache.
+        let chunk_timestamp = now_ms();
 
         // 7. Create the ConversationHistory panel
         let panel_id = state.next_available_context_id();
