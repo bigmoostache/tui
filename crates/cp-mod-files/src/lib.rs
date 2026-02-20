@@ -281,10 +281,10 @@ fn style_callback_line(
             if !after.is_empty() {
                 spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
             }
-        } else if let Some(pos) = rest.find(" running") {
+        } else if let Some(pos) = rest.find(" dispatched") {
             let name = &rest[..pos];
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" running", Style::default().fg(blue)));
+            spans.push(Span::styled(" dispatched", Style::default().fg(blue)));
         } else if let Some(pos) = rest.find(" skipped") {
             let name = &rest[..pos];
             let after = &rest[pos + 8..]; // skip " skipped"

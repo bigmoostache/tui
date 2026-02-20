@@ -128,7 +128,7 @@ pub fn fire_callback(
 }
 
 /// Fire all matched non-blocking callbacks.
-/// Returns one summary line per callback in compact format: "· name running"
+/// Returns one summary line per callback in compact format: "· name dispatched"
 pub fn fire_async_callbacks(
     state: &mut State,
     callbacks: &[MatchedCallback],
@@ -137,7 +137,7 @@ pub fn fire_async_callbacks(
     for cb in callbacks {
         match fire_callback(state, cb, None) {
             Ok(_session_key) => {
-                summaries.push(format!("· {} running", cb.definition.name));
+                summaries.push(format!("· {} dispatched", cb.definition.name));
             }
             Err(e) => {
                 summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e));
@@ -277,7 +277,7 @@ impl Watcher for CallbackWatcher {
         let elapsed_s = (now - self.registered_at_ms) / 1000;
         Some(WatcherResult {
             description: format!(
-                "Callback '{}' TIMED OUT after {}s. Files: [{}]",
+                "· {} TIMED OUT ({}s). Files: [{}]",
                 self.callback_name, elapsed_s, self.matched_files.join(", "),
             ),
             panel_id: None,
