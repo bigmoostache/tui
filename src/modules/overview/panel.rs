@@ -22,7 +22,7 @@ impl Panel for OverviewPanel {
     }
 
     fn title(&self, _state: &State) -> String {
-        "Context Overview".to_string()
+        "Statistics".to_string()
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -30,7 +30,7 @@ impl Panel for OverviewPanel {
         if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::OVERVIEW)
             && let Some(content) = &ctx.cached_content
         {
-            return vec![ContextItem::new(&ctx.id, "Context Overview", content.clone(), ctx.last_refresh_ms)];
+            return vec![ContextItem::new(&ctx.id, "Statistics", content.clone(), ctx.last_refresh_ms)];
         }
 
         // Fallback: generate fresh
@@ -41,10 +41,13 @@ impl Panel for OverviewPanel {
             .find(|c| c.context_type == ContextType::OVERVIEW)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P5", 0));
-        vec![ContextItem::new(id, "Context Overview", output, last_refresh_ms)]
+        vec![ContextItem::new(id, "Statistics", output, last_refresh_ms)]
     }
 
     fn refresh(&self, state: &mut State) {
+        // Refresh git status (branch, file changes) before generating context
+        cp_mod_git::refresh_git_status(state);
+
         let content = self.generate_context_content(state);
         let token_count = crate::state::estimate_tokens(&content);
 
@@ -72,18 +75,6 @@ impl Panel for OverviewPanel {
         text.extend(render::separator());
 
         text.extend(render::render_statistics(state, base_style));
-        text.extend(render::separator());
-
-        text.extend(render::render_seeds(state, base_style));
-        text.extend(render::separator());
-
-        let presets_section = render::render_presets(base_style);
-        if !presets_section.is_empty() {
-            text.extend(presets_section);
-            text.extend(render::separator());
-        }
-
-        text.extend(render::render_tools(state, base_style));
 
         text
     }

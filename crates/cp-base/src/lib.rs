@@ -5,3 +5,7 @@ pub mod panels;
 pub mod state;
 pub mod tools;
 pub mod ui;
+pub mod watchers {
+    //! Re-export from state::watchers for convenience.
+    pub use crate::state::watchers::*;
+}

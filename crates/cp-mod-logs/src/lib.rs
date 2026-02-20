@@ -221,7 +221,7 @@ impl Module for LogsModule {
             },
 
             ToolDefinition {
-                id: "close_conversation_history".to_string(),
+                id: "Close_conversation_history".to_string(),
                 name: "Close Conversation History".to_string(),
                 short_desc: "Close a conversation history panel with logs/memories".to_string(),
                 description: "Closes a conversation history panel. Before closing, creates log entries and memory items to preserve important information. Everything in the history panel will be lost after closing.\n\nIMPORTANT: Before calling this tool, carefully review ALL human messages in the panel. Extract and preserve:\n- **Logs**: Short, atomic entries for mid-conversation context — decisions made, actions taken, bugs found, user preferences expressed, task context. Logs are medium-lifecycle: they maintain conversation flow across reloads.\n- **Memories**: Longer-lived knowledge that matters beyond this session — architecture decisions, user preferences, project conventions, important discoveries. Memories persist across conversations.\n\nEvery substantive piece of information from human messages should be captured in either a log or a memory. When in doubt, preserve it. Log timestamps are set to the panel's last message time, not the current time.".to_string(),
@@ -256,7 +256,7 @@ impl Module for LogsModule {
             "log_create" => Some(tools::execute_log_create(tool, state)),
             "log_summarize" => Some(tools::execute_log_summarize(tool, state)),
             "log_toggle" => Some(tools::execute_log_toggle(tool, state)),
-            "close_conversation_history" => Some(tools::execute_close_conversation_history(tool, state)),
+            "Close_conversation_history" => Some(tools::execute_close_conversation_history(tool, state)),
             _ => None,
         }
     }
@@ -266,7 +266,7 @@ impl Module for LogsModule {
             ("log_create", visualize_logs_output as ToolVisualizer),
             ("log_summarize", visualize_logs_output as ToolVisualizer),
             ("log_toggle", visualize_logs_output as ToolVisualizer),
-            ("close_conversation_history", visualize_logs_output as ToolVisualizer),
+            ("Close_conversation_history", visualize_logs_output as ToolVisualizer),
         ]
     }
 

@@ -9,6 +9,7 @@ use crate::state::{
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
+use crate::modules::conversation::refresh::estimate_message_tokens;
 
 /// Context data prepared for streaming
 pub struct StreamContext {
@@ -178,7 +179,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             .messages
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| estimate_tokens(&m.content))
+            .map(|m| estimate_message_tokens(m))
             .sum();
 
         // 2. Quick check: if we can't possibly satisfy both chunk minimums
@@ -201,7 +202,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
                 continue;
             }
             active_seen += 1;
-            tokens_seen += estimate_tokens(&msg.content);
+            tokens_seen += estimate_message_tokens(msg);
 
             if active_seen >= DETACH_CHUNK_MIN_MESSAGES
                 && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
@@ -225,7 +226,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
         let remaining_tokens: usize = state.messages[boundary..]
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| estimate_tokens(&m.content))
+            .map(|m| estimate_message_tokens(m))
             .sum();
 
         if remaining_active < DETACH_KEEP_MIN_MESSAGES || remaining_tokens < DETACH_KEEP_MIN_TOKENS {
@@ -257,12 +258,11 @@ pub fn detach_conversation_chunks(state: &mut State) {
             break; // Nothing useful to detach
         }
 
-        // 6. Get timestamp from first active message (for sort ordering — oldest first)
-        let chunk_timestamp = state.messages[..boundary]
-            .iter()
-            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.timestamp_ms)
-            .unwrap_or_else(now_ms);
+        // 6. Use current time as last_refresh_ms so the history panel sorts
+        //    to the end of the context. This preserves prompt cache hits for
+        //    all panels before it — history panels stack progressively like
+        //    icebergs calving off, instead of sinking deep and invalidating cache.
+        let chunk_timestamp = now_ms();
 
         // 7. Create the ConversationHistory panel
         let panel_id = state.next_available_context_id();

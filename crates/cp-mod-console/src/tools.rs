@@ -1,9 +1,10 @@
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};
+use cp_base::watchers::WatcherRegistry;
 
 use crate::manager::SessionHandle;
-use crate::types::{ConsoleState, ConsoleWaiter, format_wait_result};
+use crate::types::{ConsoleState, ConsoleWatcher, format_wait_result};
 
 /// Sentinel value returned when a blocking console_wait is registered.
 /// The binary's event loop replaces this with the real result when satisfied.
@@ -11,6 +12,45 @@ pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 
 /// Maximum execution time for debug_bash (blocking tool — must be short).
 const BASH_MAX_EXECUTION_SECS: u64 = 10;
+
+/// Check if a command string contains git or gh commands.
+/// Returns Some(error_message) if blocked, None if allowed.
+fn check_git_gh_guardrail(input: &str) -> Option<String> {
+    // Split on shell operators to handle chained commands
+    let segments: Vec<&str> = input.split(|c| c == '|' || c == ';' || c == '&' || c == '\n')
+        .collect();
+
+    for segment in &segments {
+        let trimmed = segment.trim();
+        // Skip empty segments
+        if trimmed.is_empty() {
+            continue;
+        }
+        // Strip leading env vars (KEY=VAL) to find the actual command
+        let cmd_part = trimmed.split_whitespace()
+            .skip_while(|w| w.contains('=') && !w.starts_with('='))
+            .next()
+            .unwrap_or("");
+
+        // Check the actual binary name (could be a path like /usr/bin/git)
+        let binary = cmd_part.rsplit('/').next().unwrap_or(cmd_part);
+
+        if binary == "git" {
+            return Some(
+                "Blocked: use the `git_execute` tool instead of running git through console.\n\
+                 Example: git_execute with command=\"git status\"".to_string()
+            );
+        }
+        if binary == "gh" {
+            return Some(
+                "Blocked: use the `gh_execute` tool instead of running gh through console.\n\
+                 Example: gh_execute with command=\"gh pr list\"".to_string()
+            );
+        }
+    }
+
+    None
+}
 
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
 /// Returns (session_key, panel_id) or an error.
@@ -28,6 +68,12 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(c) => c.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
     };
+
+    // Guardrail: block git/gh commands
+    if let Some(msg) = check_git_gh_guardrail(&command) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
+
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
     let description = tool.input.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
 
@@ -85,6 +131,11 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => return ToolResult::new(tool.id.clone(), "Missing required 'input' parameter".to_string(), true),
     };
 
+    // Guardrail: block git/gh commands sent to interactive shells
+    if let Some(msg) = check_git_gh_guardrail(&input) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
+
     let session_key = match resolve_session_key(state, &panel_id) {
         Ok(k) => k,
         Err(e) => return ToolResult::new(tool.id.clone(), e, true),
@@ -124,7 +175,6 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_string(), true),
     };
     let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let block = tool.input.get("block").and_then(|v| v.as_bool()).unwrap_or(true);
     let max_wait: u64 = tool
         .input
         .get("max_wait")
@@ -185,26 +235,120 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let now = now_ms();
-    let waiter = ConsoleWaiter {
+    let desc = match mode.as_str() {
+        "exit" => format!("⏳ Waiting for {} to exit", panel_id),
+        "pattern" => format!("⏳ Waiting for pattern '{}' in {}", pattern.as_deref().unwrap_or("?"), panel_id),
+        _ => format!("⏳ Waiting on {}", panel_id),
+    };
+
+    let watcher = ConsoleWatcher {
+        watcher_id: format!("console_{}_{}", session_key, mode),
         session_name: session_key,
         mode,
         pattern,
-        blocking: block,
+        blocking: true,
         tool_use_id: Some(tool.id.clone()),
-        registered_ms: now,
-        deadline_ms: if block { Some(now + max_wait * 1000) } else { None },
-        is_debug_bash: false,
+        registered_at_ms: now,
+        deadline_ms: Some(now + max_wait * 1000),
+        easy_bash: false,
+        panel_id,
+        desc,
     };
 
-    if block {
-        let cs = ConsoleState::get_mut(state);
-        cs.blocking_waiters.push(waiter);
-        ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
-    } else {
-        let cs = ConsoleState::get_mut(state);
-        cs.async_waiters.push(waiter);
-        ToolResult::new(tool.id.clone(), format!("Watcher registered for '{}'", panel_id), false)
+    let registry = WatcherRegistry::get_mut(state);
+    registry.register(Box::new(watcher));
+
+    ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
+}
+
+pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
+        None => return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true),
+    };
+    let mode = match tool.input.get("mode").and_then(|v| v.as_str()) {
+        Some(m) => m.to_string(),
+        None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_string(), true),
+    };
+    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+    // Validate mode
+    if mode != "exit" && mode != "pattern" {
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Invalid mode '{}'. Must be 'exit' or 'pattern'.", mode),
+            true,
+        );
     }
+
+    if mode == "pattern" && pattern.is_none() {
+        return ToolResult::new(
+            tool.id.clone(),
+            "Mode 'pattern' requires a 'pattern' parameter".to_string(),
+            true,
+        );
+    }
+
+    let session_key = match resolve_session_key(state, &panel_id) {
+        Ok(k) => k,
+        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    };
+
+    // Check if session exists
+    let cs = ConsoleState::get(state);
+    let handle = match cs.sessions.get(&session_key) {
+        Some(h) => h,
+        None => return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true),
+    };
+
+    // Check if condition is already met — return immediately
+    let already_met = match mode.as_str() {
+        "exit" => handle.get_status().is_terminal(),
+        "pattern" => {
+            if let Some(ref pat) = pattern {
+                handle.buffer.contains_pattern(pat)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+
+    if already_met {
+        let exit_code = handle.get_status().exit_code();
+        let last_lines = handle.buffer.last_n_lines(5);
+        return ToolResult::new(
+            tool.id.clone(),
+            format_wait_result(&session_key, exit_code, &panel_id, &last_lines),
+            false,
+        );
+    }
+
+    let now = now_ms();
+    let desc = match mode.as_str() {
+        "exit" => format!("👁 Watching {} for exit", panel_id),
+        "pattern" => format!("👁 Watching {} for '{}'", panel_id, pattern.as_deref().unwrap_or("?")),
+        _ => format!("👁 Watching {}", panel_id),
+    };
+
+    let watcher = ConsoleWatcher {
+        watcher_id: format!("console_{}_{}", session_key, mode),
+        session_name: session_key,
+        mode,
+        pattern,
+        blocking: false,
+        tool_use_id: None,
+        registered_at_ms: now,
+        deadline_ms: None, // async watchers have no timeout
+        easy_bash: false,
+        panel_id: panel_id.clone(),
+        desc,
+    };
+
+    let registry = WatcherRegistry::get_mut(state);
+    registry.register(Box::new(watcher));
+
+    ToolResult::new(tool.id.clone(), format!("Watcher registered for '{}' — you'll get a spine notification when the condition is met.", panel_id), false)
 }
 
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -212,6 +356,12 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(c) => c.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'command' parameter".to_string(), true),
     };
+
+    // Guardrail: block git/gh commands
+    if let Some(msg) = check_git_gh_guardrail(&command) {
+        return ToolResult::new(tool.id.clone(), msg, true);
+    }
+
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     // Spawn via the console server (non-blocking to the main loop)
@@ -222,29 +372,50 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd) {
+    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
         Ok(h) => h,
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
     };
+
+    // Create a panel so output goes there instead of flooding the conversation
+    let display_name = if command.len() > 30 { &command[..30] } else { &command };
+    let panel_id = state.next_available_context_id();
+    let uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid += 1;
+    let mut ctx =
+        make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    ctx.uid = Some(uid);
+    ctx.set_meta("console_name", &session_key);
+    ctx.set_meta("console_command", &command);
+    ctx.set_meta("console_status", &handle.get_status().label());
+    ctx.set_meta("console_is_easy_bash", &"true".to_string());
+    if let Some(ref dir) = cwd {
+        ctx.set_meta("console_cwd", dir);
+    }
+    state.context.push(ctx);
 
     // Store the handle (needed for waiter to check status + read buffer)
     let cs = ConsoleState::get_mut(state);
     cs.sessions.insert(session_key.clone(), handle);
 
-    // Register a blocking exit waiter with BASH_MAX_EXECUTION_SECS timeout
+    // Register a blocking exit watcher via WatcherRegistry
     let now = now_ms();
-    let waiter = ConsoleWaiter {
+    let watcher = ConsoleWatcher {
+        watcher_id: format!("console_{}_easy_bash", session_key),
         session_name: session_key,
         mode: "exit".to_string(),
         pattern: None,
         blocking: true,
         tool_use_id: Some(tool.id.clone()),
-        registered_ms: now,
+        registered_at_ms: now,
         deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
-        is_debug_bash: true,
+        easy_bash: true,
+        panel_id: panel_id.clone(),
+        desc: format!("⏳ easy_bash: {}", if command.len() > 40 { &command[..40] } else { &command }),
     };
-    let cs = ConsoleState::get_mut(state);
-    cs.blocking_waiters.push(waiter);
+
+    let registry = WatcherRegistry::get_mut(state);
+    registry.register(Box::new(watcher));
 
     ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
 }

@@ -6,7 +6,8 @@ use ratatui::{
 use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
-use cp_mod_git::GitChangeType;
+
+
 use cp_mod_prompt::PromptState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
@@ -129,9 +130,10 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Git change stats (if there are any changes)
     if !gs.git_file_changes.is_empty() {
-        // Calculate line change statistics
-        let mut total_additions = 0;
-        let mut total_deletions = 0;
+        use cp_mod_git::GitChangeType;
+
+        let mut total_additions: i32 = 0;
+        let mut total_deletions: i32 = 0;
         let mut untracked_count = 0;
         let mut modified_count = 0;
         let mut deleted_count = 0;
@@ -143,14 +145,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
                 GitChangeType::Untracked => untracked_count += 1,
                 GitChangeType::Modified => modified_count += 1,
                 GitChangeType::Deleted => deleted_count += 1,
-                GitChangeType::Added => modified_count += 1, // Added files count as modified for UI
-                GitChangeType::Renamed => modified_count += 1, // Renamed files count as modified
+                GitChangeType::Added => modified_count += 1,
+                GitChangeType::Renamed => modified_count += 1,
             }
         }
 
         let net_change = total_additions - total_deletions;
 
-        // Card 1: Line changes with slashes between counts on gray bg
+        // Line changes card: +N/-N/net
         let (net_prefix, net_value) = if net_change >= 0 { ("+", net_change) } else { ("", net_change) };
 
         spans.push(Span::styled(" +", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
@@ -180,7 +182,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         ));
         spans.push(Span::styled(" ", base_style));
 
-        // Card 2: File changes with slashes between counts on gray bg
+        // File changes card: U/M/D
         spans.push(Span::styled(" U", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
         spans.push(Span::styled(
             format!("{}", untracked_count),

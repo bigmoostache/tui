@@ -44,56 +44,6 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created agent '{}' with ID '{}'", name, id), false)
 }
 
-pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
-        }
-    };
-
-    let agent = match PromptState::get_mut(state).agents.iter_mut().find(|a| a.id == id) {
-        Some(a) => a,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
-        }
-    };
-
-    if agent.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in agent '{}'", id), true);
-    }
-
-    let mut changes = Vec::new();
-
-    if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
-        agent.name = name.to_string();
-        changes.push("name");
-    }
-
-    if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
-        agent.description = desc.to_string();
-        changes.push("description");
-    }
-
-    if let Some(content) = tool.input.get("content").and_then(|v| v.as_str()) {
-        agent.content = content.to_string();
-        changes.push("content");
-    }
-
-    if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true);
-    }
-
-    // Save to disk
-    let agent_clone = agent.clone();
-    storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), &agent_clone);
-
-    state.touch_panel(ContextType::new(ContextType::SYSTEM));
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
-
-    ToolResult::new(tool.id.clone(), format!("Updated agent '{}': {}", id, changes.join(", ")), false)
-}
-
 pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id,

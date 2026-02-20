@@ -4,8 +4,9 @@ use ratatui::prelude::*;
 use cp_base::state::Action;
 use cp_base::config::SCROLL_ARROW_AMOUNT;
 use cp_base::config::theme;
-use cp_base::panels::{ContextItem, Panel};
+use cp_base::panels::{ContextItem, Panel, now_ms};
 use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::watchers::WatcherRegistry;
 
 use crate::types::{NotificationType, SpineState};
 
@@ -49,10 +50,6 @@ impl SpinePanel {
         // Show spine config summary
         output.push_str("\n=== Spine Config ===\n");
         output.push_str(&format!(
-            "max_tokens_auto_continue: {}\n",
-            SpineState::get(state).config.max_tokens_auto_continue
-        ));
-        output.push_str(&format!(
             "continue_until_todos_done: {}\n",
             SpineState::get(state).config.continue_until_todos_done
         ));
@@ -60,6 +57,20 @@ impl SpinePanel {
             .push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
             output.push_str(&format!("max_auto_retries: {}\n", v));
+        }
+
+        // Show active watchers
+        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
+            let watchers = registry.active_watchers();
+            if !watchers.is_empty() {
+                output.push_str("\n=== Active Watchers ===\n");
+                let now = now_ms();
+                for w in watchers {
+                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let mode = if w.is_blocking() { "blocking" } else { "async" };
+                    output.push_str(&format!("[{}] {} ({}, {}s ago)\n", w.id(), w.description(), mode, age_s));
+                }
+            }
         }
 
         output.trim_end().to_string()
@@ -164,7 +175,6 @@ impl Panel for SpinePanel {
         lines.push(Line::from(vec![Span::styled("Config".to_string(), Style::default().fg(theme::text_secondary()))]));
 
         let config_items = vec![
-            ("max_tokens_auto_continue", format!("{}", SpineState::get(state).config.max_tokens_auto_continue)),
             ("continue_until_todos_done", format!("{}", SpineState::get(state).config.continue_until_todos_done)),
             ("auto_continuations", format!("{}", SpineState::get(state).config.auto_continuation_count)),
         ];
@@ -177,6 +187,29 @@ impl Panel for SpinePanel {
             ]));
         }
 
+        // === Active Watchers ===
+        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
+            let watchers = registry.active_watchers();
+            if !watchers.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![Span::styled(
+                    format!("Active Watchers ({})", watchers.len()),
+                    Style::default().fg(theme::accent()),
+                )]));
+                let now = now_ms();
+                for w in watchers {
+                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let mode_color = if w.is_blocking() { theme::warning() } else { theme::text_secondary() };
+                    let mode_label = if w.is_blocking() { "⏳" } else { "👁" };
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {} ", mode_label), Style::default().fg(mode_color)),
+                        Span::styled(w.description().to_string(), Style::default().fg(theme::text())),
+                        Span::styled(format!(" ({}s)", age_s), Style::default().fg(theme::text_muted())),
+                    ]));
+                }
+            }
+        }
+
         lines
     }
 }
@@ -184,15 +217,19 @@ impl Panel for SpinePanel {
 fn notification_type_color(nt: &NotificationType) -> Color {
     match nt {
         NotificationType::UserMessage => theme::user(),
-        NotificationType::MaxTokensTruncated => theme::warning(),
-        NotificationType::TodoIncomplete => theme::accent(),
         NotificationType::ReloadResume => theme::text_secondary(),
         NotificationType::Custom => theme::text_secondary(),
     }
 }
 
-/// Truncate content for display, appending "..." if truncated
+/// Truncate content for display, appending "..." if truncated.
+/// Uses char boundaries to avoid panicking on multi-byte UTF-8 (emojis etc).
 fn truncate_content(s: &str, max_chars: usize) -> String {
     let first_line = s.lines().next().unwrap_or(s);
-    if first_line.len() > max_chars { format!("{}...", &first_line[..max_chars]) } else { first_line.to_string() }
+    if first_line.chars().count() > max_chars {
+        let byte_end = first_line.char_indices().nth(max_chars).map(|(i, _)| i).unwrap_or(first_line.len());
+        format!("{}...", &first_line[..byte_end])
+    } else {
+        first_line.to_string()
+    }
 }

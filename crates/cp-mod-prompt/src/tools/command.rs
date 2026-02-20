@@ -42,54 +42,6 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created command '{}' with ID '{}' (use as /{})", name, id, id), false)
 }
 
-pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
-        }
-    };
-
-    let cmd = match PromptState::get_mut(state).commands.iter_mut().find(|c| c.id == id) {
-        Some(c) => c,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Command '{}' not found", id), true);
-        }
-    };
-
-    if cmd.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in command '{}'", id), true);
-    }
-
-    let mut changes = Vec::new();
-
-    if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
-        cmd.name = name.to_string();
-        changes.push("name");
-    }
-
-    if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
-        cmd.description = desc.to_string();
-        changes.push("description");
-    }
-
-    if let Some(content) = tool.input.get("content").and_then(|v| v.as_str()) {
-        cmd.content = content.to_string();
-        changes.push("content");
-    }
-
-    if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true);
-    }
-
-    let cmd_clone = cmd.clone();
-    storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &cmd_clone);
-
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
-
-    ToolResult::new(tool.id.clone(), format!("Updated command '{}': {}", id, changes.join(", ")), false)
-}
-
 pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id,

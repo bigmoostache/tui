@@ -1,12 +1,138 @@
 pub(crate) mod cache_invalidation;
 mod classify;
-mod panel;
-mod panel_render;
 mod result_panel;
 mod tools;
 pub mod types;
 
-pub use types::{GitCacheUpdate, GitChangeType, GitFileChange, GitState};
+pub use types::{GitChangeType, GitFileChange, GitState};
+
+/// Refresh git status (branch, file changes) into GitState.
+/// Called periodically by the overview panel to keep stats up to date.
+pub fn refresh_git_status(state: &mut State) {
+    use std::process::Command;
+    use types::GitChangeType;
+
+    // Check if git repo
+    let is_repo = Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let gs = GitState::get_mut(state);
+    gs.git_is_repo = is_repo;
+
+    if !is_repo {
+        gs.git_branch = None;
+        gs.git_branches = vec![];
+        gs.git_file_changes = vec![];
+        return;
+    }
+
+    // Get current branch
+    if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output() {
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if branch.is_empty() {
+            // Detached HEAD
+            if let Ok(o2) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
+                gs.git_branch = Some(format!("detached:{}", String::from_utf8_lossy(&o2.stdout).trim()));
+            }
+        } else {
+            gs.git_branch = Some(branch);
+        }
+    }
+
+    // Get file changes with numstat
+    let diff_base = gs.git_diff_base.clone();
+    let diff_args = if let Some(ref base) = diff_base {
+        vec!["diff", "--numstat", base.as_str()]
+    } else {
+        vec!["diff", "--numstat", "HEAD"]
+    };
+
+    let mut file_changes: Vec<GitFileChange> = Vec::new();
+
+    // Tracked changes (diff against HEAD or base)
+    if let Ok(output) = Command::new("git").args(&diff_args).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() >= 3 {
+                    let additions = parts[0].parse::<i32>().unwrap_or(0);
+                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                    let path = parts[2].to_string();
+
+                    // Check if file exists to determine if deleted
+                    let change_type = if !std::path::Path::new(&path).exists() {
+                        GitChangeType::Deleted
+                    } else {
+                        GitChangeType::Modified
+                    };
+
+                    file_changes.push(GitFileChange {
+                        path,
+                        additions,
+                        deletions,
+                        change_type,
+                    });
+                }
+            }
+        }
+    }
+
+    // Staged changes (diff --cached)
+    if let Ok(output) = Command::new("git").args(["diff", "--numstat", "--cached"]).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() >= 3 {
+                    let additions = parts[0].parse::<i32>().unwrap_or(0);
+                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                    let path = parts[2].to_string();
+
+                    // Skip if already in the list
+                    if file_changes.iter().any(|f| f.path == path) {
+                        continue;
+                    }
+
+                    file_changes.push(GitFileChange {
+                        path,
+                        additions,
+                        deletions,
+                        change_type: GitChangeType::Added,
+                    });
+                }
+            }
+        }
+    }
+
+    // Untracked files
+    if let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let path = line.trim().to_string();
+                if path.is_empty() {
+                    continue;
+                }
+                // Count lines for untracked files
+                let line_count = std::fs::read_to_string(&path)
+                    .map(|c| c.lines().count() as i32)
+                    .unwrap_or(0);
+
+                file_changes.push(GitFileChange {
+                    path,
+                    additions: line_count,
+                    deletions: 0,
+                    change_type: GitChangeType::Untracked,
+                });
+            }
+        }
+    }
+
+    let gs = GitState::get_mut(state);
+    gs.git_file_changes = file_changes;
+}
+
 
 /// Timeout for git commands (seconds)
 pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
@@ -22,7 +148,7 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use self::panel::{GitPanel, GitResultPanel};
+use self::result_panel::GitResultPanel;
 use cp_base::modules::Module;
 
 pub struct GitModule;
@@ -49,22 +175,18 @@ impl Module for GitModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let gs = GitState::get(state);
         json!({
-            "git_show_diffs": gs.git_show_diffs,
             "git_diff_base": gs.git_diff_base,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(v) = data.get("git_show_diffs").and_then(|v| v.as_bool()) {
-            GitState::get_mut(state).git_show_diffs = v;
-        }
         if let Some(v) = data.get("git_diff_base").and_then(|v| v.as_str()) {
             GitState::get_mut(state).git_diff_base = Some(v.to_string());
         }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::GIT)]
+        vec![]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
@@ -72,12 +194,11 @@ impl Module for GitModule {
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::GIT), "Changes", false)]
+        vec![]
     }
 
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::GIT => Some(Box::new(GitPanel)),
             ContextType::GIT_RESULT => Some(Box::new(GitResultPanel)),
             _ => None,
         }
@@ -102,31 +223,12 @@ impl Module for GitModule {
                 enabled: true,
                 category: "Git".to_string(),
             },
-            ToolDefinition {
-                id: "git_configure_p6".to_string(),
-                name: "Configure Git Panel".to_string(),
-                short_desc: "Configure P6 panel".to_string(),
-                description: "Configures the P6 git status panel. Can toggle diff display, log display, \
-                    change log arguments, and set a diff base ref for comparison."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("show_diffs", ParamType::Boolean).desc("Show full diff content in P6 panel"),
-                    ToolParam::new("show_logs", ParamType::Boolean).desc("Show recent commit history in P6 panel"),
-                    ToolParam::new("log_args", ParamType::String)
-                        .desc("Custom git log arguments (e.g., '-10 --oneline')"),
-                    ToolParam::new("diff_base", ParamType::String)
-                        .desc("Git ref to diff against (e.g., 'HEAD~3', 'main'). Set to empty string to clear."),
-                ],
-                enabled: true,
-                category: "Git".to_string(),
-            },
         ]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "git_execute" => Some(self::tools::execute_git_command(tool, state)),
-            "git_configure_p6" => Some(self::tools::execute_configure_p6(tool, state)),
             _ => None,
         }
     }
@@ -134,22 +236,11 @@ impl Module for GitModule {
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
             ("git_execute", visualize_git_output as ToolVisualizer),
-            ("git_configure_p6", visualize_git_config as ToolVisualizer),
         ]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
         vec![
-            cp_base::state::ContextTypeMeta {
-                context_type: "git",
-                icon_id: "git",
-                is_fixed: true,
-                needs_cache: true,
-                fixed_order: Some(7),
-                display_name: "git",
-                short_name: "changes",
-                needs_async_wait: false,
-            },
             cp_base::state::ContextTypeMeta {
                 context_type: "git_result",
                 icon_id: "git",
@@ -232,8 +323,7 @@ impl Module for GitModule {
         changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {
-        let ct = ctx.context_type.as_str();
-        (ct == ContextType::GIT || ct == ContextType::GIT_RESULT) && changed_path.starts_with(".git/")
+        ctx.context_type.as_str() == ContextType::GIT_RESULT && changed_path.starts_with(".git/")
     }
 
     fn watcher_immediate_refresh(&self) -> bool {
@@ -292,44 +382,6 @@ fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<
         };
 
         // Truncate long lines
-        let display = if line.len() > width {
-            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
-}
-
-/// Visualizer for git_configure_p6 tool results.
-/// Highlights configuration changes with success color and shows before/after values.
-fn visualize_git_config(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
-
-    let success_color = Color::Rgb(80, 250, 123);
-    let info_color = Color::Rgb(139, 233, 253);
-    let error_color = Color::Rgb(255, 85, 85);
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.contains("Updated") || line.contains("Configured") || line.contains("enabled") || line.contains("disabled") {
-            Style::default().fg(success_color)
-        } else if line.contains("->") || line.contains(":") {
-            Style::default().fg(info_color)
-        } else {
-            Style::default()
-        };
-
         let display = if line.len() > width {
             format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
         } else {

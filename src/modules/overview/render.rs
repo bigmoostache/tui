@@ -24,7 +24,11 @@ pub fn separator() -> Vec<Line<'static>> {
 pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
 
-    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt) * 2;
+    let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
+    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
@@ -89,7 +93,7 @@ pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>
     text
 }
 
-/// Render the GIT STATUS section (branch, file changes table).
+/// Render the GIT STATUS section (branch + file changes summary table).
 pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
     let gs = cp_mod_git::GitState::get(state);
@@ -100,7 +104,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
-        Span::styled("GIT STATUS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+        Span::styled("GIT".to_string(), Style::default().fg(theme::text_muted()).bold()),
     ]));
     text.push(Line::from(""));
 
@@ -142,12 +146,12 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
 
-                let (type_char, _type_color) = match file.change_type {
-                    GitChangeType::Added => ("A", theme::success()),
-                    GitChangeType::Untracked => ("U", theme::success()),
-                    GitChangeType::Deleted => ("D", theme::error()),
-                    GitChangeType::Modified => ("M", theme::warning()),
-                    GitChangeType::Renamed => ("R", theme::accent()),
+                let type_char = match file.change_type {
+                    GitChangeType::Added => "A",
+                    GitChangeType::Untracked => "U",
+                    GitChangeType::Deleted => "D",
+                    GitChangeType::Modified => "M",
+                    GitChangeType::Renamed => "R",
                 };
 
                 let display_path = if file.path.len() > 38 {
@@ -211,68 +215,106 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         Cell::new("ID", Style::default()),
         Cell::new("Type", Style::default()),
         Cell::right("Tokens", Style::default()),
+        Cell::right("Acc", Style::default()),
         Cell::right("Cost", Style::default()),
         Cell::new("Hit", Style::default()),
         Cell::new("Refreshed", Style::default()),
         Cell::new("Details", Style::default()),
     ];
 
-    // Sort by last_refresh_ms ascending (oldest first = same order LLM sees them)
+    let mut accumulated = 0usize;
+    let now_ms = crate::app::panels::now_ms();
+    let modules = all_modules();
+
+    let mut rows: Vec<Vec<Cell>> = Vec::new();
+
+    // --- System prompt entry ---
+    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt) * 2;
+    accumulated += system_prompt_tokens;
+    rows.push(vec![
+        Cell::new("--", Style::default().fg(theme::text_muted())),
+        Cell::new("system-prompt (×2)", Style::default().fg(theme::text_secondary())),
+        Cell::right(format_number(system_prompt_tokens), Style::default().fg(theme::accent())),
+        Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
+        Cell::right("—", Style::default().fg(theme::text_muted())),
+        Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::new("", Style::default()),
+    ]);
+
+    // --- Tool definitions entry ---
+    let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
+    let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
+    accumulated += tool_def_tokens;
+    rows.push(vec![
+        Cell::new("--", Style::default().fg(theme::text_muted())),
+        Cell::new(format!("tool-defs ({} enabled)", enabled_count), Style::default().fg(theme::text_secondary())),
+        Cell::right(format_number(tool_def_tokens), Style::default().fg(theme::accent())),
+        Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
+        Cell::right("—", Style::default().fg(theme::text_muted())),
+        Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::new("", Style::default()),
+    ]);
+
+    // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
     let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
-    let now_ms = crate::app::panels::now_ms();
+    // Partition: conversation ("chat") always last
+    let (mut panels, mut conversation): (Vec<_>, Vec<_>) =
+        sorted_contexts.into_iter().partition(|ctx| ctx.id != "chat");
+    panels.append(&mut conversation);
 
-    let modules = all_modules();
+    for ctx in &panels {
+        // Look up display_name from registry, fallback to raw context type string
+        let type_name = get_context_type_meta(ctx.context_type.as_str())
+            .map(|m| m.display_name)
+            .unwrap_or(ctx.context_type.as_str());
 
-    let rows: Vec<Vec<Cell>> = sorted_contexts
-        .iter()
-        .map(|ctx| {
-            // Look up display_name from registry, fallback to raw context type string
-            let type_name = get_context_type_meta(ctx.context_type.as_str())
-                .map(|m| m.display_name)
-                .unwrap_or(ctx.context_type.as_str());
+        // Ask modules for detail string
+        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
-            // Ask modules for detail string
-            let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
+        let truncated_details = if details.len() > 30 {
+            format!("{}...", &details[..details.floor_char_boundary(27)])
+        } else {
+            details
+        };
 
-            let truncated_details = if details.len() > 30 {
-                format!("{}...", &details[..details.floor_char_boundary(27)])
-            } else {
-                details
-            };
+        // Format refresh time as relative
+        let refreshed = if ctx.last_refresh_ms < 1577836800000 {
+            "—".to_string()
+        } else if now_ms > ctx.last_refresh_ms {
+            crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
+        } else {
+            "now".to_string()
+        };
 
-            // Format refresh time as relative
-            let refreshed = if ctx.last_refresh_ms < 1577836800000 {
-                "—".to_string()
-            } else if now_ms > ctx.last_refresh_ms {
-                crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
-            } else {
-                "now".to_string()
-            };
+        let icon = ctx.context_type.icon();
+        let id_with_icon = format!("{}{}", icon, ctx.id);
 
-            let icon = ctx.context_type.icon();
-            let id_with_icon = format!("{}{}", icon, ctx.id);
+        let cost_str = format!("${:.2}", ctx.panel_total_cost);
+        let (hit_str, hit_color) =
+            if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
 
-            let cost_str = format!("${:.2}", ctx.panel_total_cost);
-            let (hit_str, hit_color) =
-                if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
+        accumulated += ctx.token_count;
 
-            vec![
-                Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
-                Cell::new(type_name, Style::default().fg(theme::text_secondary())),
-                Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
-                Cell::right(cost_str, Style::default().fg(theme::text_muted())),
-                Cell::new(hit_str, Style::default().fg(hit_color)),
-                Cell::new(refreshed, Style::default().fg(theme::text_muted())),
-                Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
-            ]
-        })
-        .collect();
+        rows.push(vec![
+            Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
+            Cell::new(type_name, Style::default().fg(theme::text_secondary())),
+            Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
+            Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
+            Cell::right(cost_str, Style::default().fg(theme::text_muted())),
+            Cell::new(hit_str, Style::default().fg(hit_color)),
+            Cell::new(refreshed, Style::default().fg(theme::text_muted())),
+            Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
+        ]);
+    }
 
     text.extend(render_table(&header, &rows, None, 1));
 
     text
 }
 
-pub use super::render_details::{render_presets, render_seeds, render_statistics, render_tools};
+pub use super::render_details::render_statistics;

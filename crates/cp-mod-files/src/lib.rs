@@ -43,7 +43,7 @@ impl Module for FilesModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         vec![
             ToolDefinition {
-                id: "file_open".to_string(),
+                id: "Open".to_string(),
                 name: "Open File".to_string(),
                 short_desc: "Read file into context".to_string(),
                 description: "Opens a file and adds it to context so you can see its content. ALWAYS use this BEFORE file_edit to see current content - you need exact text for edits.".to_string(),
@@ -56,7 +56,7 @@ impl Module for FilesModule {
                 category: "File".to_string(),
             },
             ToolDefinition {
-                id: "file_edit".to_string(),
+                id: "Edit".to_string(),
                 name: "Edit File".to_string(),
                 short_desc: "Modify file content".to_string(),
                 description: "Edits a file by replacing exact text. PREFERRED over file_write for any modification — only use file_write to create new files or completely replace all content. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context). 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
@@ -99,8 +99,8 @@ impl Module for FilesModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "file_open" => Some(self::tools::file::execute_open(tool, state)),
-            "file_edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
+            "Open" => Some(self::tools::file::execute_open(tool, state)),
+            "Edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
             "Write" => Some(self::tools::write::execute(tool, state)),
 
             _ => None,
@@ -108,7 +108,7 @@ impl Module for FilesModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("file_edit", visualize_diff as ToolVisualizer), ("Write", visualize_diff as ToolVisualizer)]
+        vec![("Edit", visualize_diff as ToolVisualizer), ("Write", visualize_diff as ToolVisualizer)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
@@ -158,10 +158,11 @@ impl Module for FilesModule {
     }
 }
 
-/// Visualizer for file_edit and Write tool results.
+/// Visualizer for Edit and Write tool results.
+/// Also reused by cp-mod-prompt for Edit_prompt.
 /// Parses ```diff blocks and renders deleted lines in red, added lines in green.
 /// Non-diff content is rendered in secondary text color.
-fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
+pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
 
     let error_color = Color::Rgb(255, 85, 85);

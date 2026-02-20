@@ -1,10 +1,48 @@
 use crate::modules::all_modules;
-use crate::state::{State, get_context_type_meta};
+use crate::state::{State, estimate_tokens, get_context_type_meta};
+
+/// Estimate tokens for all enabled tool definitions as they'd appear in the API request.
+pub fn estimate_tool_definitions_tokens(state: &State) -> usize {
+    let mut total = 0;
+    for tool in &state.tools {
+        if !tool.enabled {
+            continue;
+        }
+        // Each tool contributes: name, description, and parameter schema
+        total += estimate_tokens(&tool.name);
+        total += estimate_tokens(&tool.description);
+        for param in &tool.params {
+            total += estimate_tokens(&param.name);
+            if let Some(desc) = &param.description {
+                total += estimate_tokens(desc);
+            }
+            if let Some(vals) = &param.enum_values {
+                for v in vals {
+                    total += estimate_tokens(v);
+                }
+            }
+            // JSON schema overhead per param (~10 tokens for type, required, etc.)
+            total += 10;
+        }
+        // Per-tool JSON overhead (~15 tokens for wrapping object, input_schema, etc.)
+        total += 15;
+    }
+    total
+}
 
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (overview_render.rs).
 pub fn generate_context_content(state: &State) -> String {
-    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    // Estimate system prompt tokens
+    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    // The system prompt is sent twice: once in the system field, once as seed re-injection
+    let system_prompt_tokens = estimate_tokens(&system_prompt) * 2;
+
+    // Estimate tool definition tokens
+    let tool_def_tokens = estimate_tool_definitions_tokens(state);
+
+    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
@@ -14,31 +52,55 @@ pub fn generate_context_content(state: &State) -> String {
         total_tokens, threshold, budget, usage_pct
     );
 
+    let mut accumulated = 0usize;
+
+    // --- Non-panel entries first: system prompt and tool definitions ---
     output.push_str("Context Elements:\n");
 
-    // Sort by last_refresh_ms ascending (oldest first = same order LLM sees them)
+    accumulated += system_prompt_tokens;
+    output.push_str(&format!(
+        "  -- system-prompt (×2): {} tokens (acc: {})\n",
+        system_prompt_tokens, accumulated
+    ));
+
+    accumulated += tool_def_tokens;
+    let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
+    output.push_str(&format!(
+        "  -- tool-definitions ({} enabled): {} tokens (acc: {})\n",
+        enabled_count, tool_def_tokens, accumulated
+    ));
+
+    // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
     let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
+    // Partition: conversation ("chat") always last
+    let (mut panels, mut conversation): (Vec<_>, Vec<_>) =
+        sorted_contexts.into_iter().partition(|ctx| ctx.id != "chat");
+    panels.append(&mut conversation);
+
     let modules = all_modules();
 
-    for ctx in &sorted_contexts {
-        // Look up short_name from registry, fallback to context_type string
+    for ctx in &panels {
         let type_name =
             get_context_type_meta(ctx.context_type.as_str()).map(|m| m.short_name).unwrap_or(ctx.context_type.as_str());
 
-        // Ask modules for detail string
         let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
         let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
         let cost = format!("${:.2}", ctx.panel_total_cost);
 
+        accumulated += ctx.token_count;
+
         if details.is_empty() {
-            output.push_str(&format!("  {} {}: {} tokens {} {}\n", ctx.id, type_name, ctx.token_count, cost, hit_miss));
+            output.push_str(&format!(
+                "  {} {}: {} tokens {} {} (acc: {})\n",
+                ctx.id, type_name, ctx.token_count, cost, hit_miss, accumulated
+            ));
         } else {
             output.push_str(&format!(
-                "  {} {} ({}): {} tokens {} {}\n",
-                ctx.id, type_name, details, ctx.token_count, cost, hit_miss
+                "  {} {} ({}): {} tokens {} {} (acc: {})\n",
+                ctx.id, type_name, details, ctx.token_count, cost, hit_miss, accumulated
             ));
         }
     }
@@ -53,22 +115,11 @@ pub fn generate_context_content(state: &State) -> String {
         assistant_msgs
     ));
 
-    // Module-specific overview sections (todos, memories, presets, git, etc.)
+    // Module-specific overview sections (todos, memories, git status, etc.)
     for module in &modules {
         if let Some(section) = module.overview_context_section(state) {
             output.push_str(&section);
         }
-    }
-
-    // Tools table (markdown format for LLM)
-    let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
-    output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
-    output.push_str("| Category | Tool | Status | Description |\n");
-    output.push_str("|----------|------|--------|-------------|\n");
-    for tool in &state.tools {
-        let status = if tool.enabled { "\u{2713}" } else { "\u{2717}" };
-        output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc));
     }
 
     output

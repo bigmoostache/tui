@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use cp_base::panels::now_ms;
-use cp_base::state::{ContextElement, State};
+use cp_base::state::State;
+use cp_base::watchers::{Watcher, WatcherResult};
 use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
@@ -48,35 +49,10 @@ impl ProcessStatus {
     }
 }
 
-/// A registered waiter for a console event.
-pub struct ConsoleWaiter {
-    pub session_name: String,
-    pub mode: String, // "exit" or "pattern"
-    pub pattern: Option<String>,
-    pub blocking: bool,
-    pub tool_use_id: Option<String>,
-    pub registered_ms: u64,
-    /// Deadline for blocking waiters (ms since epoch). None for async waiters.
-    pub deadline_ms: Option<u64>,
-    /// If true, this waiter was created by debug_bash — clean up session after completion.
-    pub is_debug_bash: bool,
-}
-
-/// Result of a completed async wait (ready for spine notification).
-pub struct CompletedWait {
-    pub session_name: String,
-    pub exit_code: Option<i32>,
-    pub panel_id: String,
-    pub last_lines: String,
-}
-
 /// Module-owned state for the Console module.
 /// Stored in State.module_data via TypeMap.
 pub struct ConsoleState {
     pub sessions: HashMap<String, SessionHandle>,
-    pub blocking_waiters: Vec<ConsoleWaiter>,
-    pub async_waiters: Vec<ConsoleWaiter>,
-    pub completed_async: Vec<CompletedWait>,
     pub next_session_id: usize,
 }
 
@@ -90,9 +66,6 @@ impl ConsoleState {
     pub fn new() -> Self {
         Self {
             sessions: HashMap::new(),
-            blocking_waiters: Vec::new(),
-            async_waiters: Vec::new(),
-            completed_async: Vec::new(),
             next_session_id: 1,
         }
     }
@@ -119,184 +92,7 @@ impl ConsoleState {
         for (_, handle) in cs.sessions.drain() {
             handle.kill();
         }
-        cs.blocking_waiters.clear();
-        cs.async_waiters.clear();
-        cs.completed_async.clear();
     }
-
-    /// Check waiters against current state.
-    /// Returns list of (tool_use_id, result_content) for satisfied blocking waiters.
-    /// Moves satisfied async waiters to completed_async.
-    pub fn check_waiters(state: &mut State) -> Vec<(String, String)> {
-        let mut satisfied_blocking = Vec::new();
-
-        // Take waiters out to avoid borrow conflicts with state.context
-        let cs = Self::get_mut(state);
-        let blocking_waiters: Vec<ConsoleWaiter> = cs.blocking_waiters.drain(..).collect();
-        let async_waiters: Vec<ConsoleWaiter> = cs.async_waiters.drain(..).collect();
-
-        // Check blocking waiters (now cs is dropped, we can borrow state freely)
-        let now = now_ms();
-        let mut remaining_blocking = Vec::new();
-        let mut debug_bash_cleanup = Vec::new();
-        for waiter in blocking_waiters {
-            // Check if condition is satisfied FIRST (before timeout check)
-            // to avoid race where pattern arrives in the same poll cycle as deadline
-            let cs = Self::get(state);
-            if let Some(result) = check_single_waiter(&waiter, &cs.sessions, &state.context) {
-                if let Some(ref id) = waiter.tool_use_id {
-                    if waiter.is_debug_bash {
-                        // For easy_bash: read log file directly (buffer may lag behind)
-                        let output = cs.sessions.get(&waiter.session_name)
-                            .map(|h| std::fs::read_to_string(&h.log_path).unwrap_or_default())
-                            .unwrap_or_default();
-                        let exit_code = cs.sessions.get(&waiter.session_name)
-                            .and_then(|h| h.get_status().exit_code())
-                            .unwrap_or(-1);
-                        let trimmed = output.trim();
-                        if trimmed.is_empty() {
-                            satisfied_blocking.push((id.clone(), format!("exit_code: {}\n(no output)", exit_code)));
-                        } else {
-                            satisfied_blocking.push((id.clone(), format!("{}", trimmed)));
-                        }
-                    } else {
-                        satisfied_blocking.push((id.clone(), result));
-                    }
-                }
-                if waiter.is_debug_bash {
-                    debug_bash_cleanup.push(waiter.session_name.clone());
-                }
-                continue;
-            }
-
-            // Then check timeout
-            if let Some(deadline) = waiter.deadline_ms {
-                if now >= deadline {
-                    if let Some(ref id) = waiter.tool_use_id {
-                        let panel_id = find_panel_id_for_session(&waiter.session_name, &state.context);
-                        let cs = Self::get(state);
-                        let last_lines = cs
-                            .sessions
-                            .get(&waiter.session_name)
-                            .map(|h| h.buffer.last_n_lines(5))
-                            .unwrap_or_default();
-                        let elapsed_s = (now - waiter.registered_ms) / 1000;
-                        satisfied_blocking.push((
-                            id.clone(),
-                            format!(
-                                "Console '{}' wait TIMED OUT after {}s (panel={})\nLast output:\n{}",
-                                waiter.session_name, elapsed_s, panel_id, last_lines
-                            ),
-                        ));
-                    }
-                    if waiter.is_debug_bash {
-                        debug_bash_cleanup.push(waiter.session_name.clone());
-                    }
-                    continue;
-                }
-            }
-            remaining_blocking.push(waiter);
-        }
-
-        // Check async waiters
-        let mut remaining_async = Vec::new();
-        let mut new_completed = Vec::new();
-        for waiter in async_waiters {
-            let cs = Self::get(state);
-            if let Some(handle) = cs.sessions.get(&waiter.session_name) {
-                let is_terminal = handle.get_status().is_terminal();
-                let satisfied = match waiter.mode.as_str() {
-                    "exit" => is_terminal,
-                    "pattern" => {
-                        if let Some(ref pat) = waiter.pattern {
-                            // Pattern matched, or process exited (pattern can never appear)
-                            handle.buffer.contains_pattern(pat) || is_terminal
-                        } else {
-                            false
-                        }
-                    }
-                    _ => false,
-                };
-                if satisfied {
-                    let exit_code = handle.get_status().exit_code();
-                    let last_lines = handle.buffer.last_n_lines(5);
-                    let panel_id = find_panel_id_for_session(&waiter.session_name, &state.context);
-                    new_completed.push(CompletedWait {
-                        session_name: waiter.session_name,
-                        exit_code,
-                        panel_id,
-                        last_lines,
-                    });
-                } else {
-                    remaining_async.push(waiter);
-                }
-            } else {
-                let panel_id = find_panel_id_for_session(&waiter.session_name, &state.context);
-                new_completed.push(CompletedWait {
-                    session_name: waiter.session_name,
-                    exit_code: None,
-                    panel_id,
-                    last_lines: "(session not found)".to_string(),
-                });
-            }
-        }
-
-        // Put remaining waiters and completed items back
-        let cs = Self::get_mut(state);
-        cs.blocking_waiters = remaining_blocking;
-        cs.async_waiters = remaining_async;
-        cs.completed_async.extend(new_completed);
-
-        // Clean up debug_bash sessions (no panel, no persistence needed)
-        for key in debug_bash_cleanup {
-            let cs = Self::get_mut(state);
-            if let Some(handle) = cs.sessions.remove(&key) {
-                handle.kill();
-                let log = handle.log_path.clone();
-                let _ = std::fs::remove_file(&log);
-            }
-        }
-
-        satisfied_blocking
-    }
-}
-
-/// Check if a single waiter's condition is met.
-fn check_single_waiter(
-    waiter: &ConsoleWaiter,
-    sessions: &HashMap<String, SessionHandle>,
-    context: &[ContextElement],
-) -> Option<String> {
-    let handle = sessions.get(&waiter.session_name)?;
-    let satisfied = match waiter.mode.as_str() {
-        "exit" => handle.get_status().is_terminal(),
-        "pattern" => {
-            if let Some(ref pat) = waiter.pattern {
-                handle.buffer.contains_pattern(pat)
-            } else {
-                false
-            }
-        }
-        _ => false,
-    };
-
-    if satisfied {
-        let exit_code = handle.get_status().exit_code();
-        let panel_id = find_panel_id_for_session(&waiter.session_name, context);
-        let last_lines = handle.buffer.last_n_lines(5);
-        Some(format_wait_result(&waiter.session_name, exit_code, &panel_id, &last_lines))
-    } else {
-        None
-    }
-}
-
-/// Find the panel ID for a session by name.
-fn find_panel_id_for_session(name: &str, context: &[ContextElement]) -> String {
-    context
-        .iter()
-        .find(|c| c.get_meta_str("console_name") == Some(name))
-        .map(|c| c.id.clone())
-        .unwrap_or_else(|| "?".to_string())
 }
 
 /// Format a wait result message for the LLM.
@@ -307,4 +103,148 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
         "Console '{}' condition met (exit_code={}, panel={}, time={}ms)\nLast output:\n{}",
         name, code_str, panel_id, now, last_lines
     )
+}
+
+// ============================================================
+// Console Watcher — implements cp_base::watchers::Watcher trait
+// ============================================================
+
+/// A watcher that monitors a console session for a condition.
+pub struct ConsoleWatcher {
+    /// Unique ID for this watcher (e.g., "console_c_42_exit").
+    pub watcher_id: String,
+    /// Session key in ConsoleState (e.g., "c_42").
+    pub session_name: String,
+    /// Watch mode: "exit" or "pattern".
+    pub mode: String,
+    /// Regex pattern to match (when mode="pattern").
+    pub pattern: Option<String>,
+    /// Whether this watcher blocks tool execution.
+    pub blocking: bool,
+    /// Tool use ID for sentinel replacement (blocking watchers).
+    pub tool_use_id: Option<String>,
+    /// When this watcher was registered (ms since epoch).
+    pub registered_at_ms: u64,
+    /// Deadline for timeout (ms since epoch). None = no timeout.
+    pub deadline_ms: Option<u64>,
+    /// If true, format result as easy_bash output summary.
+    pub easy_bash: bool,
+    /// Panel ID for this console session.
+    pub panel_id: String,
+    /// Human-readable description.
+    pub desc: String,
+}
+
+impl Watcher for ConsoleWatcher {
+    fn id(&self) -> &str {
+        &self.watcher_id
+    }
+
+    fn description(&self) -> &str {
+        &self.desc
+    }
+
+    fn is_blocking(&self) -> bool {
+        self.blocking
+    }
+
+    fn tool_use_id(&self) -> Option<&str> {
+        self.tool_use_id.as_deref()
+    }
+
+    fn check(&self, state: &State) -> Option<WatcherResult> {
+        let cs = ConsoleState::get(state);
+        let handle = cs.sessions.get(&self.session_name)?;
+
+        let satisfied = match self.mode.as_str() {
+            "exit" => handle.get_status().is_terminal(),
+            "pattern" => {
+                if let Some(ref pat) = self.pattern {
+                    handle.buffer.contains_pattern(pat)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        if !satisfied {
+            return None;
+        }
+
+        if self.easy_bash {
+            let output = std::fs::read_to_string(
+                cs.sessions
+                    .get(&self.session_name)
+                    .map(|h| h.log_path.as_str())
+                    .unwrap_or(""),
+            )
+            .unwrap_or_default();
+            let exit_code = handle.get_status().exit_code().unwrap_or(-1);
+            let line_count = output.lines().count();
+            Some(WatcherResult {
+                description: format!(
+                    "Output in {} ({} lines, exit_code={})",
+                    self.panel_id, line_count, exit_code
+                ),
+                panel_id: Some(self.panel_id.clone()),
+                tool_use_id: self.tool_use_id.clone(),
+            })
+        } else {
+            let exit_code = handle.get_status().exit_code();
+            let last_lines = handle.buffer.last_n_lines(5);
+            Some(WatcherResult {
+                description: format_wait_result(
+                    &self.session_name,
+                    exit_code,
+                    &self.panel_id,
+                    &last_lines,
+                ),
+                panel_id: Some(self.panel_id.clone()),
+                tool_use_id: self.tool_use_id.clone(),
+            })
+        }
+    }
+
+    fn check_timeout(&self) -> Option<WatcherResult> {
+        let deadline = self.deadline_ms?;
+        let now = now_ms();
+        if now < deadline {
+            return None;
+        }
+
+        let elapsed_s = (now - self.registered_at_ms) / 1000;
+
+        if self.easy_bash {
+            Some(WatcherResult {
+                description: format!(
+                    "Output in {} (TIMED OUT after {}s, process may still be running)",
+                    self.panel_id, elapsed_s
+                ),
+                panel_id: Some(self.panel_id.clone()),
+                tool_use_id: self.tool_use_id.clone(),
+            })
+        } else {
+            Some(WatcherResult {
+                description: format!(
+                    "Console '{}' wait TIMED OUT after {}s (panel={})",
+                    self.session_name, elapsed_s, self.panel_id
+                ),
+                panel_id: Some(self.panel_id.clone()),
+                tool_use_id: self.tool_use_id.clone(),
+            })
+        }
+    }
+
+    fn registered_ms(&self) -> u64 {
+        self.registered_at_ms
+    }
+
+    fn source_tag(&self) -> &str {
+        "console"
+    }
+
+    fn is_easy_bash(&self) -> bool {
+        self.easy_bash
+    }
 }

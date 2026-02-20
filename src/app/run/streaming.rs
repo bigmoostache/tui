@@ -215,6 +215,7 @@ impl App {
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,
             // not on total auto-continuations in an autonomous session.
             cp_mod_spine::SpineState::get_mut(&mut self.state).config.auto_continuation_count = 0;
+
             self.typewriter.reset();
             self.pending_done = None;
         }

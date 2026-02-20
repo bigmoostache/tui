@@ -135,8 +135,8 @@ impl App {
             self.check_deferred_sleep(&tx);
             // Check if a question form has been resolved by the user
             self.check_question_form(&tx);
-            // Check console waiters (blocking sentinel replacement + async → spine notifications)
-            self.check_console_waiters(&tx);
+            // Check watchers (blocking sentinel replacement + async → spine notifications)
+            self.check_watchers(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
@@ -251,6 +251,9 @@ impl App {
     fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
         use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
+        // Sync TodoWatcher: ensure it exists iff continue_until_todos_done is true
+        self.sync_todo_watcher();
+
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
             SpineDecision::Blocked(reason) => {
@@ -295,6 +298,21 @@ impl App {
                     self.state.dirty = true;
                 }
             }
+        }
+    }
+
+    /// Sync the TodoWatcher in/out of WatcherRegistry based on config.
+    /// If continue_until_todos_done is true → ensure a TodoWatcher is registered.
+    /// If false → remove any existing TodoWatcher.
+    fn sync_todo_watcher(&mut self) {
+        let enabled = cp_mod_spine::SpineState::get(&self.state).config.continue_until_todos_done;
+        let registry = cp_base::watchers::WatcherRegistry::get_mut(&mut self.state);
+        let has_watcher = registry.has_watcher_with_tag("todo_continuation");
+
+        if enabled && !has_watcher {
+            registry.register(Box::new(cp_mod_todo::TodoWatcher::new()));
+        } else if !enabled && has_watcher {
+            registry.remove_by_tag("todo_continuation");
         }
     }
 

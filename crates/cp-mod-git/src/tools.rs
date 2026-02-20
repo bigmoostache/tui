@@ -7,7 +7,6 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::classify::{CommandClass, classify_git, validate_git_command};
-use crate::types::GitState;
 
 /// Execute a raw git command.
 /// Read-only commands create/reuse GitResult panels.
@@ -149,107 +148,4 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
     }
-}
-
-/// Configure the P6 git status panel.
-/// Supports: show_diffs, show_logs, log_args, diff_base.
-pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let show_diffs = tool.input.get("show_diffs").and_then(|v| v.as_bool());
-    let show_logs = tool.input.get("show_logs").and_then(|v| v.as_bool());
-    let log_args = tool.input.get("log_args").and_then(|v| v.as_str());
-    let diff_base = tool.input.get("diff_base").and_then(|v| v.as_str());
-
-    let mut changes = Vec::new();
-
-    // Update show_diffs
-    if let Some(v) = show_diffs {
-        GitState::get_mut(state).git_show_diffs = v;
-        changes.push(format!("show_diffs={}", v));
-    }
-
-    // Update show_logs
-    if let Some(v) = show_logs {
-        {
-            let gs = GitState::get_mut(state);
-            gs.git_show_logs = v;
-            if v {
-                // Fetch git log content
-                let args_str = log_args.or(gs.git_log_args.as_deref()).unwrap_or("-10 --oneline");
-                let args_vec: Vec<&str> = args_str.split_whitespace().collect();
-
-                let mut cmd = Command::new("git");
-                cmd.arg("log");
-                for arg in args_vec {
-                    cmd.arg(arg);
-                }
-                match cmd.output() {
-                    Ok(output) if output.status.success() => {
-                        gs.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
-                    }
-                    _ => {
-                        gs.git_log_content = Some("Failed to fetch git log".to_string());
-                    }
-                }
-            } else {
-                gs.git_log_content = None;
-            }
-        }
-        changes.push(format!("show_logs={}", v));
-    }
-
-    // Update log_args (even without toggling show_logs)
-    if let Some(args) = log_args {
-        {
-            let gs = GitState::get_mut(state);
-            gs.git_log_args = Some(args.to_string());
-            // Re-fetch if logs are currently shown
-            if gs.git_show_logs {
-                let args_vec: Vec<&str> = args.split_whitespace().collect();
-                let mut cmd = Command::new("git");
-                cmd.arg("log");
-                for arg in args_vec {
-                    cmd.arg(arg);
-                }
-                match cmd.output() {
-                    Ok(output) if output.status.success() => {
-                        gs.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
-                    }
-                    _ => {
-                        gs.git_log_content = Some("Failed to fetch git log".to_string());
-                    }
-                }
-            }
-        }
-        changes.push(format!("log_args={}", args));
-    }
-
-    // Update diff_base
-    if let Some(base) = diff_base {
-        if base.is_empty() || base == "none" || base == "null" {
-            // Clear diff base — revert to default
-            GitState::get_mut(state).git_diff_base = None;
-            changes.push("diff_base=<cleared>".to_string());
-        } else {
-            // Validate the ref
-            let check = Command::new("git").args(["rev-parse", "--verify", base]).output();
-            match check {
-                Ok(output) if output.status.success() => {
-                    GitState::get_mut(state).git_diff_base = Some(base.to_string());
-                    changes.push(format!("diff_base={}", base));
-                }
-                _ => {
-                    return ToolResult::new(tool.id.clone(), format!("Error: '{}' is not a valid git ref", base), true);
-                }
-            }
-        }
-    }
-
-    if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), "No changes specified. Use show_diffs, show_logs, log_args, or diff_base parameters.".to_string(), true);
-    }
-
-    // Mark P6 as deprecated to refresh
-    cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::GIT));
-
-    ToolResult::new(tool.id.clone(), format!("P6 configured: {}", changes.join(", ")), false)
 }

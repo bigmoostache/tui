@@ -42,68 +42,6 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created skill '{}' with ID '{}'", name, id), false)
 }
 
-pub fn edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
-        }
-    };
-
-    let ps = PromptState::get_mut(state);
-    let skill = match ps.skills.iter_mut().find(|s| s.id == id) {
-        Some(s) => s,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
-        }
-    };
-
-    if skill.is_builtin {
-        return ToolResult::new(tool.id.clone(), format!("Cannot edit built-in skill '{}'", id), true);
-    }
-
-    let mut changes = Vec::new();
-
-    if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
-        skill.name = name.to_string();
-        changes.push("name");
-    }
-
-    if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
-        skill.description = desc.to_string();
-        changes.push("description");
-    }
-
-    if let Some(content) = tool.input.get("content").and_then(|v| v.as_str()) {
-        skill.content = content.to_string();
-        changes.push("content");
-    }
-
-    if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), "No changes specified".to_string(), true);
-    }
-
-    let skill_clone = skill.clone();
-    storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &skill_clone);
-
-    // If loaded, update the panel's cached_content
-    let is_loaded = PromptState::get(state).loaded_skill_ids.contains(&id.to_string());
-    if is_loaded {
-        let content_str = format!("[{}] {}\n\n{}", skill_clone.id, skill_clone.name, skill_clone.content);
-        let tokens = estimate_tokens(&content_str);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("skill_prompt_id") == Some(id)) {
-            ctx.cached_content = Some(content_str);
-            ctx.token_count = tokens;
-            ctx.name = skill_clone.name.clone();
-            ctx.last_refresh_ms = cp_base::panels::now_ms();
-        }
-    }
-
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
-
-    ToolResult::new(tool.id.clone(), format!("Updated skill '{}': {}", id, changes.join(", ")), false)
-}
-
 pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id,

@@ -1,11 +1,11 @@
-pub(crate) mod continuation;
+pub(crate) mod coucou;
 pub mod engine;
 pub(crate) mod guard_rail;
 mod panel;
 pub(crate) mod tools;
 pub mod types;
 
-pub use types::{ContinuationAction, Notification, NotificationType, SpineConfig, SpineState};
+pub use types::{Notification, NotificationType, SpineConfig, SpineState};
 
 use serde_json::json;
 
@@ -33,10 +33,13 @@ impl Module for SpineModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
+        // Initialize the watcher registry (cross-cutting concern managed by spine)
+        state.set_ext(cp_base::watchers::WatcherRegistry::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
+        state.set_ext(cp_base::watchers::WatcherRegistry::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
@@ -52,10 +55,14 @@ impl Module for SpineModule {
         // Sort by ID number to maintain order
         to_save.sort_by_key(|n| n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0));
 
+        // Collect pending coucou watchers for persistence
+        let pending_coucous = coucou::collect_pending_coucous(state);
+
         json!({
             "notifications": to_save,
             "next_notification_id": ss.next_notification_id,
             "spine_config": ss.config,
+            "pending_coucous": pending_coucous,
         })
     }
 
@@ -75,6 +82,25 @@ impl Module for SpineModule {
         }
         // Prune stale processed notifications on load too
         prune_notifications(&mut SpineState::get_mut(state).notifications);
+
+        // Restore pending coucou watchers into the WatcherRegistry
+        if let Some(coucous) = data.get("pending_coucous")
+            && let Ok(coucou_list) = serde_json::from_value::<Vec<coucou::CoucouData>>(coucous.clone())
+        {
+            let now = cp_base::panels::now_ms();
+            let registry = cp_base::watchers::WatcherRegistry::get_mut(state);
+            for cd in coucou_list {
+                // Only re-register if the coucou hasn't already expired
+                if cd.fire_at_ms > now {
+                    registry.register(Box::new(cd.into_watcher()));
+                }
+                // If it expired during reload, it will fire on next poll_all
+                // and create a notification — which is the desired behavior
+                else {
+                    registry.register(Box::new(cd.into_watcher()));
+                }
+            }
+        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
@@ -113,8 +139,6 @@ impl Module for SpineModule {
                 short_desc: "Configure auto-continuation and guard rails".to_string(),
                 description: "Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.".to_string(),
                 params: vec![
-                    ToolParam::new("max_tokens_auto_continue", ParamType::Boolean)
-                        .desc("Auto-continue when stream hits max_tokens (default: true)"),
                     ToolParam::new("continue_until_todos_done", ParamType::Boolean)
                         .desc("Keep auto-continuing until all todos are done (default: false)"),
                     ToolParam::new("max_output_tokens", ParamType::Integer)
@@ -133,6 +157,26 @@ impl Module for SpineModule {
                 enabled: true,
                 category: "Spine".to_string(),
             },
+            ToolDefinition {
+                id: "coucou".to_string(),
+                name: "Coucou".to_string(),
+                short_desc: "Schedule a reminder notification".to_string(),
+                description: "Schedules a notification to fire after a delay (timer mode) or at a specific time (datetime mode). The notification appears in the Spine panel and triggers auto-continuation. Use for reminders, delayed checks, or timed follow-ups.".to_string(),
+                params: vec![
+                    ToolParam::new("mode", ParamType::String)
+                        .desc("Scheduling mode: 'timer' for relative delay, 'datetime' for absolute time")
+                        .required(),
+                    ToolParam::new("message", ParamType::String)
+                        .desc("Message to deliver when the notification fires")
+                        .required(),
+                    ToolParam::new("delay", ParamType::String)
+                        .desc("Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"),
+                    ToolParam::new("datetime", ParamType::String)
+                        .desc("When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"),
+                ],
+                enabled: true,
+                category: "Spine".to_string(),
+            },
         ]
     }
 
@@ -140,6 +184,7 @@ impl Module for SpineModule {
         match tool.name.as_str() {
             "notification_mark_processed" => Some(self::tools::execute_mark_processed(tool, state)),
             "spine_configure" => Some(self::tools::execute_configure(tool, state)),
+            "coucou" => Some(self::coucou::execute_coucou(tool, state)),
             _ => None,
         }
     }

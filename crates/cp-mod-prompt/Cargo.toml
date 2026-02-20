@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 cp-base.workspace = true
+cp-mod-files = { path = "../cp-mod-files" }
 ratatui.workspace = true
 crossterm.workspace = true
 serde.workspace = true

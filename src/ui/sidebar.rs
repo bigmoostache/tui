@@ -29,9 +29,28 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Line::from(""),
     ];
 
-    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    // Use shared token calculation (same as Statistics panel)
+    let system_prompt_tokens = {
+        let sp = cp_mod_prompt::seed::get_active_agent_content(state);
+        crate::state::estimate_tokens(&sp) * 2
+    };
+    let tool_def_tokens = crate::modules::overview::context::estimate_tool_definitions_tokens(state);
+    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let max_tokens = state.effective_context_budget();
     let threshold_tokens = state.cleaning_threshold_tokens();
+
+    // Compute hit/miss token breakdown for progress bar
+    // System prompt and tool definitions always count as "hit" (stable, always cached)
+    let mut hit_tokens = system_prompt_tokens + tool_def_tokens;
+    let mut miss_tokens = 0usize;
+    for ctx in &state.context {
+        if ctx.panel_cache_hit {
+            hit_tokens += ctx.token_count;
+        } else {
+            miss_tokens += ctx.token_count;
+        }
+    }
 
     // Calculate ID width for alignment based on longest ID
     let id_width = state.context.iter().map(|c| c.id.len()).max().unwrap_or(2);
@@ -122,23 +141,9 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Style::default().fg(theme::border()),
     )]));
 
-    // Token usage bar - full width
+    // Token usage bar - full width with hit/miss coloring
     let bar_width = 34usize;
     let threshold_pct = state.cleaning_threshold;
-    let usage_pct = (total_tokens as f64 / max_tokens as f64).min(1.0);
-
-    // Calculate bar positions
-    let filled = (usage_pct * bar_width as f64) as usize;
-    let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
-
-    // Color based on threshold
-    let bar_color = if total_tokens >= threshold_tokens {
-        theme::error()
-    } else if total_tokens as f64 >= threshold_tokens as f64 * 0.9 {
-        theme::warning()
-    } else {
-        theme::accent()
-    };
 
     // Format: "12.5K / 140K threshold / 200K budget"
     let current = format_number(total_tokens);
@@ -155,21 +160,32 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Span::styled(budget, Style::default().fg(theme::accent())),
     ]));
 
-    // Build bar with threshold marker
+    // Calculate bar segment positions
+    let hit_pct = if max_tokens > 0 { hit_tokens as f64 / max_tokens as f64 } else { 0.0 };
+    let miss_pct = if max_tokens > 0 { miss_tokens as f64 / max_tokens as f64 } else { 0.0 };
+    let hit_filled = (hit_pct * bar_width as f64) as usize;
+    let miss_filled = (miss_pct * bar_width as f64) as usize;
+    let total_filled = (hit_filled + miss_filled).min(bar_width);
+    let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
+
+    // Build bar: [green hit][orange miss][empty]
     let mut bar_spans = vec![Span::styled(" ", base_style)];
     for i in 0..bar_width {
-        let char = if i == threshold_pos && threshold_pos < bar_width {
-            "|" // Threshold marker
-        } else if i < filled {
+        let is_threshold = i == threshold_pos && threshold_pos < bar_width;
+        let char = if is_threshold {
+            "|"
+        } else if i < total_filled {
             chars::BLOCK_FULL
         } else {
             chars::BLOCK_LIGHT
         };
 
-        let color = if i == threshold_pos {
+        let color = if is_threshold {
             theme::warning()
-        } else if i < filled {
-            bar_color
+        } else if i < hit_filled {
+            theme::success() // green = cache hit
+        } else if i < total_filled {
+            theme::warning() // orange = cache miss
         } else {
             theme::bg_elevated()
         };

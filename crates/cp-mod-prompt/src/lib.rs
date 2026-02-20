@@ -50,7 +50,6 @@ impl Module for PromptModule {
         json!({
             "active_agent_id": ps.active_agent_id,
             "loaded_skill_ids": ps.loaded_skill_ids,
-            "library_preview": ps.library_preview,
         })
     }
 
@@ -69,11 +68,6 @@ impl Module for PromptModule {
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ps.loaded_skill_ids = v;
-        }
-        if let Some(v) = data.get("library_preview")
-            && let Ok(lp) = serde_json::from_value(v.clone())
-        {
-            ps.library_preview = lp;
         }
     }
 
@@ -113,16 +107,17 @@ impl Module for PromptModule {
                 enabled: true,
                 category: "Agent".to_string(),
             },
+            // === Edit tool (unified for agents, skills, commands) ===
             ToolDefinition {
-                id: "agent_edit".to_string(),
-                name: "Edit Agent".to_string(),
-                short_desc: "Edit agent".to_string(),
-                description: "Edits an existing agent. Can update name, description, or content.".to_string(),
+                id: "Edit_prompt".to_string(),
+                name: "Edit Prompt".to_string(),
+                short_desc: "Edit agent/skill/command content".to_string(),
+                description: "Edits an agent, skill, or command by replacing exact text in its content. Routes automatically based on ID. Uses the same old_string/new_string pattern as the file Edit tool.".to_string(),
                 params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Agent ID").required(),
-                    ToolParam::new("name", ParamType::String).desc("New name"),
-                    ToolParam::new("description", ParamType::String).desc("New description"),
-                    ToolParam::new("content", ParamType::String).desc("New content"),
+                    ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID").required(),
+                    ToolParam::new("old_string", ParamType::String).desc("Exact text to find and replace in content").required(),
+                    ToolParam::new("new_string", ParamType::String).desc("Replacement text").required(),
+                    ToolParam::new("replace_all", ParamType::Boolean).desc("Replace all occurrences (default: false)"),
                 ],
                 enabled: true,
                 category: "Agent".to_string(),
@@ -164,20 +159,6 @@ impl Module for PromptModule {
                 category: "Skill".to_string(),
             },
             ToolDefinition {
-                id: "skill_edit".to_string(),
-                name: "Edit Skill".to_string(),
-                short_desc: "Edit skill".to_string(),
-                description: "Edits an existing skill. If loaded, updates the panel content live.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Skill ID").required(),
-                    ToolParam::new("name", ParamType::String).desc("New name"),
-                    ToolParam::new("description", ParamType::String).desc("New description"),
-                    ToolParam::new("content", ParamType::String).desc("New content"),
-                ],
-                enabled: true,
-                category: "Skill".to_string(),
-            },
-            ToolDefinition {
                 id: "skill_delete".to_string(),
                 name: "Delete Skill".to_string(),
                 short_desc: "Delete skill".to_string(),
@@ -210,6 +191,31 @@ impl Module for PromptModule {
                 enabled: true,
                 category: "Skill".to_string(),
             },
+            // === Library editor tools ===
+            ToolDefinition {
+                id: "Library_open_prompt_editor".to_string(),
+                name: "Open Prompt Editor".to_string(),
+                short_desc: "Open prompt in editor".to_string(),
+                description: "Opens a prompt's content in the Library panel for reading and editing. \
+                    Required before using Edit_prompt. Max one prompt open at a time — opening a new one \
+                    closes the previous. The Library panel will show the prompt content with a warning banner."
+                    .to_string(),
+                params: vec![
+                    ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID to open").required(),
+                ],
+                enabled: true,
+                category: "Agent".to_string(),
+            },
+            ToolDefinition {
+                id: "Library_close_prompt_editor".to_string(),
+                name: "Close Prompt Editor".to_string(),
+                short_desc: "Close prompt editor".to_string(),
+                description: "Closes the prompt editor in the Library panel, restoring the normal library view."
+                    .to_string(),
+                params: vec![],
+                enabled: true,
+                category: "Agent".to_string(),
+            },
             // === Command tools ===
             ToolDefinition {
                 id: "command_create".to_string(),
@@ -220,20 +226,6 @@ impl Module for PromptModule {
                     ToolParam::new("name", ParamType::String).desc("Command name").required(),
                     ToolParam::new("description", ParamType::String).desc("Short description"),
                     ToolParam::new("content", ParamType::String).desc("Content to replace the /command with").required(),
-                ],
-                enabled: true,
-                category: "Command".to_string(),
-            },
-            ToolDefinition {
-                id: "command_edit".to_string(),
-                name: "Edit Command".to_string(),
-                short_desc: "Edit command".to_string(),
-                description: "Edits an existing command.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Command ID").required(),
-                    ToolParam::new("name", ParamType::String).desc("New name"),
-                    ToolParam::new("description", ParamType::String).desc("New description"),
-                    ToolParam::new("content", ParamType::String).desc("New content"),
                 ],
                 enabled: true,
                 category: "Command".to_string(),
@@ -259,16 +251,16 @@ impl Module for PromptModule {
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
             ("agent_create", visualize_prompt_output as ToolVisualizer),
-            ("agent_edit", visualize_prompt_output as ToolVisualizer),
+            ("Edit_prompt", cp_mod_files::visualize_diff as ToolVisualizer),
+            ("Library_open_prompt_editor", visualize_prompt_output as ToolVisualizer),
+            ("Library_close_prompt_editor", visualize_prompt_output as ToolVisualizer),
             ("agent_delete", visualize_prompt_output as ToolVisualizer),
             ("agent_load", visualize_prompt_output as ToolVisualizer),
             ("skill_create", visualize_prompt_output as ToolVisualizer),
-            ("skill_edit", visualize_prompt_output as ToolVisualizer),
             ("skill_delete", visualize_prompt_output as ToolVisualizer),
             ("skill_load", visualize_prompt_output as ToolVisualizer),
             ("skill_unload", visualize_prompt_output as ToolVisualizer),
             ("command_create", visualize_prompt_output as ToolVisualizer),
-            ("command_edit", visualize_prompt_output as ToolVisualizer),
             ("command_delete", visualize_prompt_output as ToolVisualizer),
         ]
     }

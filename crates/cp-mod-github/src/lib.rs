@@ -64,7 +64,7 @@ impl Module for GithubModule {
                     .required(),
             ],
             enabled: true,
-            category: "GitHub".to_string(),
+            category: "Git".to_string(),
         }]
     }
 
@@ -109,7 +109,7 @@ impl Module for GithubModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("GitHub", "GitHub API operations via gh CLI")]
+        vec![("Git", "Git and GitHub operations")]
     }
 }
 

@@ -53,7 +53,7 @@ impl Module for ConversationHistoryModule {
         if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
             return Some(Err(format!(
                 "{} — Cannot close conversation history with context_close. \
-                 Use close_conversation_history instead, which lets you create logs \
+                 Use Close_conversation_history instead, which lets you create logs \
                  and memories to preserve important information before closing.",
                 ctx.id
             )));

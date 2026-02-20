@@ -273,72 +273,6 @@ mod tests {
     }
 
     #[test]
-    fn git_status_apply_cache_update() {
-        let mut state = State::default();
-        // Initialize GitState
-        state.set_ext(cp_mod_git::GitState::new());
-        let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
-        if idx.is_none() {
-            return;
-        } // Git module not active
-        let idx = idx.unwrap();
-        state.context[idx].cache_deprecated = true;
-
-        let panel = get_panel(&ContextType::new(ContextType::GIT));
-        let update = CacheUpdate::ModuleSpecific {
-            context_type: ContextType::new(ContextType::GIT),
-            data: Box::new(cp_mod_git::GitCacheUpdate::Status {
-                branch: Some("main".to_string()),
-                is_repo: true,
-                file_changes: vec![],
-                branches: vec![("main".to_string(), true)],
-                formatted_content: "## Git Status\nOn branch main".to_string(),
-                token_count: 10,
-                source_hash: "abc123".to_string(),
-            }),
-        };
-
-        let mut ctx = state.context.remove(idx);
-        let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
-        state.context.insert(idx, ctx);
-
-        assert!(changed);
-        assert!(!state.context[idx].cache_deprecated);
-        let gs = cp_mod_git::GitState::get(&state);
-        assert_eq!(gs.git_branch.as_deref(), Some("main"));
-        assert!(gs.git_is_repo);
-        assert!(state.context[idx].source_hash.is_some());
-        assert!(state.context[idx].content_hash.is_some());
-    }
-
-    #[test]
-    fn git_status_unchanged_clears_deprecated() {
-        let mut state = State::default();
-        state.set_ext(cp_mod_git::GitState::new());
-        let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
-        if idx.is_none() {
-            return;
-        }
-        let idx = idx.unwrap();
-        state.context[idx].cache_deprecated = true;
-
-        let panel = get_panel(&ContextType::new(ContextType::GIT));
-        let mut ctx = state.context.remove(idx);
-        let changed = panel.apply_cache_update(
-            CacheUpdate::ModuleSpecific {
-                context_type: ContextType::new(ContextType::GIT),
-                data: Box::new(cp_mod_git::GitCacheUpdate::StatusUnchanged),
-            },
-            &mut ctx,
-            &mut state,
-        );
-        state.context.insert(idx, ctx);
-
-        assert!(!changed, "Unchanged should return false");
-        assert!(!state.context[idx].cache_deprecated, "cache_deprecated should be cleared");
-    }
-
-    #[test]
     fn git_result_panel_apply_cache_update() {
         let mut state = State::default();
         let mut ctx = test_ctx("P99", ContextType::new(ContextType::GIT_RESULT));
@@ -402,9 +336,9 @@ mod tests {
     // ── Timer interval tests ───────────────────────────────────────
 
     #[test]
-    fn git_has_timer_interval() {
-        let panel = get_panel(&ContextType::new(ContextType::GIT));
-        assert!(panel.cache_refresh_interval_ms().is_some(), "Git should have timer interval");
+    fn git_result_has_timer_interval() {
+        let panel = get_panel(&ContextType::new(ContextType::GIT_RESULT));
+        assert!(panel.cache_refresh_interval_ms().is_some(), "Git result should have timer interval");
     }
 
     #[test]
@@ -442,7 +376,7 @@ mod tests {
         assert!(ContextType::new(ContextType::GLOB).needs_cache());
         assert!(ContextType::new(ContextType::GREP).needs_cache());
         // tmux module removed — no longer in registry
-        assert!(ContextType::new(ContextType::GIT).needs_cache());
+        // git fixed panel removed — only git_result remains
         assert!(ContextType::new(ContextType::GIT_RESULT).needs_cache());
         assert!(ContextType::new(ContextType::GITHUB_RESULT).needs_cache());
 
