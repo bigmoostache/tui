@@ -126,8 +126,8 @@ impl Module for SpineModule {
                 short_desc: "Mark notification as handled".to_string(),
                 description: "Marks a spine notification as processed, indicating you've addressed it.".to_string(),
                 params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Notification ID (e.g., N1)")
+                    ToolParam::new("ids", ParamType::Array(Box::new(ParamType::String)))
+                        .desc("Notification IDs to mark as processed (e.g., ['N1', 'N2'])")
                         .required(),
                 ],
                 enabled: true,

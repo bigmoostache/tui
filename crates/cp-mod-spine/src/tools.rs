@@ -5,24 +5,45 @@ use crate::types::SpineState;
 
 /// Execute the notification_mark_processed tool
 pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(i) => i,
+    let all_ids: Vec<String> = match tool.input.get("ids").and_then(|v| v.as_array()) {
+        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required 'ids' parameter.".to_string(), true);
         }
     };
 
-    // Check if notification exists and its current state
-    let already_processed = SpineState::get(state).notifications.iter().find(|n| n.id == id).map(|n| n.processed);
-
-    match already_processed {
-        Some(true) => ToolResult::new(tool.id.clone(), format!("Notification {} is already processed", id), false),
-        Some(false) => {
-            SpineState::mark_notification_processed(state, id);
-            ToolResult::new(tool.id.clone(), format!("Marked notification {} as processed", id), false)
-        }
-        None => ToolResult::new(tool.id.clone(), format!("Notification '{}' not found", id), true),
+    if all_ids.is_empty() {
+        return ToolResult::new(tool.id.clone(), "Empty 'ids' array.".to_string(), true);
     }
+
+    let mut marked = Vec::new();
+    let mut already = Vec::new();
+    let mut not_found = Vec::new();
+
+    for id in &all_ids {
+        let status = SpineState::get(state).notifications.iter().find(|n| n.id == *id).map(|n| n.processed);
+        match status {
+            Some(true) => already.push(id.as_str()),
+            Some(false) => {
+                SpineState::mark_notification_processed(state, id);
+                marked.push(id.as_str());
+            }
+            None => not_found.push(id.as_str()),
+        }
+    }
+
+    let mut parts = Vec::new();
+    if !marked.is_empty() {
+        parts.push(format!("Marked {} as processed", marked.join(", ")));
+    }
+    if !already.is_empty() {
+        parts.push(format!("{} already processed", already.join(", ")));
+    }
+    if !not_found.is_empty() {
+        parts.push(format!("{} not found", not_found.join(", ")));
+    }
+
+    ToolResult::new(tool.id.clone(), parts.join("\n"), !not_found.is_empty())
 }
 
 /// Execute the spine_configure tool — update spine auto-continuation and guard rail settings
