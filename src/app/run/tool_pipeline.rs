@@ -101,8 +101,12 @@ impl App {
 
         // === CALLBACK TRIGGER ===
         // After all tools executed, check if any file edits match active callbacks.
-        // Collect changed files from Edit/Write tool inputs.
-        let changed_files = callback_trigger::collect_changed_files(&tools);
+        // Only collect files from SUCCESSFUL Edit/Write tools (skip failed ones).
+        let successful_tools: Vec<_> = tools.iter().zip(tool_results.iter())
+            .filter(|(_, r)| !r.is_error)
+            .map(|(t, _)| t.clone())
+            .collect();
+        let changed_files = callback_trigger::collect_changed_files(&successful_tools);
         if !changed_files.is_empty() {
             let matched = callback_trigger::match_callbacks(&self.state, &changed_files);
             if !matched.is_empty() {
