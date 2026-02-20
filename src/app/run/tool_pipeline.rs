@@ -9,6 +9,7 @@ use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUs
 use crate::infra::tools::{execute_tool, perform_reload};
 
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_callback::trigger as callback_trigger;
 
 use crate::app::App;
 
@@ -96,6 +97,74 @@ impl App {
             self.pending_question_tool_results = Some(tool_results);
             self.save_state_async();
             return;
+        }
+
+        // === CALLBACK TRIGGER ===
+        // After all tools executed, check if any file edits match active callbacks.
+        // Collect changed files from Edit/Write tool inputs.
+        let changed_files = callback_trigger::collect_changed_files(&tools);
+        if !changed_files.is_empty() {
+            let matched = callback_trigger::match_callbacks(&self.state, &changed_files);
+            if !matched.is_empty() {
+                let (blocking_cbs, async_cbs) = callback_trigger::partition_callbacks(matched);
+
+                // Fire non-blocking callbacks immediately (they run async via watchers)
+                if !async_cbs.is_empty() {
+                    let _summaries = callback_trigger::fire_async_callbacks(&mut self.state, &async_cbs);
+                    // Summaries logged but not blocking the pipeline
+                }
+
+                // Fire blocking callbacks — these hold the pipeline
+                if !blocking_cbs.is_empty() {
+                    // Generate a unique synthetic tool_use_id for the blocking sentinel.
+                    // We also need a matching tool_call message so the API sees a proper
+                    // tool_use → tool_result pair (otherwise we get duplicate tool_result IDs).
+                    let sentinel_id = format!("cb_block_{}", self.state.next_tool_id);
+
+                    // Create a synthetic tool_call message for the blocking callback
+                    let tool_id = format!("T{}", self.state.next_tool_id);
+                    let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
+                    self.state.next_tool_id += 1;
+                    self.state.global_next_uid += 1;
+
+                    let cb_names: Vec<&str> = blocking_cbs.iter().map(|cb| cb.definition.name.as_str()).collect();
+                    let tool_msg = Message {
+                        id: tool_id,
+                        uid: Some(tool_uid),
+                        role: "assistant".to_string(),
+                        message_type: MessageType::ToolCall,
+                        content: String::new(),
+                        content_token_count: 0,
+                        tl_dr: None,
+                        tl_dr_token_count: 0,
+                        status: MessageStatus::Full,
+                        tool_uses: vec![ToolUseRecord {
+                            id: sentinel_id.clone(),
+                            name: "callback_blocking".to_string(),
+                            input: serde_json::json!({
+                                "callbacks": cb_names,
+                            }),
+                        }],
+                        tool_results: Vec::new(),
+                        input_tokens: 0,
+                        timestamp_ms: now_ms(),
+                    };
+                    self.save_message_async(&tool_msg);
+                    self.state.messages.push(tool_msg);
+
+                    let _summaries = callback_trigger::fire_blocking_callbacks(
+                        &mut self.state, &blocking_cbs, &sentinel_id,
+                    );
+
+                    // Insert a sentinel tool result so the pipeline knows to wait
+                    tool_results.push(crate::infra::tools::ToolResult {
+                        tool_use_id: sentinel_id,
+                        content: CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(),
+                        is_error: false,
+                        tool_name: "callback_blocking".to_string(),
+                    });
+                }
+            }
         }
 
         // Check if any tool triggered a console blocking wait

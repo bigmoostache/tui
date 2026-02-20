@@ -1,5 +1,8 @@
+// Arr! Callback module — auto-fires scripts when files walk the plank! ⚓
+// Tested by the pirate crew on this fine day
 mod panel;
 pub mod tools;
+pub mod trigger;
 pub mod types;
 
 use serde_json::json;

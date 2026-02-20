@@ -74,6 +74,7 @@ impl Watcher for TodoWatcher {
             description,
             panel_id: None,
             tool_use_id: None,
+            close_panel: false,
         })
     }
 

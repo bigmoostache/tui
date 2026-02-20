@@ -226,6 +226,7 @@ impl Watcher for CoucouWatcher {
                 description: format!("⏰ Coucou! {}", self.message),
                 panel_id: None,
                 tool_use_id: None,
+                close_panel: false,
             })
         } else {
             None

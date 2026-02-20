@@ -35,14 +35,30 @@ impl App {
 
         // --- Async completions → spine notifications ---
         if !async_results.is_empty() {
-            for result in async_results {
+            for result in &async_results {
                 SpineState::create_notification(
                     &mut self.state,
                     NotificationType::Custom,
                     "watcher".to_string(),
-                    result.description,
+                    result.description.clone(),
                 );
             }
+
+            // Auto-close panels for async watchers that request it (e.g. callback success)
+            for result in &async_results {
+                if result.close_panel {
+                    if let Some(ref panel_id) = result.panel_id {
+                        // Kill the console session first
+                        if let Some(ctx) = self.state.context.iter().find(|c| c.id == *panel_id) {
+                            if let Some(name) = ctx.get_meta::<String>("console_name") {
+                                cp_mod_console::types::ConsoleState::kill_session(&mut self.state, &name);
+                            }
+                        }
+                        self.state.context.retain(|c| c.id != *panel_id);
+                    }
+                }
+            }
+
             self.save_state_async();
         }
 

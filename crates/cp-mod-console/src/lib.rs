@@ -1,4 +1,4 @@
-mod manager;
+pub mod manager;
 mod panel;
 mod pollers;
 pub mod ring_buffer;

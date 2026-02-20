@@ -15,6 +15,9 @@ pub struct WatcherResult {
     pub panel_id: Option<String>,
     /// Tool use ID for blocking watchers that need sentinel replacement.
     pub tool_use_id: Option<String>,
+    /// If true, the panel should be auto-closed (removed from context).
+    /// Used by callback watchers to clean up console panels on success.
+    pub close_panel: bool,
 }
 
 /// A watcher monitors a condition and reports when it's satisfied.
