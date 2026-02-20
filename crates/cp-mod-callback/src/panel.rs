@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use ratatui::prelude::*;
+use unicode_width::UnicodeWidthStr;
 
 use cp_base::config::{STORE_DIR, theme};
 use cp_base::panels::{ContextItem, Panel};
@@ -94,6 +95,77 @@ impl Panel for CallbackPanel {
         let muted = Style::default().fg(theme::text_muted());
         let normal = Style::default().fg(theme::text());
 
+        // Calculate available width for Description column (word-wrapped)
+        let indent = 1usize;
+        let separator_width = 3; // " │ "
+
+        // Measure fixed column widths
+        let id_width = cs.definitions.iter().map(|d| UnicodeWidthStr::width(d.id.as_str())).max().unwrap_or(2).max(2);
+        let name_width = cs.definitions.iter().map(|d| UnicodeWidthStr::width(d.name.as_str())).max().unwrap_or(4).max(4);
+        let pattern_width = cs.definitions.iter().map(|d| UnicodeWidthStr::width(d.pattern.as_str())).max().unwrap_or(7).max(7);
+        let blocking_width = 8; // "Blocking"
+        let timeout_width = 7; // "Timeout"
+        let active_width = 6; // "Active"
+        let one_at_width = 11; // "1-at-a-time"
+        let successes: Vec<String> = cs.definitions.iter()
+            .map(|d| d.success_message.as_deref().unwrap_or("—").to_string())
+            .collect();
+        let success_width = successes.iter().map(|s| UnicodeWidthStr::width(s.as_str())).max().unwrap_or(11).max(11);
+        let cwds: Vec<String> = cs.definitions.iter()
+            .map(|d| d.cwd.as_deref().unwrap_or("project root").to_string())
+            .collect();
+        let cwd_width = cwds.iter().map(|s| UnicodeWidthStr::width(s.as_str())).max().unwrap_or(3).max(3);
+
+        let viewport = state.last_viewport_width as usize;
+        let fixed_width = indent + id_width + separator_width + name_width + separator_width + pattern_width + separator_width
+            + separator_width + blocking_width + separator_width + timeout_width + separator_width + active_width
+            + separator_width + one_at_width + separator_width + success_width + separator_width + cwd_width;
+        let desc_max = if viewport > fixed_width + 20 {
+            viewport - fixed_width
+        } else {
+            40 // minimum reasonable width
+        };
+
+        // Build multi-row entries with word-wrapped Description
+        let mut all_rows: Vec<Vec<Cell>> = Vec::new();
+        for (i, def) in cs.definitions.iter().enumerate() {
+            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
+            let blocking = if def.blocking { "yes" } else { "no" };
+            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
+            let one_at = if def.one_at_a_time { "yes" } else { "no" };
+            let wrapped = wrap_text_simple(&def.description, desc_max);
+
+            for (line_idx, line) in wrapped.iter().enumerate() {
+                if line_idx == 0 {
+                    all_rows.push(vec![
+                        Cell::new(&def.id, Style::default().fg(theme::accent())),
+                        Cell::new(&def.name, Style::default().fg(Color::Rgb(80, 250, 123))),
+                        Cell::new(&def.pattern, normal),
+                        Cell::new(line, muted),
+                        Cell::new(blocking, normal),
+                        Cell::new(&timeout, normal),
+                        Cell::new(active, normal),
+                        Cell::new(one_at, muted),
+                        Cell::new(&successes[i], muted),
+                        Cell::new(&cwds[i], muted),
+                    ]);
+                } else {
+                    all_rows.push(vec![
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new(line, muted),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                        Cell::new("", Style::default()),
+                    ]);
+                }
+            }
+        }
+
         let header = [
             Cell::new("ID", normal),
             Cell::new("Name", normal),
@@ -107,29 +179,7 @@ impl Panel for CallbackPanel {
             Cell::new("CWD", normal),
         ];
 
-        let rows: Vec<Vec<Cell>> = cs.definitions.iter().map(|def| {
-            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
-            let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
-            let success = def.success_message.as_deref().unwrap_or("—").to_string();
-            let cwd = def.cwd.as_deref().unwrap_or("project root").to_string();
-            let one_at = if def.one_at_a_time { "yes" } else { "no" };
-
-            vec![
-                Cell::new(&def.id, Style::default().fg(theme::accent())),
-                Cell::new(&def.name, Style::default().fg(Color::Rgb(80, 250, 123))),
-                Cell::new(&def.pattern, normal),
-                Cell::new(&def.description, muted),
-                Cell::new(blocking, normal),
-                Cell::new(timeout, normal),
-                Cell::new(active, normal),
-                Cell::new(one_at, muted),
-                Cell::new(success, muted),
-                Cell::new(cwd, muted),
-            ]
-        }).collect();
-
-        let mut lines = render_table(&header, &rows, None, 1);
+        let mut lines = render_table(&header, &all_rows, None, 1);
 
         // If editor is open, render the script content below the table with warning banner
         if let Some(ref editor_id) = cs.editor_open {
@@ -208,4 +258,42 @@ impl Panel for CallbackPanel {
             .unwrap_or(("", 0));
         vec![ContextItem::new(id, "Callbacks", content, last_refresh_ms)]
     }
+}
+
+/// Simple word-wrap: break text at word boundaries to fit within max_width.
+/// Uses UnicodeWidthStr for correct display width measurement.
+fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
+    }
+    if UnicodeWidthStr::width(text) <= max_width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0usize;
+
+    for word in text.split_whitespace() {
+        let word_width = UnicodeWidthStr::width(word);
+        if current_width == 0 {
+            current_line.push_str(word);
+            current_width = word_width;
+        } else if current_width + 1 + word_width <= max_width {
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+            current_width = word_width;
+        }
+    }
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
