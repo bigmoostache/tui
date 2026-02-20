@@ -128,7 +128,7 @@ pub fn fire_callback(
 }
 
 /// Fire all matched non-blocking callbacks.
-/// Returns a summary of what was fired.
+/// Returns one summary line per callback in compact format: "· name running"
 pub fn fire_async_callbacks(
     state: &mut State,
     callbacks: &[MatchedCallback],
@@ -136,19 +136,11 @@ pub fn fire_async_callbacks(
     let mut summaries = Vec::new();
     for cb in callbacks {
         match fire_callback(state, cb, None) {
-            Ok(session_key) => {
-                summaries.push(format!(
-                    "Callback '{}' fired (async) → {} [{}]",
-                    cb.definition.name,
-                    session_key,
-                    cb.matched_files.join(", "),
-                ));
+            Ok(_session_key) => {
+                summaries.push(format!("· {} running", cb.definition.name));
             }
             Err(e) => {
-                summaries.push(format!(
-                    "Callback '{}' FAILED to spawn: {}",
-                    cb.definition.name, e,
-                ));
+                summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e));
             }
         }
     }
@@ -157,6 +149,7 @@ pub fn fire_async_callbacks(
 
 /// Fire all matched blocking callbacks.
 /// Each gets a sentinel tool_use_id so tool_pipeline can track them.
+/// Returns one summary line per callback: "· name running (blocking)"
 pub fn fire_blocking_callbacks(
     state: &mut State,
     callbacks: &[MatchedCallback],
@@ -165,19 +158,11 @@ pub fn fire_blocking_callbacks(
     let mut summaries = Vec::new();
     for cb in callbacks {
         match fire_callback(state, cb, Some(tool_use_id)) {
-            Ok(session_key) => {
-                summaries.push(format!(
-                    "Callback '{}' fired (blocking) → {} [{}]",
-                    cb.definition.name,
-                    session_key,
-                    cb.matched_files.join(", "),
-                ));
+            Ok(_session_key) => {
+                summaries.push(format!("· {} running (blocking)", cb.definition.name));
             }
             Err(e) => {
-                summaries.push(format!(
-                    "Callback '{}' FAILED to spawn: {}",
-                    cb.definition.name, e,
-                ));
+                summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e));
             }
         }
     }
@@ -243,11 +228,11 @@ impl Watcher for CallbackWatcher {
             let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
             let log_path_str = log_path.to_string_lossy();
             let msg = if let Some(ref sm) = self.success_message {
-                format!("Callback '{}': {} (exit 0). Files: [{}]. Log: {}",
-                    self.callback_name, sm, self.matched_files.join(", "), log_path_str)
+                format!("· {} passed ({}). Log: {}",
+                    self.callback_name, sm, log_path_str)
             } else {
-                format!("Callback '{}' passed ✓ (exit 0). Files: [{}]. Log: {}",
-                    self.callback_name, self.matched_files.join(", "), log_path_str)
+                format!("· {} passed. Log: {}",
+                    self.callback_name, log_path_str)
             };
             Some(WatcherResult {
                 description: msg,
@@ -258,10 +243,11 @@ impl Watcher for CallbackWatcher {
                 processed_already: true,
             })
         } else {
-            let last_lines = handle.buffer.last_n_lines(4);
+            let last_lines = handle.buffer.last_n_lines(3);
             let msg = format!(
-                "Callback '{}' FAILED (exit {}). Files: [{}]\nLast output:\n{}",
-                self.callback_name, exit_code, self.matched_files.join(", "), last_lines,
+                "· {} FAILED (exit {})\n{}",
+                self.callback_name, exit_code,
+                last_lines.lines().map(|l| format!("    {}", l)).collect::<Vec<_>>().join("\n"),
             );
             Some(WatcherResult {
                 description: msg,

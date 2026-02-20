@@ -165,7 +165,7 @@ impl Module for FilesModule {
 /// Visualizer for Edit and Write tool results.
 /// Also reused by cp-mod-prompt for Edit_prompt.
 /// Parses ```diff blocks and renders deleted lines in red, added lines in green.
-/// Callback messages get distinct styling: async triggers dim cyan, results green/red.
+/// Callback summary blocks get compact styled rendering (only status word colored).
 /// Non-diff content is rendered in secondary text color.
 pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
@@ -173,9 +173,8 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
     let error_color = Color::Rgb(255, 85, 85);
     let success_color = Color::Rgb(80, 250, 123);
     let secondary_color = Color::Rgb(150, 150, 170);
-    let callback_async_color = Color::Rgb(100, 160, 200);
-    let callback_warn_color = Color::Rgb(230, 180, 80);
-    let dim_color = Color::Rgb(110, 110, 130);
+    let cb_blue = Color::Rgb(100, 160, 220);
+    let cb_dim = Color::Rgb(110, 110, 130);
 
     let mut lines = Vec::new();
     let mut in_diff_block = false;
@@ -191,6 +190,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             continue;
         }
 
+        // Skip empty lines inside callback blocks (no wasted vertical space)
         if line.is_empty() {
             lines.push(Line::from(""));
             continue;
@@ -206,7 +206,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             };
             let display = truncate_line(line, width);
             lines.push(Line::from(Span::styled(display, style)));
-        } else if let Some(styled) = style_callback_line(line, width, success_color, error_color, callback_async_color, callback_warn_color, dim_color) {
+        } else if let Some(styled) = style_callback_line(line, width, cb_blue, success_color, error_color, cb_dim) {
             lines.push(styled);
         } else {
             // Non-diff content: plain secondary text
@@ -227,48 +227,89 @@ fn truncate_line(line: &str, width: usize) -> String {
     }
 }
 
-/// Style callback-related lines injected into Edit/Write tool results.
-/// Returns None if the line is not a callback message.
+/// Style callback-related lines in tool results.
+/// Format: "Callbacks:" header, "· name ✓ log: path", "· name ✗ P20", "    error line"
+/// Only the status symbol (✓/✗/⏳) is colored. Rest is dim.
 fn style_callback_line(
     line: &str,
     width: usize,
-    success_color: ratatui::style::Color,
-    error_color: ratatui::style::Color,
-    async_color: ratatui::style::Color,
-    warn_color: ratatui::style::Color,
-    dim_color: ratatui::style::Color,
+    blue: ratatui::style::Color,
+    green: ratatui::style::Color,
+    red: ratatui::style::Color,
+    dim: ratatui::style::Color,
 ) -> Option<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
 
     let trimmed = line.trim();
 
-    // [Async callbacks triggered: ...]
-    if trimmed.starts_with("[Async callbacks triggered:") {
-        let display = truncate_line(trimmed, width);
-        return Some(Line::from(Span::styled(display, Style::default().fg(async_color).dim())));
+    // "Callbacks:" header
+    if trimmed == "Callbacks:" {
+        return Some(Line::from(Span::styled(
+            truncate_line(trimmed, width),
+            Style::default().fg(dim),
+        )));
     }
 
-    // [Callback result: ... passed / Build passed ✓ / success]
-    if trimmed.starts_with("[Callback result:") {
-        let display = truncate_line(trimmed, width);
-        let style = if trimmed.contains("FAILED") || trimmed.contains("TIMED OUT") {
-            Style::default().fg(error_color)
+    // "· name passed ..." or "· name FAILED ..." or "· name running"
+    if trimmed.starts_with("· ") {
+        let rest = &trimmed[4..]; // skip "· " (dot + nbsp + space = 4 bytes)
+        let mut spans = Vec::new();
+        spans.push(Span::styled("· ", Style::default().fg(dim)));
+
+        // Find the status word and split around it
+        if let Some(pos) = rest.find(" passed") {
+            let name = &rest[..pos];
+            let after = &rest[pos + 7..]; // skip " passed"
+            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(" passed", Style::default().fg(green)));
+            if !after.is_empty() {
+                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+            }
+        } else if let Some(pos) = rest.find(" FAILED") {
+            let name = &rest[..pos];
+            let after = &rest[pos + 7..]; // skip " FAILED"
+            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(" FAILED", Style::default().fg(red)));
+            if !after.is_empty() {
+                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+            }
+        } else if let Some(pos) = rest.find(" TIMED OUT") {
+            let name = &rest[..pos];
+            let after = &rest[pos + 10..]; // skip " TIMED OUT"
+            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(" TIMED OUT", Style::default().fg(red)));
+            if !after.is_empty() {
+                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+            }
+        } else if let Some(pos) = rest.find(" running") {
+            let name = &rest[..pos];
+            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(" running", Style::default().fg(blue)));
+        } else if let Some(pos) = rest.find(" skipped") {
+            let name = &rest[..pos];
+            let after = &rest[pos + 8..]; // skip " skipped"
+            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(" skipped", Style::default().fg(dim)));
+            if !after.is_empty() {
+                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+            }
         } else {
-            Style::default().fg(success_color).dim()
-        };
-        return Some(Line::from(Span::styled(display, style)));
+            // Fallback: just dim
+            spans.push(Span::styled(rest.to_string(), Style::default().fg(dim)));
+        }
+        return Some(Line::from(spans));
+    }
+
+    // Indented error lines (4 spaces)
+    if line.starts_with("    ") && !line.trim().is_empty() {
+        let display = truncate_line(line, width);
+        return Some(Line::from(Span::styled(display, Style::default().fg(red))));
     }
 
     // [skip_callbacks warnings: ...]
     if trimmed.starts_with("[skip_callbacks warnings:") {
         let display = truncate_line(trimmed, width);
-        return Some(Line::from(Span::styled(display, Style::default().fg(warn_color))));
-    }
-
-    // Standalone callback trigger/result lines (not wrapped in [...])
-    if trimmed.starts_with("Callback '") && trimmed.contains("fired") {
-        let display = truncate_line(trimmed, width);
-        return Some(Line::from(Span::styled(display, Style::default().fg(dim_color))));
+        return Some(Line::from(Span::styled(display, Style::default().fg(Color::Rgb(230, 180, 80)))));
     }
 
     None

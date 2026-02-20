@@ -121,8 +121,9 @@ impl App {
                 if let Some(result) = matched_result {
                     let sentinel_id = result.tool_use_id.as_ref().unwrap();
                     let original_content = &after_sentinel[sentinel_id.len()..];
+                    // Format callback result as compact summary line
                     tr.content = format!(
-                        "{}\n\n[Callback result: {}]",
+                        "{}\nCallbacks:\n{}",
                         original_content, result.description,
                     );
                 }

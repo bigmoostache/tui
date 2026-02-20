@@ -128,9 +128,9 @@ impl App {
                 // Fire non-blocking callbacks immediately (they run async via watchers)
                 if !async_cbs.is_empty() {
                     let summaries = callback_firing::fire_async_callbacks(&mut self.state, &async_cbs);
-                    // Append async callback notes to the Edit/Write tool results so the AI knows
+                    // Append compact callback summary to the last Edit/Write tool result
                     if !summaries.is_empty() {
-                        let note = format!("\n\n[Async callbacks triggered: {}]", summaries.join("; "));
+                        let note = format!("\nCallbacks:\n{}", summaries.join("\n"));
                         // Find the last Edit/Write tool result and append the note
                         for tr in tool_results.iter_mut().rev() {
                             if tr.tool_name == "Edit" || tr.tool_name == "Write" {

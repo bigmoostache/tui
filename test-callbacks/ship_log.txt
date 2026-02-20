@@ -3,3 +3,4 @@ Second entry: kraken sighted off port bow!
 Third entry: fired while first callback still sleeps!
 Fourth entry: callback be deactivated, this should be silent!
 Fifth entry: callback reactivated, this should FIRE!
+Sixth entry: testin' the new visualizer colors, arr! 🏴‍☠️
