@@ -1,7 +1,9 @@
 use ratatui::prelude::*;
 
+use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::ui::{Cell, render_table};
 
 use crate::types::CallbackState;
 
@@ -57,13 +59,48 @@ impl Panel for CallbackPanel {
             ];
         }
 
-        // Render as markdown table — the TUI markdown renderer will pick it up
-        let table = Self::format_for_context(state);
-        let mut lines = Vec::new();
-        for line in table.lines() {
-            lines.push(Line::from(Span::raw(line.to_string())));
-        }
-        lines
+        let muted = Style::default().fg(theme::text_muted());
+        let normal = Style::default().fg(theme::text());
+
+        let header = [
+            Cell::new("ID", normal),
+            Cell::new("Name", normal),
+            Cell::new("Pattern", normal),
+            Cell::new("Description", normal),
+            Cell::new("Blocking", normal),
+            Cell::new("Timeout", normal),
+            Cell::new("Active", normal),
+            Cell::new("1-at-a-time", normal),
+            Cell::new("Once/batch", normal),
+            Cell::new("Success Msg", normal),
+            Cell::new("CWD", normal),
+        ];
+
+        let rows: Vec<Vec<Cell>> = cs.definitions.iter().map(|def| {
+            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
+            let blocking = if def.blocking { "yes" } else { "no" };
+            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
+            let success = def.success_message.as_deref().unwrap_or("—").to_string();
+            let cwd = def.cwd.as_deref().unwrap_or("project root").to_string();
+            let one_at = if def.one_at_a_time { "yes" } else { "no" };
+            let once_batch = if def.once_per_batch { "yes" } else { "no" };
+
+            vec![
+                Cell::new(&def.id, Style::default().fg(theme::accent())),
+                Cell::new(&def.name, Style::default().fg(Color::Rgb(80, 250, 123))),
+                Cell::new(&def.pattern, normal),
+                Cell::new(&def.description, muted),
+                Cell::new(blocking, normal),
+                Cell::new(timeout, normal),
+                Cell::new(active, normal),
+                Cell::new(one_at, muted),
+                Cell::new(once_batch, muted),
+                Cell::new(success, muted),
+                Cell::new(cwd, muted),
+            ]
+        }).collect();
+
+        render_table(&header, &rows, None, 1)
     }
 
     fn refresh(&self, state: &mut State) {
