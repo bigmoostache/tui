@@ -20,6 +20,7 @@ pub use cp_mod_prompt::PromptModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
 pub use cp_mod_console::ConsoleModule;
+pub use cp_mod_callback::CallbackModule;
 pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
 
@@ -79,6 +80,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(GitModule),
         Box::new(GithubModule),
         Box::new(ConsoleModule),
+        Box::new(CallbackModule),
         Box::new(TodoModule),
         Box::new(MemoryModule),
         Box::new(ScratchpadModule),

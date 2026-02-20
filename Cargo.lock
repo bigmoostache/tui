@@ -236,6 +236,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-callback"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "cp-mod-console",
+ "globset",
+ "ratatui",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
@@ -2662,6 +2674,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cp-base",
+ "cp-mod-callback",
  "cp-mod-console",
  "cp-mod-files",
  "cp-mod-git",

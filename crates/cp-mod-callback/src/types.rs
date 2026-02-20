@@ -1,0 +1,67 @@
+use std::collections::HashSet;
+
+use cp_base::state::State;
+use serde::{Deserialize, Serialize};
+
+/// A callback rule that fires when matching files are edited.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallbackDefinition {
+    /// Auto-generated ID: "CB1", "CB2", ...
+    pub id: String,
+    /// User-chosen display name (e.g., "rust-check")
+    pub name: String,
+    /// Short explanation of what this callback does
+    pub description: String,
+    /// Gitignore-style glob pattern (e.g., "*.rs", "src/**/*.ts")
+    pub pattern: String,
+    /// Whether this callback blocks Edit/Write tool results
+    pub blocking: bool,
+    /// Max execution time in seconds (required for blocking, optional for non-blocking)
+    pub timeout_secs: Option<u64>,
+    /// Custom message shown on success (e.g., "Build passed ✓")
+    pub success_message: Option<String>,
+    /// Working directory for the script (defaults to project root)
+    pub cwd: Option<String>,
+    /// Won't run simultaneously with itself
+    pub one_at_a_time: bool,
+    /// Fires once per tool batch with all matched files in $CP_CHANGED_FILES
+    pub once_per_batch: bool,
+}
+
+/// Module-owned state for the Callback module.
+/// Stored in State.module_data via TypeMap.
+pub struct CallbackState {
+    /// All callback definitions (loaded from global config.json)
+    pub definitions: Vec<CallbackDefinition>,
+    /// Counter for auto-generating CB IDs
+    pub next_id: usize,
+    /// Per-worker: which callback IDs are active
+    pub active_set: HashSet<String>,
+    /// Which callback ID is currently open in the editor (if any)
+    pub editor_open: Option<String>,
+}
+
+impl Default for CallbackState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CallbackState {
+    pub fn new() -> Self {
+        Self {
+            definitions: Vec::new(),
+            next_id: 1,
+            active_set: HashSet::new(),
+            editor_open: None,
+        }
+    }
+
+    pub fn get(state: &State) -> &Self {
+        state.get_ext::<Self>().expect("CallbackState not initialized")
+    }
+
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.get_ext_mut::<Self>().expect("CallbackState not initialized")
+    }
+}

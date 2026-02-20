@@ -1,0 +1,12 @@
+[package]
+name = "cp-mod-callback"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cp-base.workspace = true
+cp-mod-console = { path = "../cp-mod-console" }
+ratatui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+globset.workspace = true

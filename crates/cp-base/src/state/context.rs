@@ -104,6 +104,7 @@ impl ContextType {
     pub const SPINE: &str = "spine";
     pub const LOGS: &str = "logs";
     pub const CONSOLE: &str = "console";
+    pub const CALLBACK: &str = "callback";
     pub const TOOLS: &str = "tools";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
