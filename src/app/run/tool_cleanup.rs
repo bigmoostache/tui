@@ -76,12 +76,15 @@ impl App {
 
             // Now create notifications (after panel creation, so descriptions include panel refs)
             for result in &async_results {
-                SpineState::create_notification(
+                let nid = SpineState::create_notification(
                     &mut self.state,
                     NotificationType::Custom,
                     "watcher".to_string(),
                     result.description.clone(),
                 );
+                if result.processed_already {
+                    SpineState::mark_notification_processed(&mut self.state, &nid);
+                }
             }
 
             self.save_state_async();

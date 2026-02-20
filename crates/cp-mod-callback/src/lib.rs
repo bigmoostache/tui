@@ -1,4 +1,4 @@
-// Arr! Callback module — auto-fires scripts when files walk the plank! ⚓
+// Arr! Callback module — auto-fires scripts when files walk the plank! ⚓🏴‍☠️
 // Tested by the pirate crew on this fine day
 mod panel;
 pub mod tools;
@@ -67,7 +67,7 @@ impl Module for CallbackModule {
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         let cs = CallbackState::get(state);
         let active: Vec<&String> = cs.active_set.iter().collect();
-        json!({ "active_set": active })
+        json!({ "active_set": active, "editor_open": cs.editor_open })
     }
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -75,6 +75,9 @@ impl Module for CallbackModule {
             && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
         {
             CallbackState::get_mut(state).active_set = v.into_iter().collect();
+        }
+        if let Some(v) = data.get("editor_open") {
+            CallbackState::get_mut(state).editor_open = v.as_str().map(|s| s.to_string());
         }
     }
 

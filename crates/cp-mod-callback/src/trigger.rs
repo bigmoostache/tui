@@ -369,6 +369,7 @@ impl Watcher for CallbackWatcher {
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
                 create_panel: None, // Success = no panel needed
+                processed_already: true, // Success — no action needed, don't auto-continue
             })
         } else {
             // Failure — request deferred panel creation so AI can inspect output
@@ -391,6 +392,7 @@ impl Watcher for CallbackWatcher {
                     callback_id: self.deferred_panel.callback_id.clone(),
                     callback_name: self.deferred_panel.callback_name.clone(),
                 }),
+                processed_already: false,
             })
         }
     }
@@ -419,6 +421,7 @@ impl Watcher for CallbackWatcher {
                 callback_id: self.deferred_panel.callback_id.clone(),
                 callback_name: self.deferred_panel.callback_name.clone(),
             }),
+            processed_already: false,
         })
     }
 

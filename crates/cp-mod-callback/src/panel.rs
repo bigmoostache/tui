@@ -127,7 +127,47 @@ impl Panel for CallbackPanel {
             ]
         }).collect();
 
-        render_table(&header, &rows, None, 1)
+        let mut lines = render_table(&header, &rows, None, 1);
+
+        // If editor is open, render the script content below the table
+        if let Some(ref editor_id) = cs.editor_open {
+            if let Some(def) = cs.definitions.iter().find(|d| d.id == *editor_id) {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    format!("--- Editing: {} [{}] ---", def.name, def.id),
+                    Style::default().fg(theme::accent()).add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!("Pattern: {} | Blocking: {} | Timeout: {}",
+                        def.pattern,
+                        if def.blocking { "yes" } else { "no" },
+                        def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string()),
+                    ),
+                    muted,
+                )));
+                lines.push(Line::from(""));
+
+                let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+                match fs::read_to_string(&script_path) {
+                    Ok(content) => {
+                        for line in content.lines() {
+                            lines.push(Line::from(Span::styled(
+                                line.to_string(),
+                                Style::default().fg(Color::Rgb(80, 250, 123)),
+                            )));
+                        }
+                    }
+                    Err(e) => {
+                        lines.push(Line::from(Span::styled(
+                            format!("Error reading script: {}", e),
+                            Style::default().fg(Color::Red),
+                        )));
+                    }
+                }
+            }
+        }
+
+        lines
     }
 
     fn refresh(&self, state: &mut State) {

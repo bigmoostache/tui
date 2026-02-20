@@ -22,6 +22,9 @@ pub struct WatcherResult {
     /// Used by callback watchers that defer panel creation until failure.
     /// Contains (session_key, display_name, command, description, cwd).
     pub create_panel: Option<DeferredPanel>,
+    /// If true, the spine notification is created already processed (no auto-continuation).
+    /// Used for success notifications that don't need attention.
+    pub processed_already: bool,
 }
 
 /// Info needed to create a console panel after a watcher fires.

@@ -228,6 +228,7 @@ impl Watcher for CoucouWatcher {
                 tool_use_id: None,
                 close_panel: false,
                 create_panel: None,
+                processed_already: false,
             })
         } else {
             None

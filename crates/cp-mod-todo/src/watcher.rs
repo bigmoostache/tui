@@ -76,6 +76,7 @@ impl Watcher for TodoWatcher {
             tool_use_id: None,
             close_panel: false,
             create_panel: None,
+            processed_already: false,
         })
     }
 
