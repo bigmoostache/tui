@@ -9,10 +9,6 @@ pub enum NotificationType {
     UserMessage,
     /// TUI was reloaded and needs to resume streaming
     ReloadResume,
-    /// Todos remain incomplete (pending/in_progress)
-    TodoIncomplete,
-    /// Stream stopped due to max_tokens (output was truncated)
-    MaxTokensTruncated,
     /// Custom notification from a module or external source
     Custom,
 }
@@ -22,8 +18,6 @@ impl NotificationType {
         match self {
             NotificationType::UserMessage => "User Message",
             NotificationType::ReloadResume => "Reload Resume",
-            NotificationType::TodoIncomplete => "Todo Incomplete",
-            NotificationType::MaxTokensTruncated => "Max Tokens Truncated",
             NotificationType::Custom => "Custom",
         }
     }
@@ -65,9 +59,6 @@ pub enum ContinuationAction {
 /// Configuration for spine module (per-worker, persisted)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpineConfig {
-    /// Whether auto-continuation on max_tokens is enabled
-    #[serde(default = "default_true")]
-    pub max_tokens_auto_continue: bool,
     /// Whether to continue until all todos are done
     #[serde(default)]
     pub continue_until_todos_done: bool,
@@ -106,14 +97,9 @@ pub struct SpineConfig {
     pub autonomous_start_ms: Option<u64>,
 }
 
-fn default_true() -> bool {
-    true
-}
-
 impl Default for SpineConfig {
     fn default() -> Self {
         Self {
-            max_tokens_auto_continue: true,
             continue_until_todos_done: false,
             max_output_tokens: None,
             max_cost: None,

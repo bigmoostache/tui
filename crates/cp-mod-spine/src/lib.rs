@@ -1,4 +1,3 @@
-pub(crate) mod continuation;
 pub(crate) mod coucou;
 pub mod engine;
 pub(crate) mod guard_rail;
@@ -6,7 +5,7 @@ mod panel;
 pub(crate) mod tools;
 pub mod types;
 
-pub use types::{ContinuationAction, Notification, NotificationType, SpineConfig, SpineState};
+pub use types::{Notification, NotificationType, SpineConfig, SpineState};
 
 use serde_json::json;
 
@@ -140,8 +139,6 @@ impl Module for SpineModule {
                 short_desc: "Configure auto-continuation and guard rails".to_string(),
                 description: "Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.".to_string(),
                 params: vec![
-                    ToolParam::new("max_tokens_auto_continue", ParamType::Boolean)
-                        .desc("Auto-continue when stream hits max_tokens (default: true)"),
                     ToolParam::new("continue_until_todos_done", ParamType::Boolean)
                         .desc("Keep auto-continuing until all todos are done (default: false)"),
                     ToolParam::new("max_output_tokens", ParamType::Integer)

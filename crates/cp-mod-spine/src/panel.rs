@@ -50,10 +50,6 @@ impl SpinePanel {
         // Show spine config summary
         output.push_str("\n=== Spine Config ===\n");
         output.push_str(&format!(
-            "max_tokens_auto_continue: {}\n",
-            SpineState::get(state).config.max_tokens_auto_continue
-        ));
-        output.push_str(&format!(
             "continue_until_todos_done: {}\n",
             SpineState::get(state).config.continue_until_todos_done
         ));
@@ -179,7 +175,6 @@ impl Panel for SpinePanel {
         lines.push(Line::from(vec![Span::styled("Config".to_string(), Style::default().fg(theme::text_secondary()))]));
 
         let config_items = vec![
-            ("max_tokens_auto_continue", format!("{}", SpineState::get(state).config.max_tokens_auto_continue)),
             ("continue_until_todos_done", format!("{}", SpineState::get(state).config.continue_until_todos_done)),
             ("auto_continuations", format!("{}", SpineState::get(state).config.auto_continuation_count)),
         ];
@@ -222,8 +217,6 @@ impl Panel for SpinePanel {
 fn notification_type_color(nt: &NotificationType) -> Color {
     match nt {
         NotificationType::UserMessage => theme::user(),
-        NotificationType::MaxTokensTruncated => theme::warning(),
-        NotificationType::TodoIncomplete => theme::accent(),
         NotificationType::ReloadResume => theme::text_secondary(),
         NotificationType::Custom => theme::text_secondary(),
     }

@@ -30,11 +30,6 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut changes: Vec<String> = Vec::new();
 
     // === Auto-continuation toggles ===
-    if let Some(v) = tool.input.get("max_tokens_auto_continue").and_then(|v| v.as_bool()) {
-        SpineState::get_mut(state).config.max_tokens_auto_continue = v;
-        changes.push(format!("max_tokens_auto_continue = {}", v));
-    }
-
     if let Some(v) = tool.input.get("continue_until_todos_done").and_then(|v| v.as_bool()) {
         SpineState::get_mut(state).config.continue_until_todos_done = v;
         changes.push(format!("continue_until_todos_done = {}", v));
