@@ -10,6 +10,7 @@ use crate::infra::tools::{execute_tool, perform_reload};
 
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_callback::trigger as callback_trigger;
+use cp_mod_callback::firing as callback_firing;
 
 use crate::app::App;
 
@@ -126,7 +127,7 @@ impl App {
 
                 // Fire non-blocking callbacks immediately (they run async via watchers)
                 if !async_cbs.is_empty() {
-                    let summaries = callback_trigger::fire_async_callbacks(&mut self.state, &async_cbs);
+                    let summaries = callback_firing::fire_async_callbacks(&mut self.state, &async_cbs);
                     // Append async callback notes to the Edit/Write tool results so the AI knows
                     if !summaries.is_empty() {
                         let note = format!("\n\n[Async callbacks triggered: {}]", summaries.join("; "));
@@ -150,7 +151,7 @@ impl App {
                     let sentinel_id = format!("cb_block_{}", self.state.next_tool_id);
                     self.state.next_tool_id += 1;
 
-                    let _summaries = callback_trigger::fire_blocking_callbacks(
+                    let _summaries = callback_firing::fire_blocking_callbacks(
                         &mut self.state, &blocking_cbs, &sentinel_id,
                     );
 

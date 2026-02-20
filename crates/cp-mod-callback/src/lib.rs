@@ -4,6 +4,7 @@ mod panel;
 pub mod tools;
 mod tools_upsert;
 pub mod trigger;
+pub mod firing;
 pub mod types;
 
 use serde_json::json;
