@@ -15,21 +15,26 @@ impl CallbackPanel {
             return "No callbacks configured.".to_string();
         }
 
-        let mut hull = Vec::new();
-        hull.push(format!(
-            "{:<5} {:<16} {:<20} {:<9} {:<7}",
-            "ID", "Name", "Pattern", "Blocking", "Active"
-        ));
+        let mut lines = Vec::new();
+        lines.push("| ID | Name | Pattern | Description | Blocking | Timeout | Active | 1-at-a-time | Once/batch | Success Msg | CWD |".to_string());
+        lines.push("|------|------|---------|-------------|----------|---------|--------|-------------|------------|-------------|-----|".to_string());
+
         for def in &cs.definitions {
-            let active_flag = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
-            let blocking_flag = if def.blocking { "yes" } else { "no" };
-            hull.push(format!(
-                "{:<5} {:<16} {:<20} {:<9} {:<7}",
-                def.id, def.name, def.pattern, blocking_flag, active_flag
+            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
+            let blocking = if def.blocking { "yes" } else { "no" };
+            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
+            let success = def.success_message.as_deref().unwrap_or("—");
+            let cwd = def.cwd.as_deref().unwrap_or("project root");
+            let one_at = if def.one_at_a_time { "yes" } else { "no" };
+            let once_batch = if def.once_per_batch { "yes" } else { "no" };
+
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                def.id, def.name, def.pattern, def.description, blocking, timeout, active, one_at, once_batch, success, cwd
             ));
         }
 
-        hull.join("\n")
+        lines.join("\n")
     }
 }
 
@@ -38,31 +43,25 @@ impl Panel for CallbackPanel {
         "Callbacks".to_string()
     }
 
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let cs = CallbackState::get(state);
 
         if cs.definitions.is_empty() {
             return vec![
-                Line::from(Span::styled("No callbacks configured.", base_style)),
+                Line::from(Span::styled("No callbacks configured.", Style::default())),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Use Callback_upsert to create one.",
-                    base_style.fg(Color::Rgb(150, 150, 170)),
+                    Style::default().fg(Color::Rgb(150, 150, 170)),
                 )),
             ];
         }
 
+        // Render as markdown table — the TUI markdown renderer will pick it up
+        let table = Self::format_for_context(state);
         let mut lines = Vec::new();
-        for def in &cs.definitions {
-            let anchor = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
-            let sail_type = if def.blocking { "blocking" } else { "async" };
-            lines.push(Line::from(vec![
-                Span::styled(format!("{} ", anchor), base_style),
-                Span::styled(format!("{} ", def.id), base_style.fg(Color::Rgb(139, 233, 253))),
-                Span::styled(format!("[{}] ", def.name), base_style.fg(Color::Rgb(80, 250, 123))),
-                Span::styled(format!("{} ", def.pattern), base_style),
-                Span::styled(format!("({})", sail_type), base_style.fg(Color::Rgb(150, 150, 170))),
-            ]));
+        for line in table.lines() {
+            lines.push(Line::from(Span::raw(line.to_string())));
         }
         lines
     }
