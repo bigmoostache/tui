@@ -27,6 +27,7 @@ pub struct MatchedCallback {
 
 /// Collect changed file paths from a batch of tool uses.
 /// Extracts `file_path` from Edit and Write tool inputs.
+/// Skips files from tools that have `block_callbacks: true`.
 pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<String> {
     let mut hull: Vec<String> = Vec::new();
     let project_root = std::env::current_dir()
@@ -36,6 +37,10 @@ pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<String> {
     for tool in tools {
         match tool.name.as_str() {
             "Edit" | "Write" => {
+                // Skip files from tools that explicitly block callbacks
+                if tool.input.get("block_callbacks").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    continue;
+                }
                 if let Some(path) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     // Normalize: strip leading ./ if present, strip absolute project root prefix
                     let mut anchor_path = path.strip_prefix("./").unwrap_or(path);

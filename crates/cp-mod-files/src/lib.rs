@@ -72,6 +72,8 @@ impl Module for FilesModule {
                         .required(),
                     ToolParam::new("replace_all", ParamType::Boolean)
                         .desc("Replace all occurrences (default: false)"),
+                    ToolParam::new("block_callbacks", ParamType::Boolean)
+                        .desc("Skip callback triggers for this edit (default: false)"),
                 ],
                 enabled: true,
                 category: "File".to_string(),
@@ -88,6 +90,8 @@ impl Module for FilesModule {
                     ToolParam::new("contents", ParamType::String)
                         .desc("Complete file contents to write")
                         .required(),
+                    ToolParam::new("block_callbacks", ParamType::Boolean)
+                        .desc("Skip callback triggers for this write (default: false)"),
                 ],
                 enabled: true,
                 category: "File".to_string(),
