@@ -2,6 +2,7 @@
 // Tested by the pirate crew on this fine day
 mod panel;
 pub mod tools;
+mod tools_upsert;
 pub mod trigger;
 pub mod types;
 
