@@ -277,8 +277,8 @@ impl Watcher for CallbackWatcher {
         let elapsed_s = (now - self.registered_at_ms) / 1000;
         Some(WatcherResult {
             description: format!(
-                "· {} TIMED OUT ({}s). Files: [{}]",
-                self.callback_name, elapsed_s, self.matched_files.join(", "),
+                "· {} TIMED OUT ({}s)",
+                self.callback_name, elapsed_s,
             ),
             panel_id: None,
             tool_use_id: self.tool_use_id.clone(),

@@ -13,6 +13,7 @@ chrono = "0.4"
 regex = "1.10"
 ignore = "0.4"
 globset = "0.4"
+unicode-width = "0.2"
 
 [package]
 name = "tui"
@@ -46,7 +47,7 @@ globset.workspace = true
 regex.workspace = true
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 dotenvy = "0.15"
-unicode-width = "0.2"
+unicode-width.workspace = true
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 secrecy = { version = "0.10", features = ["serde"] }
 notify = "6.1"

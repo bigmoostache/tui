@@ -1,2 +1,2 @@
-This file exists only to trigger the timeout-test callback.
-Fire in the hold!
+Testing timeout callback — round 2!
+This cannonball should explode after 5 seconds.

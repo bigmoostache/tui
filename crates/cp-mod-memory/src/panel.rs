@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
+use unicode_width::UnicodeWidthStr;
 
 use cp_base::state::Action;
 use cp_base::config::theme;
@@ -145,8 +146,64 @@ impl Panel for MemoryPanel {
         let closed: Vec<_> = sorted.iter().filter(|m| !ms.open_memory_ids.contains(&m.id)).collect();
         let open: Vec<_> = sorted.iter().filter(|m| ms.open_memory_ids.contains(&m.id)).collect();
 
-        // Closed memories as table
+        // Closed memories as table with word-wrapped Summary column
         if !closed.is_empty() {
+            // Calculate available width for Summary column
+            // Layout: indent(1) + ID col + " │ " + Summary + " │ " + Importance + " │ " + Labels
+            let indent = 1usize;
+            let separator_width = 3; // " │ "
+
+            // Measure fixed column widths
+            let id_width = closed.iter().map(|m| UnicodeWidthStr::width(m.id.as_str())).max().unwrap_or(2).max(2);
+            let imp_width = closed.iter()
+                .map(|m| UnicodeWidthStr::width(m.importance.as_str()))
+                .max().unwrap_or(10).max(10); // "Importance" header
+            let labels: Vec<String> = closed.iter()
+                .map(|m| if m.labels.is_empty() { String::new() } else { m.labels.join(", ") })
+                .collect();
+            let labels_width = labels.iter().map(|l| UnicodeWidthStr::width(l.as_str())).max().unwrap_or(6).max(6);
+
+            let viewport = state.last_viewport_width as usize;
+            let fixed_width = indent + id_width + separator_width + separator_width + imp_width + separator_width + labels_width;
+            let summary_max = if viewport > fixed_width + 20 {
+                viewport - fixed_width
+            } else {
+                40 // minimum reasonable width
+            };
+
+            // Word-wrap summaries and build multi-row entries
+            let mut all_rows: Vec<Vec<Cell>> = Vec::new();
+            for (i, memory) in closed.iter().enumerate() {
+                let importance_color = match memory.importance {
+                    MemoryImportance::Critical => theme::warning(),
+                    MemoryImportance::High => theme::accent(),
+                    MemoryImportance::Medium => theme::text_secondary(),
+                    MemoryImportance::Low => theme::text_muted(),
+                };
+                let label_str = &labels[i];
+                let wrapped = wrap_text_simple(&memory.tl_dr, summary_max);
+
+                for (line_idx, line) in wrapped.iter().enumerate() {
+                    if line_idx == 0 {
+                        // First line: show all columns
+                        all_rows.push(vec![
+                            Cell::new(&memory.id, Style::default().fg(theme::accent_dim())),
+                            Cell::new(line, Style::default().fg(theme::text())),
+                            Cell::new(memory.importance.as_str(), Style::default().fg(importance_color)),
+                            Cell::new(label_str, Style::default().fg(theme::text_muted())),
+                        ]);
+                    } else {
+                        // Continuation lines: empty ID/Importance/Labels, just Summary
+                        all_rows.push(vec![
+                            Cell::new("", Style::default()),
+                            Cell::new(line, Style::default().fg(theme::text())),
+                            Cell::new("", Style::default()),
+                            Cell::new("", Style::default()),
+                        ]);
+                    }
+                }
+            }
+
             let header = [
                 Cell::new("ID", Style::default()),
                 Cell::new("Summary", Style::default()),
@@ -154,28 +211,7 @@ impl Panel for MemoryPanel {
                 Cell::new("Labels", Style::default()),
             ];
 
-            let rows: Vec<Vec<Cell>> = closed
-                .iter()
-                .map(|memory| {
-                    let importance_color = match memory.importance {
-                        MemoryImportance::Critical => theme::warning(),
-                        MemoryImportance::High => theme::accent(),
-                        MemoryImportance::Medium => theme::text_secondary(),
-                        MemoryImportance::Low => theme::text_muted(),
-                    };
-
-                    let labels = if memory.labels.is_empty() { String::new() } else { memory.labels.join(", ") };
-
-                    vec![
-                        Cell::new(&memory.id, Style::default().fg(theme::accent_dim())),
-                        Cell::new(&memory.tl_dr, Style::default().fg(theme::text())),
-                        Cell::new(memory.importance.as_str(), Style::default().fg(importance_color)),
-                        Cell::new(labels, Style::default().fg(theme::text_muted())),
-                    ]
-                })
-                .collect();
-
-            text.extend(render_table(&header, &rows, None, 1));
+            text.extend(render_table(&header, &all_rows, None, 1));
         }
 
         // Open memories as YAML
@@ -247,4 +283,42 @@ impl Panel for MemoryPanel {
 
         text
     }
+}
+
+/// Simple word-wrap: break text at word boundaries to fit within max_width.
+/// Uses UnicodeWidthStr for correct display width measurement.
+fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
+    }
+    if UnicodeWidthStr::width(text) <= max_width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0usize;
+
+    for word in text.split_whitespace() {
+        let word_width = UnicodeWidthStr::width(word);
+        if current_width == 0 {
+            current_line.push_str(word);
+            current_width = word_width;
+        } else if current_width + 1 + word_width <= max_width {
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_width += 1 + word_width;
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+            current_width = word_width;
+        }
+    }
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
