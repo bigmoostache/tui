@@ -72,8 +72,8 @@ impl Module for FilesModule {
                         .required(),
                     ToolParam::new("replace_all", ParamType::Boolean)
                         .desc("Replace all occurrences (default: false)"),
-                    ToolParam::new("block_callbacks", ParamType::Boolean)
-                        .desc("Skip callback triggers for this edit (default: false)"),
+                    ToolParam::new("skip_callbacks", ParamType::Array(Box::new(ParamType::String)))
+                        .desc("List of callback names to skip for this edit. Use sparingly — only when you KNOW the callback will fail (e.g. mid-refactor) or when actively debugging. Callbacks exist to help you; prefer letting them run."),
                 ],
                 enabled: true,
                 category: "File".to_string(),
@@ -90,8 +90,8 @@ impl Module for FilesModule {
                     ToolParam::new("contents", ParamType::String)
                         .desc("Complete file contents to write")
                         .required(),
-                    ToolParam::new("block_callbacks", ParamType::Boolean)
-                        .desc("Skip callback triggers for this write (default: false)"),
+                    ToolParam::new("skip_callbacks", ParamType::Array(Box::new(ParamType::String)))
+                        .desc("List of callback names to skip for this write. Use sparingly — only when you KNOW the callback will fail (e.g. mid-refactor) or when actively debugging. Callbacks exist to help you; prefer letting them run."),
                 ],
                 enabled: true,
                 category: "File".to_string(),

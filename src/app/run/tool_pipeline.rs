@@ -108,7 +108,19 @@ impl App {
             .collect();
         let changed_files = callback_trigger::collect_changed_files(&successful_tools);
         if !changed_files.is_empty() {
-            let matched = callback_trigger::match_callbacks(&self.state, &changed_files);
+            let (matched, skip_warnings) = callback_trigger::match_callbacks(&self.state, &changed_files);
+
+            // Inject skip_callbacks warnings into tool results so the AI sees them
+            if !skip_warnings.is_empty() {
+                let warning_note = format!("\n\n[skip_callbacks warnings: {}]", skip_warnings.join("; "));
+                for tr in tool_results.iter_mut().rev() {
+                    if tr.tool_name == "Edit" || tr.tool_name == "Write" {
+                        tr.content.push_str(&warning_note);
+                        break;
+                    }
+                }
+            }
+
             if !matched.is_empty() {
                 let (blocking_cbs, async_cbs) = callback_trigger::partition_callbacks(matched);
 

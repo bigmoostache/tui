@@ -1,0 +1,5 @@
+Captain's log: first vessel spotted at dawn.
+Second entry: kraken sighted off port bow!
+Third entry: fired while first callback still sleeps!
+Fourth entry: callback be deactivated, this should be silent!
+Fifth entry: callback reactivated, this should FIRE!
