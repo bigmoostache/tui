@@ -423,7 +423,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
         easy_bash: true,
         panel_id: panel_id.clone(),
-        desc: format!("⏳ easy_bash: {}", if command.len() > 40 { &command[..40] } else { &command }),
+        desc: format!("⏳ easy_bash: {}", truncate_str(&command, 40)),
     };
 
     let registry = WatcherRegistry::get_mut(state);

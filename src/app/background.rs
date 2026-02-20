@@ -44,7 +44,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
         log("Calling LLM for summary...");
         match summarize_content(&content) {
             Ok(summary) => {
-                log(&format!("Got summary: {}", &summary[..summary.len().min(50)]));
+                log(&format!("Got summary: {}", &summary[..summary.floor_char_boundary(50)]));
                 let summary_tokens = estimate_tokens(&summary);
                 let result = tx.send(TlDrResult { message_id, tl_dr: summary, token_count: summary_tokens });
                 log(&format!("Send result: {:?}", result.is_ok()));

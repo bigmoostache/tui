@@ -31,8 +31,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let header = match q_val.get("header").and_then(|v| v.as_str()) {
             Some(s) => {
-                if s.len() > 12 {
-                    s[..12].to_string()
+                if s.chars().count() > 12 {
+                    s.chars().take(12).collect()
                 } else {
                     s.to_string()
                 }

@@ -41,7 +41,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         if let Err(e) = validate_tldr(&content) {
-            errors.push(format!("Memory '{}...': {}", &content[..content.len().min(30)], e));
+            errors.push(format!("Memory '{}...': {}", &content[..content.floor_char_boundary(30)], e));
             continue;
         }
 
