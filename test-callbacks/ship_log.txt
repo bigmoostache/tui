@@ -1,1 +1,0 @@
-Captain's log: Testing callback name display - should show full names now.
