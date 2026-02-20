@@ -48,7 +48,16 @@ impl Watcher for TodoWatcher {
         None
     }
 
+    fn is_persistent(&self) -> bool {
+        true // Stays alive in registry — fires after each stream ends
+    }
+
     fn check(&self, state: &State) -> Option<WatcherResult> {
+        // Only fire when not streaming — prevents firing mid-stream
+        if state.is_streaming {
+            return None;
+        }
+
         let ts = TodoState::get(state);
         if !ts.has_incomplete_todos() {
             return None;

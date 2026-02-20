@@ -61,6 +61,14 @@ pub trait Watcher: Send + Sync {
         false
     }
 
+    /// Whether this watcher survives after firing. Default: false (one-shot).
+    /// Persistent watchers stay in the registry after `check()` returns Some,
+    /// and can fire again on subsequent polls. Use for recurring conditions
+    /// like "todos still incomplete".
+    fn is_persistent(&self) -> bool {
+        false
+    }
+
     /// Target fire time in ms since epoch (for time-based watchers like coucou).
     /// Returns None for condition-based watchers (console exit/pattern).
     /// Used for persistence across reloads.
@@ -101,7 +109,8 @@ impl WatcherRegistry {
     }
 
     /// Poll all watchers and return satisfied results.
-    /// Satisfied watchers are removed from the registry.
+    /// One-shot watchers are removed when they fire.
+    /// Persistent watchers stay in the registry and can fire again.
     /// Returns (blocking_results, async_results).
     pub fn poll_all(&mut self, state: &State) -> (Vec<WatcherResult>, Vec<WatcherResult>) {
         let mut blocking = Vec::new();
@@ -115,6 +124,10 @@ impl WatcherRegistry {
                     blocking.push(result);
                 } else {
                     async_results.push(result);
+                }
+                // Persistent watchers survive after firing
+                if watcher.is_persistent() {
+                    remaining.push(watcher);
                 }
                 continue;
             }
@@ -144,6 +157,16 @@ impl WatcherRegistry {
     /// Check if any blocking watchers are active.
     pub fn has_blocking_watchers(&self) -> bool {
         self.watchers.iter().any(|w| w.is_blocking())
+    }
+
+    /// Check if a watcher with the given source tag exists.
+    pub fn has_watcher_with_tag(&self, tag: &str) -> bool {
+        self.watchers.iter().any(|w| w.source_tag() == tag)
+    }
+
+    /// Remove all watchers with the given source tag.
+    pub fn remove_by_tag(&mut self, tag: &str) {
+        self.watchers.retain(|w| w.source_tag() != tag);
     }
 
     /// Get from State via TypeMap.

@@ -216,20 +216,6 @@ impl App {
             // not on total auto-continuations in an autonomous session.
             cp_mod_spine::SpineState::get_mut(&mut self.state).config.auto_continuation_count = 0;
 
-            // Register TodoWatcher if continue_until_todos_done is enabled.
-            // The watcher fires on the next poll_all() if incomplete todos exist,
-            // creating a notification that triggers spine auto-continuation.
-            if cp_mod_spine::SpineState::get(&self.state).config.continue_until_todos_done
-                && !cp_mod_spine::SpineState::get(&self.state).config.user_stopped
-            {
-                let registry = cp_base::watchers::WatcherRegistry::get_mut(&mut self.state);
-                // Don't double-register — check if a todo watcher already exists
-                let already_has = registry.active_watchers().iter().any(|w| w.source_tag() == "todo_continuation");
-                if !already_has {
-                    registry.register(Box::new(cp_mod_todo::TodoWatcher::new()));
-                }
-            }
-
             self.typewriter.reset();
             self.pending_done = None;
         }
