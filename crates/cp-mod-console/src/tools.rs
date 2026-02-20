@@ -6,6 +6,18 @@ use cp_base::watchers::WatcherRegistry;
 use crate::manager::SessionHandle;
 use crate::types::{ConsoleState, ConsoleWatcher, format_wait_result};
 
+/// Truncate a string to at most `max_bytes` without splitting a UTF-8 char.
+fn truncate_str(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
 /// Sentinel value returned when a blocking console_wait is registered.
 /// The binary's event loop replaces this with the real result when satisfied.
 pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
@@ -93,7 +105,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Display name: description if provided, else truncated command
     let display_name = description.as_deref().unwrap_or_else(|| {
-        if command.len() > 30 { &command[..30] } else { &command }
+        truncate_str(&command, 30)
     });
 
     // Create dynamic panel with UID for persistence
@@ -378,7 +390,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Create a panel so output goes there instead of flooding the conversation
-    let display_name = if command.len() > 30 { &command[..30] } else { &command };
+    let display_name = truncate_str(&command, 30);
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
