@@ -165,6 +165,7 @@ impl Module for FilesModule {
 /// Visualizer for Edit and Write tool results.
 /// Also reused by cp-mod-prompt for Edit_prompt.
 /// Parses ```diff blocks and renders deleted lines in red, added lines in green.
+/// Callback messages get distinct styling: async triggers dim cyan, results green/red.
 /// Non-diff content is rendered in secondary text color.
 pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
@@ -172,6 +173,9 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
     let error_color = Color::Rgb(255, 85, 85);
     let success_color = Color::Rgb(80, 250, 123);
     let secondary_color = Color::Rgb(150, 150, 170);
+    let callback_async_color = Color::Rgb(100, 160, 200);
+    let callback_warn_color = Color::Rgb(230, 180, 80);
+    let dim_color = Color::Rgb(110, 110, 130);
 
     let mut lines = Vec::new();
     let mut in_diff_block = false;
@@ -200,24 +204,72 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             } else {
                 Style::default().fg(secondary_color)
             };
-
-            // Truncate long lines to available width
-            let display = if line.len() > width {
-                format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
-            } else {
-                line.to_string()
-            };
+            let display = truncate_line(line, width);
             lines.push(Line::from(Span::styled(display, style)));
+        } else if let Some(styled) = style_callback_line(line, width, success_color, error_color, callback_async_color, callback_warn_color, dim_color) {
+            lines.push(styled);
         } else {
             // Non-diff content: plain secondary text
-            let display = if line.len() > width {
-                format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
-            } else {
-                line.to_string()
-            };
+            let display = truncate_line(line, width);
             lines.push(Line::from(Span::styled(display, Style::default().fg(secondary_color))));
         }
     }
 
     lines
+}
+
+/// Truncate a line to fit within the given width.
+fn truncate_line(line: &str, width: usize) -> String {
+    if line.len() > width {
+        format!("{}…", &line[..line.floor_char_boundary(width.saturating_sub(1))])
+    } else {
+        line.to_string()
+    }
+}
+
+/// Style callback-related lines injected into Edit/Write tool results.
+/// Returns None if the line is not a callback message.
+fn style_callback_line(
+    line: &str,
+    width: usize,
+    success_color: ratatui::style::Color,
+    error_color: ratatui::style::Color,
+    async_color: ratatui::style::Color,
+    warn_color: ratatui::style::Color,
+    dim_color: ratatui::style::Color,
+) -> Option<ratatui::text::Line<'static>> {
+    use ratatui::prelude::*;
+
+    let trimmed = line.trim();
+
+    // [Async callbacks triggered: ...]
+    if trimmed.starts_with("[Async callbacks triggered:") {
+        let display = truncate_line(trimmed, width);
+        return Some(Line::from(Span::styled(display, Style::default().fg(async_color).dim())));
+    }
+
+    // [Callback result: ... passed / Build passed ✓ / success]
+    if trimmed.starts_with("[Callback result:") {
+        let display = truncate_line(trimmed, width);
+        let style = if trimmed.contains("FAILED") || trimmed.contains("TIMED OUT") {
+            Style::default().fg(error_color)
+        } else {
+            Style::default().fg(success_color).dim()
+        };
+        return Some(Line::from(Span::styled(display, style)));
+    }
+
+    // [skip_callbacks warnings: ...]
+    if trimmed.starts_with("[skip_callbacks warnings:") {
+        let display = truncate_line(trimmed, width);
+        return Some(Line::from(Span::styled(display, Style::default().fg(warn_color))));
+    }
+
+    // Standalone callback trigger/result lines (not wrapped in [...])
+    if trimmed.starts_with("Callback '") && trimmed.contains("fired") {
+        let display = truncate_line(trimmed, width);
+        return Some(Line::from(Span::styled(display, Style::default().fg(dim_color))));
+    }
+
+    None
 }
