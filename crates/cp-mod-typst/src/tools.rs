@@ -173,16 +173,18 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Delete mode
     if tool.input.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
-        let typst_state = TypstState::get_mut(state);
-        let doc = match typst_state.documents.remove(&name) {
-            Some(d) => d,
-            None => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Error: document '{}' not found", name),
-                    is_error: true,
-                    tool_name: tool.name.clone(),
-                };
+        let doc = {
+            let typst_state = TypstState::get_mut(state);
+            match typst_state.documents.remove(&name) {
+                Some(d) => d,
+                None => {
+                    return ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: format!("Error: document '{}' not found", name),
+                        is_error: true,
+                        tool_name: tool.name.clone(),
+                    };
+                }
             }
         };
 
@@ -204,8 +206,8 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    // Update mode
-    {
+    // Update mode — collect values first, then mutate state
+    let (old_target, source_path, new_target_opt) = {
         let typst_state = TypstState::get_mut(state);
         let doc = match typst_state.documents.get_mut(&name) {
             Some(d) => d,
@@ -222,29 +224,54 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         };
 
-        let mut changes = Vec::new();
+        let old_target = doc.target.clone();
+        let source_path = doc.source.clone();
+        let new_target_opt = tool.input.get("target").and_then(|v| v.as_str()).map(|s| s.to_string());
 
-        if let Some(new_target) = tool.input.get("target").and_then(|v| v.as_str()) {
-            let old_target = doc.target.clone();
-            doc.target = new_target.to_string();
-            changes.push(format!("  target: {} → {}", old_target, new_target));
+        // Apply target change to the document record
+        if let Some(ref new_target) = new_target_opt {
+            doc.target = new_target.clone();
         }
 
-        if changes.is_empty() {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("No changes specified for document '{}'", name),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
+        (old_target, source_path, new_target_opt)
+    };
+
+    // Now perform filesystem and tree operations outside the TypstState borrow
+    let mut changes = Vec::new();
+
+    if let Some(ref new_target) = new_target_opt {
+        // Move the compiled PDF to the new target path
+        if Path::new(&old_target).exists() {
+            if let Some(parent) = Path::new(new_target.as_str()).parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            match fs::rename(&old_target, new_target.as_str()) {
+                Ok(_) => changes.push(format!("  moved: {} → {}", old_target, new_target)),
+                Err(e) => changes.push(format!("  target updated (move failed: {})", e)),
+            }
+        } else {
+            changes.push(format!("  target: {} → {} (no PDF to move yet)", old_target, new_target));
         }
 
-        ToolResult {
+        // Update tree annotations
+        remove_tree_annotation(state, &old_target);
+        annotate_tree_target(state, new_target, &source_path);
+    }
+
+    if changes.is_empty() {
+        return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Updated document '{}':\n{}", name, changes.join("\n")),
-            is_error: false,
+            content: format!("No changes specified for document '{}'", name),
+            is_error: true,
             tool_name: tool.name.clone(),
-        }
+        };
+    }
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Updated document '{}':\n{}", name, changes.join("\n")),
+        is_error: false,
+        tool_name: tool.name.clone(),
     }
 }
 
