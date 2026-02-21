@@ -29,8 +29,7 @@ const BASH_MAX_EXECUTION_SECS: u64 = 10;
 /// Returns Some(error_message) if blocked, None if allowed.
 fn check_git_gh_guardrail(input: &str) -> Option<String> {
     // Split on shell operators to handle chained commands
-    let segments: Vec<&str> = input.split(|c| c == '|' || c == ';' || c == '&' || c == '\n')
-        .collect();
+    let segments: Vec<&str> = input.split(|c| c == '|' || c == ';' || c == '&' || c == '\n').collect();
 
     for segment in &segments {
         let trimmed = segment.trim();
@@ -39,10 +38,8 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
             continue;
         }
         // Strip leading env vars (KEY=VAL) to find the actual command
-        let cmd_part = trimmed.split_whitespace()
-            .skip_while(|w| w.contains('=') && !w.starts_with('='))
-            .next()
-            .unwrap_or("");
+        let cmd_part =
+            trimmed.split_whitespace().skip_while(|w| w.contains('=') && !w.starts_with('=')).next().unwrap_or("");
 
         // Check the actual binary name (could be a path like /usr/bin/git)
         let binary = cmd_part.rsplit('/').next().unwrap_or(cmd_part);
@@ -50,13 +47,15 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
         if binary == "git" {
             return Some(
                 "Blocked: use the `git_execute` tool instead of running git through console.\n\
-                 Example: git_execute with command=\"git status\"".to_string()
+                 Example: git_execute with command=\"git status\""
+                    .to_string(),
             );
         }
         if binary == "gh" {
             return Some(
                 "Blocked: use the `gh_execute` tool instead of running gh through console.\n\
-                 Example: gh_execute with command=\"gh pr list\"".to_string()
+                 Example: gh_execute with command=\"gh pr list\""
+                    .to_string(),
             );
         }
     }
@@ -104,16 +103,13 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Display name: description if provided, else truncated command
-    let display_name = description.as_deref().unwrap_or_else(|| {
-        truncate_str(&command, 30)
-    });
+    let display_name = description.as_deref().unwrap_or_else(|| truncate_str(&command, 30));
 
     // Create dynamic panel with UID for persistence
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
-    let mut ctx =
-        make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);
@@ -187,12 +183,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_string(), true),
     };
     let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let max_wait: u64 = tool
-        .input
-        .get("max_wait")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(30)
-        .clamp(1, 30);
+    let max_wait: u64 = tool.input.get("max_wait").and_then(|v| v.as_u64()).unwrap_or(30).clamp(1, 30);
 
     // Validate mode
     if mode != "exit" && mode != "pattern" {
@@ -204,11 +195,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if mode == "pattern" && pattern.is_none() {
-        return ToolResult::new(
-            tool.id.clone(),
-            "Mode 'pattern' requires a 'pattern' parameter".to_string(),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), "Mode 'pattern' requires a 'pattern' parameter".to_string(), true);
     }
 
     let session_key = match resolve_session_key(state, &panel_id) {
@@ -294,11 +281,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if mode == "pattern" && pattern.is_none() {
-        return ToolResult::new(
-            tool.id.clone(),
-            "Mode 'pattern' requires a 'pattern' parameter".to_string(),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), "Mode 'pattern' requires a 'pattern' parameter".to_string(), true);
     }
 
     let session_key = match resolve_session_key(state, &panel_id) {
@@ -360,7 +343,11 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    ToolResult::new(tool.id.clone(), format!("Watcher registered for '{}' — you'll get a spine notification when the condition is met.", panel_id), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Watcher registered for '{}' — you'll get a spine notification when the condition is met.", panel_id),
+        false,
+    )
 }
 
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -394,8 +381,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
-    let mut ctx =
-        make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);

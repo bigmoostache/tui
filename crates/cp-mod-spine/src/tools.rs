@@ -127,11 +127,19 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SPINE));
 
     if changes.is_empty() {
-        ToolResult::new(tool.id.clone(), "No changes made. Pass at least one parameter to configure.".to_string(), false)
+        ToolResult::new(
+            tool.id.clone(),
+            "No changes made. Pass at least one parameter to configure.".to_string(),
+            false,
+        )
     } else {
-        ToolResult::new(tool.id.clone(), format!(
-            "Spine configured:\n{}",
-            changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
-        ), false)
+        ToolResult::new(
+            tool.id.clone(),
+            format!(
+                "Spine configured:\n{}",
+                changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
+            ),
+            false,
+        )
     }
 }

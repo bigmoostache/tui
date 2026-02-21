@@ -1,0 +1,257 @@
+//! Embedded typst compilation engine.
+//!
+//! Implements a minimal `typst::World` for compiling `.typ` files to PDF.
+
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use typst::diag::{FileError, FileResult};
+use typst::foundations::{Bytes, Datetime};
+use typst::layout::PagedDocument;
+use typst::syntax::{FileId, Source, VirtualPath};
+use typst::text::{Font, FontBook, FontInfo};
+use typst::utils::LazyHash;
+use typst::{Library, World};
+
+/// Compile a `.typ` file to PDF bytes.
+///
+/// `source_path` is relative to the project root (which is the current directory).
+/// Returns Ok(pdf_bytes) on success, Err(error_message) on failure.
+pub fn compile_to_pdf(source_path: &str) -> Result<Vec<u8>, String> {
+    let abs_path = PathBuf::from(source_path)
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve path '{}': {}", source_path, e))?;
+
+    let root = abs_path.parent().ok_or_else(|| "Source file has no parent directory".to_string())?.to_path_buf();
+
+    // For imports like "../templates/foo.typ", we need root to be the project root
+    // not just the document's directory. Walk up to find .context-pilot/
+    let project_root = find_project_root(&abs_path).unwrap_or_else(|| root.clone());
+
+    let rel_path = abs_path.strip_prefix(&project_root).map_err(|_| format!("Source path not under project root"))?;
+
+    let main_id = FileId::new(None, VirtualPath::new(rel_path));
+    let world = ContextPilotWorld::new(project_root, main_id)?;
+
+    let result = typst::compile::<PagedDocument>(&world);
+
+    // Collect warnings
+    let warnings: Vec<String> = result.warnings.iter().map(|w| format!("warning: {}", w.message)).collect();
+
+    match result.output {
+        Ok(document) => {
+            let pdf_bytes = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
+                let mut msg = String::new();
+                for diag in errors.iter() {
+                    msg.push_str(&format!("pdf error: {}\n", diag.message));
+                }
+                msg
+            })?;
+            if !warnings.is_empty() {
+                eprintln!("{}", warnings.join("\n"));
+            }
+            Ok(pdf_bytes)
+        }
+        Err(errors) => {
+            let mut msg = String::new();
+            for diag in errors.iter() {
+                msg.push_str(&format!("error: {}\n", diag.message));
+                for hint in &diag.hints {
+                    msg.push_str(&format!("  hint: {}\n", hint));
+                }
+            }
+            if !warnings.is_empty() {
+                msg.push_str(&warnings.join("\n"));
+                msg.push('\n');
+            }
+            Err(msg)
+        }
+    }
+}
+
+/// Compile a `.typ` file and write the PDF to the output path.
+pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String, String> {
+    let pdf_bytes = compile_to_pdf(source_path)?;
+
+    // Write to output path
+    if let Some(parent) = Path::new(output_path).parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
+    }
+    fs::write(output_path, &pdf_bytes).map_err(|e| format!("write {}: {}", output_path, e))?;
+
+    Ok(format!("✓ Compiled {} ({} bytes)", output_path, pdf_bytes.len()))
+}
+
+/// Find the project root by walking up and looking for .context-pilot/
+fn find_project_root(start: &Path) -> Option<PathBuf> {
+    let mut current = start.to_path_buf();
+    loop {
+        if current.join(".context-pilot").is_dir() {
+            return Some(current);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
+}
+
+/// Minimal World implementation for Context Pilot.
+struct ContextPilotWorld {
+    /// Project root directory
+    root: PathBuf,
+    /// Main source file ID
+    main_id: FileId,
+    /// Standard library
+    library: LazyHash<Library>,
+    /// Font book (metadata about available fonts)
+    book: LazyHash<FontBook>,
+    /// Loaded fonts
+    fonts: Vec<Font>,
+    /// Source file cache
+    sources: HashMap<FileId, Source>,
+}
+
+impl ContextPilotWorld {
+    fn new(root: PathBuf, main_id: FileId) -> Result<Self, String> {
+        // Discover system fonts
+        let mut book = FontBook::new();
+        let mut fonts = Vec::new();
+
+        // Search common font directories
+        let font_dirs = [
+            PathBuf::from("/usr/share/fonts"),
+            PathBuf::from("/usr/local/share/fonts"),
+            dirs_home().map(|h| h.join(".fonts")).unwrap_or_default(),
+            dirs_home().map(|h| h.join(".local/share/fonts")).unwrap_or_default(),
+        ];
+
+        for dir in &font_dirs {
+            if dir.is_dir() {
+                load_fonts_from_dir(dir, &mut book, &mut fonts);
+            }
+        }
+
+        // Also load typst's embedded fonts (from typst-assets if available)
+        // For now, system fonts should be sufficient
+
+        let mut world = Self {
+            root,
+            main_id,
+            library: LazyHash::new(Library::default()),
+            book: LazyHash::new(book),
+            fonts,
+            sources: HashMap::new(),
+        };
+
+        // Pre-load the main source
+        let _ = world.load_source(main_id)?;
+
+        Ok(world)
+    }
+
+    fn load_source(&mut self, id: FileId) -> Result<Source, String> {
+        if let Some(source) = self.sources.get(&id) {
+            return Ok(source.clone());
+        }
+
+        let path = self.resolve_path(id)?;
+        let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {}", path.display(), e))?;
+        let source = Source::new(id, content);
+        self.sources.insert(id, source.clone());
+        Ok(source)
+    }
+
+    fn resolve_path(&self, id: FileId) -> Result<PathBuf, String> {
+        let vpath = id.vpath();
+        let path = vpath.resolve(&self.root).ok_or_else(|| format!("cannot resolve virtual path: {:?}", vpath))?;
+        Ok(path)
+    }
+}
+
+impl World for ContextPilotWorld {
+    fn library(&self) -> &LazyHash<Library> {
+        &self.library
+    }
+
+    fn book(&self) -> &LazyHash<FontBook> {
+        &self.book
+    }
+
+    fn main(&self) -> FileId {
+        self.main_id
+    }
+
+    fn source(&self, id: FileId) -> FileResult<Source> {
+        if let Some(source) = self.sources.get(&id) {
+            return Ok(source.clone());
+        }
+
+        // Resolve and load on the fly
+        let path = id.vpath().resolve(&self.root).ok_or(FileError::AccessDenied)?;
+        let content = fs::read_to_string(&path).map_err(|_| FileError::NotFound(path))?;
+        Ok(Source::new(id, content))
+    }
+
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        let path = id.vpath().resolve(&self.root).ok_or(FileError::AccessDenied)?;
+        let data = fs::read(&path).map_err(|_| FileError::NotFound(path))?;
+        Ok(Bytes::new(data))
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.fonts.get(index).cloned()
+    }
+
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        use chrono::{Datelike, Local, Timelike, Utc};
+        let now = Local::now();
+        let naive = if let Some(hours) = offset {
+            let utc = Utc::now();
+            (utc + chrono::Duration::hours(hours)).naive_utc()
+        } else {
+            now.naive_local()
+        };
+        Datetime::from_ymd_hms(
+            naive.year(),
+            naive.month() as u8,
+            naive.day() as u8,
+            naive.hour() as u8,
+            naive.minute() as u8,
+            naive.second() as u8,
+        )
+    }
+}
+
+/// Load fonts from a directory recursively.
+fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            load_fonts_from_dir(&path, book, fonts);
+        } else if is_font_file(&path) {
+            if let Ok(data) = fs::read(&path) {
+                let bytes = Bytes::new(data);
+                for (i, info) in FontInfo::iter(&bytes).enumerate() {
+                    book.push(info);
+                    if let Some(font) = Font::new(bytes.clone(), i as u32) {
+                        fonts.push(font);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Check if a file looks like a font file.
+fn is_font_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_lowercase().as_str(), "ttf" | "otf" | "ttc" | "woff" | "woff2"))
+}
+
+/// Get the home directory.
+fn dirs_home() -> Option<PathBuf> {
+    std::env::var("HOME").ok().map(PathBuf::from)
+}

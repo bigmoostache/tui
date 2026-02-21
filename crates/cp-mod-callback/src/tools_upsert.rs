@@ -30,30 +30,17 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cargo_script = match tool.input.get("script_content").and_then(|v| v.as_str()) {
         Some(s) => s.to_string(),
         None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                "Missing required parameter 'script_content'".to_string(),
-                true,
-            );
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'script_content'".to_string(), true);
         }
     };
 
     // Validate glob pattern compiles
     if let Err(e) = Glob::new(&chart_pattern) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Invalid glob pattern '{}': {}", chart_pattern, e),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{}': {}", chart_pattern, e), true);
     }
 
     // Extract optional params
-    let description = tool
-        .input
-        .get("description")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
+    let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let blocking = tool.input.get("blocking").and_then(|v| v.as_bool()).unwrap_or(false);
     let timeout_secs = tool.input.get("timeout").and_then(|v| v.as_u64());
     let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -74,7 +61,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if cs.definitions.iter().any(|d| d.name == vessel_name) {
         return ToolResult::new(
             tool.id.clone(),
-            format!("A callback named '{}' already exists. Use a different name or update the existing one.", vessel_name),
+            format!(
+                "A callback named '{}' already exists. Use a different name or update the existing one.",
+                vessel_name
+            ),
             true,
         );
     }
@@ -87,11 +77,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Write script file to .context-pilot/scripts/{name}.sh
     let scripts_dir = PathBuf::from(STORE_DIR).join("scripts");
     if let Err(e) = fs::create_dir_all(&scripts_dir) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Failed to create scripts directory: {}", e),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Failed to create scripts directory: {}", e), true);
     }
 
     let script_path = scripts_dir.join(format!("{}.sh", vessel_name));
@@ -116,20 +102,12 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     );
 
     if let Err(e) = fs::write(&script_path, &full_script) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Failed to write script file: {}", e),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Failed to write script file: {}", e), true);
     }
 
     // chmod +x
     if let Err(e) = fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Failed to make script executable: {}", e),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Failed to make script executable: {}", e), true);
     }
 
     // Create the definition
@@ -143,6 +121,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         success_message: success_message.clone(),
         cwd,
         one_at_a_time,
+        built_in: false,
+        built_in_command: None,
     };
 
     // Add to state and mark active
@@ -184,11 +164,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let def_idx = match cs.definitions.iter().position(|d| d.id == anchor_id) {
         Some(i) => i,
         None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Callback '{}' not found", anchor_id),
-                true,
-            );
+            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
         }
     };
 
@@ -199,7 +175,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if has_diff && has_full_script {
         return ToolResult::new(
             tool.id.clone(),
-            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other.".to_string(),
+            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other."
+                .to_string(),
             true,
         );
     }
@@ -235,11 +212,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     if let Some(pattern) = tool.input.get("pattern").and_then(|v| v.as_str()) {
         if let Err(e) = Glob::new(pattern) {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Invalid glob pattern '{}': {}", pattern, e),
-                true,
-            );
+            return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{}': {}", pattern, e), true);
         }
         def.pattern = pattern.to_string();
         changes.push(format!("pattern → {}", pattern));
@@ -290,11 +263,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         let current_script = match fs::read_to_string(&script_path) {
             Ok(s) => s,
             Err(e) => {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    format!("Failed to read script file: {}", e),
-                    true,
-                );
+                return ToolResult::new(tool.id.clone(), format!("Failed to read script file: {}", e), true);
             }
         };
 
@@ -332,11 +301,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         );
     }
 
-    ToolResult::new(
-        tool.id.clone(),
-        format!("Callback {} updated:\n  {}", anchor_id, changes.join("\n  ")),
-        false,
-    )
+    ToolResult::new(tool.id.clone(), format!("Callback {} updated:\n  {}", anchor_id, changes.join("\n  ")), false)
 }
 
 /// Delete a callback and its script file.
@@ -356,11 +321,7 @@ pub fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let def_idx = match cs.definitions.iter().position(|d| d.id == anchor_id) {
         Some(i) => i,
         None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Callback '{}' not found", anchor_id),
-                true,
-            );
+            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
         }
     };
 
@@ -394,11 +355,7 @@ pub fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         false
     };
 
-    let script_msg = if script_deleted {
-        " + script file deleted"
-    } else {
-        " (no script file found)"
-    };
+    let script_msg = if script_deleted { " + script file deleted" } else { " (no script file found)" };
 
     ToolResult::new(
         tool.id.clone(),

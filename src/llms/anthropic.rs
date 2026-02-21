@@ -1,23 +1,23 @@
 //! Anthropic Claude API implementation.
 
-use std::env;
-use std::io::{BufRead, BufReader};
-use std::sync::mpsc::Sender;
 use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::env;
+use std::io::{BufRead, BufReader};
+use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
 use super::{
     ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text,
     panel_timestamp_text, prepare_panel_messages,
 };
-use crate::infra::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::app::panels::now_ms;
-use crate::state::{Message, MessageStatus, MessageType};
-use crate::infra::tools::build_api_tools;
+use crate::infra::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::infra::tools::ToolUse;
+use crate::infra::tools::build_api_tools;
+use crate::state::{Message, MessageStatus, MessageType};
 
 /// Anthropic Claude client
 pub struct AnthropicClient {
@@ -32,7 +32,9 @@ impl AnthropicClient {
 }
 
 impl Default for AnthropicClient {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 #[derive(Debug, Serialize)]
 struct AnthropicRequest {
@@ -167,11 +169,12 @@ impl LlmClient for AnthropicClient {
                     line_count += 1;
                 }
                 Err(e) => {
-                    let tool_ctx = current_tool.as_ref().map_or(
-                        "No tool in progress".to_string(),
-                        |(id, name, partial)| format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len()),
-                    );
-                    let recent = if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                    let tool_ctx =
+                        current_tool.as_ref().map_or("No tool in progress".to_string(), |(id, name, partial)| {
+                            format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
+                        });
+                    let recent =
+                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(
                         "{}\nStream position: {} bytes, {} lines read\n{}\nLast SSE lines:\n{}",
                         e, total_bytes, line_count, tool_ctx, recent
@@ -266,7 +269,9 @@ impl LlmClient for AnthropicClient {
             Some(k) => k,
             None => {
                 return super::ApiCheckResult {
-                    auth_ok: false, streaming_ok: false, tools_ok: false,
+                    auth_ok: false,
+                    streaming_ok: false,
+                    tools_ok: false,
                     error: Some("ANTHROPIC_API_KEY not set".to_string()),
                 };
             }
@@ -274,7 +279,8 @@ impl LlmClient for AnthropicClient {
 
         let client = Client::new();
         let base = || {
-            client.post(API_ENDPOINT)
+            client
+                .post(API_ENDPOINT)
                 .header("x-api-key", api_key.expose_secret())
                 .header("anthropic-version", API_VERSION)
                 .header("content-type", "application/json")
@@ -292,7 +298,9 @@ impl LlmClient for AnthropicClient {
 
         if !auth_ok {
             return super::ApiCheckResult {
-                auth_ok: false, streaming_ok: false, tools_ok: false,
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
                 error: Some("Auth failed".to_string()),
             };
         }

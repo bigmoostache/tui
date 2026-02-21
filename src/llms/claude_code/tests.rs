@@ -6,8 +6,7 @@ use crate::infra::constants::API_VERSION;
 #[test]
 #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
 fn test_general_kenobi() {
-    let token =
-        ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
+    let token = ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
     let client = reqwest::blocking::Client::new();
 
@@ -64,8 +63,7 @@ fn test_general_kenobi() {
 #[test]
 #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
 fn test_general_kenobi_with_tools_streaming() {
-    let token =
-        ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
+    let token = ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
     let client = reqwest::blocking::Client::new();
 

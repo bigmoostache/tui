@@ -6,9 +6,9 @@ use std::sync::mpsc::Sender;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::llms::error::LlmError;
-use crate::llms::StreamEvent;
 use crate::infra::tools::ToolUse;
+use crate::llms::StreamEvent;
+use crate::llms::error::LlmError;
 
 #[derive(Debug, Deserialize)]
 pub(super) struct StreamContentBlock {
@@ -90,8 +90,7 @@ pub(super) fn parse_sse_stream(
                     }
                     None => "No tool in progress".to_string(),
                 };
-                let recent =
-                    if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                let recent = if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                 let verbose = format!(
                     "{}\n\
                      Error kind: {} | Root cause: {}\n\
@@ -158,8 +157,8 @@ pub(super) fn parse_sse_stream(
                 }
                 "content_block_stop" => {
                     if let Some((id, name, input_json)) = current_tool.take() {
-                        let input: Value = serde_json::from_str(&input_json)
-                            .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
+                        let input: Value =
+                            serde_json::from_str(&input_json).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
                         let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                     }
                 }

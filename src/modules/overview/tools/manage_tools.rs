@@ -1,5 +1,5 @@
-use crate::state::State;
 use crate::infra::tools::{ToolResult, ToolUse};
+use crate::state::State;
 
 /// The ID of this tool - it cannot be disabled
 pub const MANAGE_TOOLS_ID: &str = "manage_tools";
@@ -89,16 +89,24 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let failure_count = failures.len();
 
     if failure_count == 0 {
-        ToolResult::new(tool.id.clone(), format!("Tool changes: {}/{} applied ({})", success_count, total_changes, successes.join("; ")), false)
+        ToolResult::new(
+            tool.id.clone(),
+            format!("Tool changes: {}/{} applied ({})", success_count, total_changes, successes.join("; ")),
+            false,
+        )
     } else if success_count == 0 {
         ToolResult::new(tool.id.clone(), format!("Failed to apply changes: {}", failures.join("; ")), true)
     } else {
-        ToolResult::new(tool.id.clone(), format!(
+        ToolResult::new(
+            tool.id.clone(),
+            format!(
                 "Partial success: {}/{} applied. Successes: {}. Failures: {}",
                 success_count,
                 total_changes,
                 successes.join("; "),
                 failures.join("; ")
-            ), false)
+            ),
+            false,
+        )
     }
 }

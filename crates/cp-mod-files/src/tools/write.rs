@@ -28,7 +28,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         && !parent.exists()
         && let Err(e) = fs::create_dir_all(parent)
     {
-        return ToolResult::new(tool.id.clone(), format!("Failed to create directory '{}': {}", parent.display(), e), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Failed to create directory '{}': {}", parent.display(), e),
+            true,
+        );
     }
 
     // Write the file

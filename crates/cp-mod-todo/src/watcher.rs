@@ -64,11 +64,8 @@ impl Watcher for TodoWatcher {
         }
 
         let remaining = ts.incomplete_todos_summary();
-        let description = format!(
-            "Todo auto-continuation: {} todo(s) remaining:\n{}",
-            remaining.len(),
-            remaining.join("\n")
-        );
+        let description =
+            format!("Todo auto-continuation: {} todo(s) remaining:\n{}", remaining.len(), remaining.join("\n"));
 
         Some(WatcherResult {
             description,

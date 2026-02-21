@@ -276,11 +276,8 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         // Ask modules for detail string
         let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
-        let truncated_details = if details.len() > 30 {
-            format!("{}...", &details[..details.floor_char_boundary(27)])
-        } else {
-            details
-        };
+        let truncated_details =
+            if details.len() > 30 { format!("{}...", &details[..details.floor_char_boundary(27)]) } else { details };
 
         // Format refresh time as relative
         let refreshed = if ctx.last_refresh_ms < 1577836800000 {

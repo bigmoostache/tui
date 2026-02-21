@@ -1,6 +1,6 @@
+use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::all_modules;
 use crate::state::State;
-use crate::infra::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ids = match tool.input.get("ids").and_then(|v| v.as_array()) {

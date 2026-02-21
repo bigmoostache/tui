@@ -19,7 +19,11 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let id = storage::slugify(&name);
     if id.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Name must contain at least one alphanumeric character".to_string(), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            "Name must contain at least one alphanumeric character".to_string(),
+            true,
+        );
     }
 
     if PromptState::get(state).agents.iter().any(|a| a.id == id) {
@@ -89,7 +93,11 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
-        return ToolResult::new(tool.id.clone(), format!("Switched to default agent ({})", library::default_agent_id()), false);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Switched to default agent ({})", library::default_agent_id()),
+            false,
+        );
     }
 
     let id = id.unwrap();

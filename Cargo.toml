@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cp-base", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset"]
+members = [".", "crates/cp-base", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset", "crates/cp-mod-typst"]
 
 [workspace.dependencies]
 cp-base = { path = "crates/cp-base" }
@@ -35,6 +35,7 @@ cp-mod-files = { path = "crates/cp-mod-files" }
 cp-mod-spine = { path = "crates/cp-mod-spine" }
 cp-mod-preset = { path = "crates/cp-mod-preset" }
 cp-mod-prompt = { path = "crates/cp-mod-prompt" }
+cp-mod-typst = { path = "crates/cp-mod-typst" }
 crossterm.workspace = true
 ratatui.workspace = true
 serde.workspace = true

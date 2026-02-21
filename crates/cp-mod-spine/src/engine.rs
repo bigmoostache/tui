@@ -190,21 +190,15 @@ fn check_context_threshold(state: &mut State) {
     }
 
     let source_tag = "context_threshold";
-    let already_notified = SpineState::get(state)
-        .notifications
-        .iter()
-        .any(|n| !n.processed && n.source == source_tag);
+    let already_notified = SpineState::get(state).notifications.iter().any(|n| !n.processed && n.source == source_tag);
 
     if already_notified {
         return;
     }
 
     let budget_tokens = state.effective_context_budget();
-    let usage_pct = if budget_tokens > 0 {
-        (total_tokens as f64 / budget_tokens as f64 * 100.0).min(100.0)
-    } else {
-        0.0
-    };
+    let usage_pct =
+        if budget_tokens > 0 { (total_tokens as f64 / budget_tokens as f64 * 100.0).min(100.0) } else { 0.0 };
 
     let content = PROMPTS
         .context_threshold_notification

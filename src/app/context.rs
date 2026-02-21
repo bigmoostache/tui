@@ -1,15 +1,15 @@
-use crate::state::cache::hash_content;
+use crate::app::panels::{ContextItem, collect_all_context, now_ms, refresh_all_panels};
 use crate::infra::constants::{
     DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS,
-};
-use crate::app::panels::{ContextItem, collect_all_context, now_ms, refresh_all_panels};
-use crate::state::{
-    ContextElement, ContextType, Message, MessageStatus, MessageType, State, compute_total_pages, estimate_tokens,
 };
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::modules::conversation::refresh::estimate_message_tokens;
+use crate::state::cache::hash_content;
+use crate::state::{
+    ContextElement, ContextType, Message, MessageStatus, MessageType, State, compute_total_pages, estimate_tokens,
+};
 
 /// Context data prepared for streaming
 pub struct StreamContext {

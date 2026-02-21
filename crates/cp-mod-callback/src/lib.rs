@@ -1,10 +1,10 @@
 // Arr! Callback module — auto-fires scripts when files walk the plank! ⚓🏴‍☠️
 // Tested by the pirate crew on this fine day
+pub mod firing;
 mod panel;
 pub mod tools;
 mod tools_upsert;
 pub mod trigger;
-pub mod firing;
 pub mod types;
 
 use serde_json::json;
@@ -144,8 +144,7 @@ impl Module for CallbackModule {
                         .desc("Max execution time in seconds (required if blocking)"),
                     ToolParam::new("success_message", ParamType::String)
                         .desc("Custom message on success (e.g., 'Build passed ✓')"),
-                    ToolParam::new("cwd", ParamType::String)
-                        .desc("Working directory (defaults to project root)"),
+                    ToolParam::new("cwd", ParamType::String).desc("Working directory (defaults to project root)"),
                     ToolParam::new("one_at_a_time", ParamType::Boolean)
                         .desc("Don't run simultaneously with itself (default: false)"),
                     ToolParam::new("old_string", ParamType::String)
@@ -164,11 +163,7 @@ impl Module for CallbackModule {
                     Required before using diff-based script editing (old_string/new_string in Callback_upsert update). \
                     Max one callback open at a time — opening a new one closes the previous."
                     .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Callback ID (e.g., 'CB1')")
-                        .required(),
-                ],
+                params: vec![ToolParam::new("id", ParamType::String).desc("Callback ID (e.g., 'CB1')").required()],
                 enabled: true,
                 category: "Callback".to_string(),
             },
@@ -176,8 +171,9 @@ impl Module for CallbackModule {
                 id: "Callback_close_editor".to_string(),
                 name: "Callback Close Editor".to_string(),
                 short_desc: "Close callback script editor".to_string(),
-                description: "Closes the callback script editor in the Callbacks panel, restoring the normal table view."
-                    .to_string(),
+                description:
+                    "Closes the callback script editor in the Callbacks panel, restoring the normal table view."
+                        .to_string(),
                 params: vec![],
                 enabled: true,
                 category: "Callback".to_string(),
@@ -190,9 +186,7 @@ impl Module for CallbackModule {
                     Does NOT modify the callback definition — only this worker's activation state."
                     .to_string(),
                 params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Callback ID (e.g., 'CB1')")
-                        .required(),
+                    ToolParam::new("id", ParamType::String).desc("Callback ID (e.g., 'CB1')").required(),
                     ToolParam::new("active", ParamType::Boolean)
                         .desc("true to activate, false to deactivate")
                         .required(),

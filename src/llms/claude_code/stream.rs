@@ -6,14 +6,16 @@ use secrecy::ExposeSecret;
 use serde_json::Value;
 
 use super::{
-    ClaudeCodeClient, StreamMessage, BILLING_HEADER, CLAUDE_CODE_ENDPOINT, OAUTH_BETA_HEADER,
-    dump_last_request, ensure_message_alternation, inject_system_reminder, map_model_name,
+    BILLING_HEADER, CLAUDE_CODE_ENDPOINT, ClaudeCodeClient, OAUTH_BETA_HEADER, StreamMessage, dump_last_request,
+    ensure_message_alternation, inject_system_reminder, map_model_name,
 };
 use crate::app::panels::now_ms;
 use crate::infra::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::infra::tools::{ToolUse, build_api_tools};
 use crate::llms::error::LlmError;
-use crate::llms::{LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages};
+use crate::llms::{
+    LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages,
+};
 use crate::state::{MessageStatus, MessageType};
 
 impl ClaudeCodeClient {

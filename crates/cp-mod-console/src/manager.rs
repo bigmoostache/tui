@@ -10,10 +10,10 @@ use std::sync::{Arc, Mutex};
 use cp_base::config::STORE_DIR;
 use cp_base::panels::now_ms;
 
-use crate::ring_buffer::RingBuffer;
-use crate::types::ProcessStatus;
 use crate::CONSOLE_DIR;
 use crate::pollers::{file_poller, file_poller_from_offset, poll_server_status};
+use crate::ring_buffer::RingBuffer;
+use crate::types::ProcessStatus;
 
 /// Socket path for the console server.
 fn server_socket_path() -> PathBuf {
@@ -70,8 +70,7 @@ pub fn log_file_path(key: &str) -> PathBuf {
 /// Send a JSON command to the server and read the response.
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
-    let stream = UnixStream::connect(&sock_path)
-        .map_err(|e| format!("Failed to connect to console server: {}", e))?;
+    let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {}", e))?;
     stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
     stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
@@ -87,8 +86,8 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
     let mut buf_reader = reader;
     buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {}", e))?;
 
-    let resp: serde_json::Value = serde_json::from_str(resp_line.trim())
-        .map_err(|e| format!("Parse response failed: {}", e))?;
+    let resp: serde_json::Value =
+        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {}", e))?;
 
     if resp.get("ok").and_then(|v| v.as_bool()) == Some(true) {
         Ok(resp)

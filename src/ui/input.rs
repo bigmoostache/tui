@@ -7,7 +7,6 @@ use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
 
-
 use cp_mod_prompt::PromptState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {

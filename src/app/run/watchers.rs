@@ -1,9 +1,9 @@
 use std::sync::mpsc::Receiver;
 
 use crate::app::panels::now_ms;
+use crate::infra::watcher::WatchEvent;
 use crate::state::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::state::{ContextType, State};
-use crate::infra::watcher::WatchEvent;
 
 use crate::app::App;
 

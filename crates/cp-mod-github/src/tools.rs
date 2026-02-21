@@ -25,7 +25,11 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let token = match &GithubState::get(state).github_token {
         Some(t) => t.clone(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(),
+                true,
+            );
         }
     };
 
@@ -118,7 +122,9 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     let is_error = !output.status.success();
                     let combined = redact_token(&combined, &token);
                     let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
-                    ToolResult::new(tool.id.clone(), if combined.is_empty() {
+                    ToolResult::new(
+                        tool.id.clone(),
+                        if combined.is_empty() {
                             if is_error {
                                 "Command failed with no output".to_string()
                             } else {

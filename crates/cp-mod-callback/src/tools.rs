@@ -45,11 +45,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let def = match cs.definitions.iter().find(|d| d.id == anchor_id) {
         Some(d) => d,
         None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Callback '{}' not found", anchor_id),
-                true,
-            );
+            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
         }
     };
 
@@ -83,10 +79,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
             anchor_id, prev
         )
     } else {
-        format!(
-            "Opened callback {} in editor. Script content is now visible in the Callbacks panel.",
-            anchor_id
-        )
+        format!("Opened callback {} in editor. Script content is now visible in the Callbacks panel.", anchor_id)
     };
 
     ToolResult::new(tool.id.clone(), msg, false)
@@ -97,11 +90,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let previous = CallbackState::get(state).editor_open.clone();
 
     if previous.is_none() {
-        return ToolResult::new(
-            tool.id.clone(),
-            "No callback editor is currently open.".to_string(),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), "No callback editor is currently open.".to_string(), true);
     }
 
     CallbackState::get_mut(state).editor_open = None;
@@ -146,11 +135,7 @@ pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let cs = CallbackState::get(state);
     if !cs.definitions.iter().any(|d| d.id == anchor_id) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Callback '{}' not found", anchor_id),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
     }
 
     let cs = CallbackState::get_mut(state);

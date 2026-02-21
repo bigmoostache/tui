@@ -13,9 +13,9 @@ use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
-pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 #[cfg(test)]
 pub use cp_base::panels::mark_panels_dirty;
+pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).
 /// This is NOT part of the Panel trait — it uses binary-specific deps (theme, profile!, UI helpers).
@@ -129,8 +129,8 @@ pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::cache::CacheUpdate;
     use crate::state::ContextElement;
+    use crate::state::cache::CacheUpdate;
 
     /// Helper: create a minimal ContextElement for testing
     fn test_ctx(id: &str, ct: ContextType) -> ContextElement {
@@ -239,40 +239,6 @@ mod tests {
     }
 
     #[test]
-    fn glob_panel_apply_cache_update() {
-        let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GLOB));
-        ctx.set_meta("glob_pattern", &"*.rs".to_string());
-        ctx.cache_deprecated = true;
-
-        let panel = get_panel(&ContextType::new(ContextType::GLOB));
-        let update =
-            CacheUpdate::Content { context_id: "P99".to_string(), content: "glob results".to_string(), token_count: 2 };
-        let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
-
-        assert!(changed);
-        assert!(!ctx.cache_deprecated);
-        assert!(ctx.content_hash.is_some());
-    }
-
-    #[test]
-    fn grep_panel_apply_cache_update() {
-        let mut state = State::default();
-        let mut ctx = test_ctx("P99", ContextType::new(ContextType::GREP));
-        ctx.set_meta("grep_pattern", &"fn main".to_string());
-        ctx.cache_deprecated = true;
-
-        let panel = get_panel(&ContextType::new(ContextType::GREP));
-        let update =
-            CacheUpdate::Content { context_id: "P99".to_string(), content: "grep results".to_string(), token_count: 2 };
-        let changed = panel.apply_cache_update(update, &mut ctx, &mut state);
-
-        assert!(changed);
-        assert!(!ctx.cache_deprecated);
-        assert!(ctx.content_hash.is_some());
-    }
-
-    #[test]
     fn git_result_panel_apply_cache_update() {
         let mut state = State::default();
         let mut ctx = test_ctx("P99", ContextType::new(ContextType::GIT_RESULT));
@@ -353,18 +319,6 @@ mod tests {
         assert!(panel.cache_refresh_interval_ms().is_none(), "Tree should use watcher, not timer");
     }
 
-    #[test]
-    fn glob_has_no_timer_interval() {
-        let panel = get_panel(&ContextType::new(ContextType::GLOB));
-        assert!(panel.cache_refresh_interval_ms().is_none(), "Glob should use watcher, not timer");
-    }
-
-    #[test]
-    fn grep_has_no_timer_interval() {
-        let panel = get_panel(&ContextType::new(ContextType::GREP));
-        assert!(panel.cache_refresh_interval_ms().is_none(), "Grep should use watcher, not timer");
-    }
-
     // ── needs_cache tests ──────────────────────────────────────────
 
     #[test]
@@ -373,8 +327,7 @@ mod tests {
         // Panels that need background caching
         assert!(ContextType::new(ContextType::FILE).needs_cache());
         assert!(ContextType::new(ContextType::TREE).needs_cache());
-        assert!(ContextType::new(ContextType::GLOB).needs_cache());
-        assert!(ContextType::new(ContextType::GREP).needs_cache());
+        // glob/grep modules removed — no longer in registry
         // tmux module removed — no longer in registry
         // git fixed panel removed — only git_result remains
         assert!(ContextType::new(ContextType::GIT_RESULT).needs_cache());

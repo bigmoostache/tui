@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
-use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::config::{chars, theme};
+use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
@@ -101,10 +101,8 @@ impl Panel for ConsolePanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context) {
-            let desc = ctx
-                .get_meta_str("console_description")
-                .or_else(|| ctx.get_meta_str("console_command"))
-                .unwrap_or("?");
+            let desc =
+                ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
             format!("console: {} ({})", desc, status)
         } else {
@@ -164,10 +162,8 @@ impl Panel for ConsolePanel {
             .iter()
             .filter(|c| c.context_type == ContextType::CONSOLE)
             .filter_map(|c| {
-                let desc = c
-                    .get_meta_str("console_description")
-                    .or_else(|| c.get_meta_str("console_command"))
-                    .unwrap_or("?");
+                let desc =
+                    c.get_meta_str("console_description").or_else(|| c.get_meta_str("console_command")).unwrap_or("?");
                 let content = c.cached_content.as_ref()?;
                 let status = c.get_meta_str("console_status").unwrap_or("?");
                 let header = format!("Console: {} ({})", desc, status);

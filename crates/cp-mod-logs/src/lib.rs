@@ -344,4 +344,3 @@ fn visualize_logs_output(content: &str, width: usize) -> Vec<ratatui::text::Line
 
     lines
 }
-

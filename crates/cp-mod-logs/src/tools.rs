@@ -84,7 +84,11 @@ pub fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Guardrail: minimum 4 entries
     if log_ids.len() < 4 {
-        return ToolResult::new(tool.id.clone(), format!("Must summarize at least 4 logs, got {}", log_ids.len()), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Must summarize at least 4 logs, got {}", log_ids.len()),
+            true,
+        );
     }
 
     // Validate: all IDs exist and are top-level
@@ -97,10 +101,11 @@ pub fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
                 Some(log) => {
                     if log.parent_id.is_some() {
-                        return ToolResult::new(tool.id.clone(), format!(
-                                "Log '{}' already has a parent — only top-level logs can be summarized",
-                                id
-                            ), true);
+                        return ToolResult::new(
+                            tool.id.clone(),
+                            format!("Log '{}' already has a parent — only top-level logs can be summarized", id),
+                            true,
+                        );
                     }
                 }
             }
@@ -149,7 +154,11 @@ pub fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let action = match tool.input.get("action").and_then(|v| v.as_str()) {
         Some(a) if a == "expand" || a == "collapse" => a.to_string(),
         _ => {
-            return ToolResult::new(tool.id.clone(), "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                "Missing or invalid 'action' parameter (must be 'expand' or 'collapse')".to_string(),
+                true,
+            );
         }
     };
 
@@ -162,7 +171,11 @@ pub fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
             Some(log) => {
                 if log.children_ids.is_empty() {
-                    return ToolResult::new(tool.id.clone(), format!("Log '{}' has no children — can only toggle summaries", id), true);
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!("Log '{}' has no children — can only toggle summaries", id),
+                        true,
+                    );
                 }
             }
         }
@@ -179,7 +192,11 @@ pub fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     touch_logs_panel(state);
 
-    ToolResult::new(tool.id.clone(), format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
+        false,
+    )
 }
 
 pub fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -199,10 +216,14 @@ pub fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> 
         }
         Some(idx) => {
             if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
-                return ToolResult::new(tool.id.clone(), format!(
+                return ToolResult::new(
+                    tool.id.clone(),
+                    format!(
                         "Panel '{}' is not a conversation history panel (type: {:?})",
                         panel_id, state.context[idx].context_type
-                    ), true);
+                    ),
+                    true,
+                );
             }
         }
     }
@@ -259,10 +280,14 @@ pub fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> 
                 // Validate tl_dr length
                 let tokens = estimate_tokens(content);
                 if tokens > MEMORY_TLDR_MAX_TOKENS {
-                    return ToolResult::new(tool.id.clone(), format!(
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!(
                             "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
                             tokens, MEMORY_TLDR_MAX_TOKENS
-                        ), true);
+                        ),
+                        true,
+                    );
                 }
 
                 let importance = mem_obj.get("importance").and_then(|v| v.as_str()).unwrap_or("medium");

@@ -27,9 +27,7 @@ impl Module for QuestionsModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Context", "Manage conversation context and system prompts"),
-        ]
+        vec![("Context", "Manage conversation context and system prompts")]
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {

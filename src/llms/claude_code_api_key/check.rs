@@ -3,8 +3,8 @@
 use reqwest::blocking::Client;
 use secrecy::ExposeSecret;
 
-use super::helpers::*;
 use super::ClaudeCodeApiKeyClient;
+use super::helpers::*;
 use crate::llms::ApiCheckResult;
 
 impl ClaudeCodeApiKeyClient {
@@ -38,18 +38,14 @@ impl ClaudeCodeApiKeyClient {
         });
 
         // Test 1: Basic auth
-        let auth_result = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            api_key,
-            "application/json",
-        )
-        .json(&serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 10,
-            "system": system,
-            "messages": [user_msg]
-        }))
-        .send();
+        let auth_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
+            .json(&serde_json::json!({
+                "model": mapped_model,
+                "max_tokens": 10,
+                "system": system,
+                "messages": [user_msg]
+            }))
+            .send();
 
         let auth_ok = match &auth_result {
             Ok(resp) => resp.status().is_success(),
@@ -69,19 +65,15 @@ impl ClaudeCodeApiKeyClient {
                 {"type": "text", "text": "Say ok"}
             ]
         });
-        let stream_result = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            api_key,
-            "text/event-stream",
-        )
-        .json(&serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 10,
-            "stream": true,
-            "system": system,
-            "messages": [stream_msg]
-        }))
-        .send();
+        let stream_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "text/event-stream")
+            .json(&serde_json::json!({
+                "model": mapped_model,
+                "max_tokens": 10,
+                "stream": true,
+                "system": system,
+                "messages": [stream_msg]
+            }))
+            .send();
 
         let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
@@ -93,27 +85,23 @@ impl ClaudeCodeApiKeyClient {
                 {"type": "text", "text": "Hi"}
             ]
         });
-        let tools_result = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            api_key,
-            "application/json",
-        )
-        .json(&serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 50,
-            "system": system,
-            "tools": [{
-                "name": "test_tool",
-                "description": "A test tool",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }],
-            "messages": [tools_msg]
-        }))
-        .send();
+        let tools_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
+            .json(&serde_json::json!({
+                "model": mapped_model,
+                "max_tokens": 50,
+                "system": system,
+                "tools": [{
+                    "name": "test_tool",
+                    "description": "A test tool",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }],
+                "messages": [tools_msg]
+            }))
+            .send();
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 

@@ -24,6 +24,14 @@ pub struct CallbackDefinition {
     pub cwd: Option<String>,
     /// Won't run simultaneously with itself
     pub one_at_a_time: bool,
+    /// If true, this is a built-in callback (not user-created, no external script).
+    /// The command is stored in `built_in_command` and executed directly.
+    #[serde(default)]
+    pub built_in: bool,
+    /// Command to execute for built-in callbacks (e.g., "/path/to/tui typst-compile $FILE").
+    /// Each matched file is appended as a separate invocation.
+    #[serde(default)]
+    pub built_in_command: Option<String>,
 }
 
 /// Module-owned state for the Callback module.
@@ -47,12 +55,7 @@ impl Default for CallbackState {
 
 impl CallbackState {
     pub fn new() -> Self {
-        Self {
-            definitions: Vec::new(),
-            next_id: 1,
-            active_set: HashSet::new(),
-            editor_open: None,
-        }
+        Self { definitions: Vec::new(), next_id: 1, active_set: HashSet::new(), editor_open: None }
     }
 
     pub fn get(state: &State) -> &Self {

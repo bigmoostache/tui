@@ -8,10 +8,10 @@ mod tools_panel;
 use serde_json::json;
 
 use crate::app::panels::Panel;
-use crate::modules::ToolVisualizer;
-use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
+use crate::modules::ToolVisualizer;
+use crate::state::{ContextType, ContextTypeMeta, State};
 
 use self::panel::OverviewPanel;
 use self::tools_panel::ToolsPanel;

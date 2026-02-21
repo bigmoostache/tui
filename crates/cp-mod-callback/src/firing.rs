@@ -28,49 +28,50 @@ pub fn fire_callback(
         let tag = format!("callback_{}", def.id);
         let registry = WatcherRegistry::get(state);
         if registry.has_watcher_with_tag(&tag) {
-            return Err(format!(
-                "Callback '{}' skipped (one_at_a_time: already running)",
-                def.name,
-            ));
+            return Err(format!("Callback '{}' skipped (one_at_a_time: already running)", def.name,));
         }
     }
 
     // Build the command with env vars baked in
     let changed_files_env = build_changed_files_env(&matched.matched_files);
-    let project_root = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
+    let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
 
     // Use the callback's cwd if set, otherwise project root
     let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
 
     // Build the script path — uses STORE_DIR for scripts dir
-    let scripts_dir = std::path::PathBuf::from(STORE_DIR).join("scripts");
-    let script_path = scripts_dir.join(format!("{}.sh", def.name));
-    let script_path_str = if script_path.is_absolute() {
-        script_path.to_string_lossy().to_string()
+    // For built-in callbacks, use the built_in_command directly instead of a script file.
+    let command = if def.built_in {
+        let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
+        format!(
+            "CP_CHANGED_FILES={changed_files} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
+            changed_files = shell_escape(&changed_files_env),
+            root = shell_escape(&project_root),
+            name = shell_escape(&def.name),
+            cmd = base_cmd,
+        )
     } else {
-        format!("{}/{}", project_root, script_path.to_string_lossy())
+        let scripts_dir = std::path::PathBuf::from(STORE_DIR).join("scripts");
+        let script_path = scripts_dir.join(format!("{}.sh", def.name));
+        let script_path_str = if script_path.is_absolute() {
+            script_path.to_string_lossy().to_string()
+        } else {
+            format!("{}/{}", project_root, script_path.to_string_lossy())
+        };
+
+        // Check script exists and is readable before spawning
+        if !script_path.exists() {
+            return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display(),));
+        }
+
+        format!(
+            "CP_CHANGED_FILES={changed_files} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
+            changed_files = shell_escape(&changed_files_env),
+            root = shell_escape(&project_root),
+            name = shell_escape(&def.name),
+            script = shell_escape(&script_path_str),
+        )
     };
-
-    // Check script exists and is readable before spawning
-    if !script_path.exists() {
-        return Err(format!(
-            "Callback '{}' script not found: {}",
-            def.name,
-            script_path.display(),
-        ));
-    }
-
-    // Construct command with env vars
-    let command = format!(
-        "CP_CHANGED_FILES={changed_files} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
-        changed_files = shell_escape(&changed_files_env),
-        root = shell_escape(&project_root),
-        name = shell_escape(&def.name),
-        script = shell_escape(&script_path_str),
-    );
 
     // Generate session key via console state
     let session_key = {
@@ -129,10 +130,7 @@ pub fn fire_callback(
 
 /// Fire all matched non-blocking callbacks.
 /// Returns one summary line per callback in compact format: "· name dispatched"
-pub fn fire_async_callbacks(
-    state: &mut State,
-    callbacks: &[MatchedCallback],
-) -> Vec<String> {
+pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) -> Vec<String> {
     let mut summaries = Vec::new();
     for cb in callbacks {
         match fire_callback(state, cb, None) {
@@ -150,11 +148,7 @@ pub fn fire_async_callbacks(
 /// Fire all matched blocking callbacks.
 /// Each gets a sentinel tool_use_id so tool_pipeline can track them.
 /// Returns one summary line per callback: "· name running (blocking)"
-pub fn fire_blocking_callbacks(
-    state: &mut State,
-    callbacks: &[MatchedCallback],
-    tool_use_id: &str,
-) -> Vec<String> {
+pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
     let mut summaries = Vec::new();
     for cb in callbacks {
         match fire_callback(state, cb, Some(tool_use_id)) {
@@ -228,11 +222,9 @@ impl Watcher for CallbackWatcher {
             let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
             let log_path_str = log_path.to_string_lossy();
             let msg = if let Some(ref sm) = self.success_message {
-                format!("· {} passed ({}). Log: {}",
-                    self.callback_name, sm, log_path_str)
+                format!("· {} passed ({}). Log: {}", self.callback_name, sm, log_path_str)
             } else {
-                format!("· {} passed. Log: {}",
-                    self.callback_name, log_path_str)
+                format!("· {} passed. Log: {}", self.callback_name, log_path_str)
             };
             Some(WatcherResult {
                 description: msg,
@@ -246,7 +238,8 @@ impl Watcher for CallbackWatcher {
             let last_lines = handle.buffer.last_n_lines(3);
             let msg = format!(
                 "· {} FAILED (exit {})\n{}",
-                self.callback_name, exit_code,
+                self.callback_name,
+                exit_code,
                 last_lines.lines().map(|l| format!("    {}", l)).collect::<Vec<_>>().join("\n"),
             );
             Some(WatcherResult {
@@ -276,10 +269,7 @@ impl Watcher for CallbackWatcher {
         }
         let elapsed_s = (now - self.registered_at_ms) / 1000;
         Some(WatcherResult {
-            description: format!(
-                "· {} TIMED OUT ({}s)",
-                self.callback_name, elapsed_s,
-            ),
+            description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s,),
             panel_id: None,
             tool_use_id: self.tool_use_id.clone(),
             close_panel: false,

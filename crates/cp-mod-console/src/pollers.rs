@@ -27,7 +27,9 @@ pub fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<Atom
             {
                 let mut buf = vec![0u8; 64 * 1024];
                 while let Ok(n) = f.read(&mut buf) {
-                    if n == 0 { break; }
+                    if n == 0 {
+                        break;
+                    }
                     buffer.write(&buf[..n]);
                 }
             }

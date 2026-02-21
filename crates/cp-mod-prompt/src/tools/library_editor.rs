@@ -17,11 +17,7 @@ pub fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         || ps.commands.iter().any(|c| c.id == id);
 
     if !found {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("ID '{}' not found in agents, skills, or commands", id),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("ID '{}' not found in agents, skills, or commands", id), true);
     }
 
     let previous = PromptState::get(state).open_prompt_id.clone();
@@ -29,7 +25,10 @@ pub fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     let msg = if let Some(prev) = previous {
-        format!("Opened '{}' in Library editor (closed previous: '{}'). Content is now visible in the Library panel.", id, prev)
+        format!(
+            "Opened '{}' in Library editor (closed previous: '{}'). Content is now visible in the Library panel.",
+            id, prev
+        )
     } else {
         format!("Opened '{}' in Library editor. Content is now visible in the Library panel.", id)
     };

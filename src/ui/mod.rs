@@ -1,6 +1,6 @@
 pub use crate::infra::constants::chars;
-pub mod helpers;
 pub mod help;
+pub mod helpers;
 mod input;
 pub mod markdown;
 pub mod perf;
@@ -13,10 +13,10 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use crate::infra::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
 use crate::app::panels;
-use crate::ui::perf::PERF;
+use crate::infra::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
 use crate::state::{ContextType, State};
+use crate::ui::perf::PERF;
 
 pub fn render(frame: &mut Frame, state: &mut State) {
     PERF.frame_start();

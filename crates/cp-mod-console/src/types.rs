@@ -64,10 +64,7 @@ impl Default for ConsoleState {
 
 impl ConsoleState {
     pub fn new() -> Self {
-        Self {
-            sessions: HashMap::new(),
-            next_session_id: 1,
-        }
+        Self { sessions: HashMap::new(), next_session_id: 1 }
     }
 
     pub fn get(state: &State) -> &Self {
@@ -173,20 +170,13 @@ impl Watcher for ConsoleWatcher {
         }
 
         if self.easy_bash {
-            let output = std::fs::read_to_string(
-                cs.sessions
-                    .get(&self.session_name)
-                    .map(|h| h.log_path.as_str())
-                    .unwrap_or(""),
-            )
-            .unwrap_or_default();
+            let output =
+                std::fs::read_to_string(cs.sessions.get(&self.session_name).map(|h| h.log_path.as_str()).unwrap_or(""))
+                    .unwrap_or_default();
             let exit_code = handle.get_status().exit_code().unwrap_or(-1);
             let line_count = output.lines().count();
             Some(WatcherResult {
-                description: format!(
-                    "Output in {} ({} lines, exit_code={})",
-                    self.panel_id, line_count, exit_code
-                ),
+                description: format!("Output in {} ({} lines, exit_code={})", self.panel_id, line_count, exit_code),
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
@@ -197,12 +187,7 @@ impl Watcher for ConsoleWatcher {
             let exit_code = handle.get_status().exit_code();
             let last_lines = handle.buffer.last_n_lines(5);
             Some(WatcherResult {
-                description: format_wait_result(
-                    &self.session_name,
-                    exit_code,
-                    &self.panel_id,
-                    &last_lines,
-                ),
+                description: format_wait_result(&self.session_name, exit_code, &self.panel_id, &last_lines),
                 panel_id: Some(self.panel_id.clone()),
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,

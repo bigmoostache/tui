@@ -6,10 +6,12 @@ pub mod questions;
 use std::collections::{HashMap, HashSet};
 
 use crate::app::panels::Panel;
-use crate::state::{ContextType, State};
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
+use crate::state::{ContextType, State};
 
+pub use cp_mod_callback::CallbackModule;
+pub use cp_mod_console::ConsoleModule;
 pub use cp_mod_files::FilesModule;
 pub use cp_mod_git::GitModule;
 pub use cp_mod_github::GithubModule;
@@ -19,10 +21,9 @@ pub use cp_mod_preset::PresetModule;
 pub use cp_mod_prompt::PromptModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
-pub use cp_mod_console::ConsoleModule;
-pub use cp_mod_callback::CallbackModule;
 pub use cp_mod_todo::TodoModule;
 pub use cp_mod_tree::TreeModule;
+pub use cp_mod_typst::TypstModule;
 
 // Re-export Module trait and helpers from cp-base
 pub use cp_base::modules::{Module, ToolVisualizer};
@@ -87,6 +88,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(PresetModule::new(all_modules, active_tool_definitions, crate::app::ensure_default_contexts)),
         Box::new(SpineModule),
         Box::new(LogsModule),
+        Box::new(TypstModule),
     ]
 }
 
@@ -130,9 +132,9 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
         }
     }
 
-    ToolResult { 
-        tool_use_id: tool.id.clone(), 
-        content: format!("Unknown tool: {}", tool.name), 
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Unknown tool: {}", tool.name),
         is_error: true,
         tool_name: tool.name.clone(),
     }

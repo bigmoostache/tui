@@ -13,11 +13,8 @@ pub fn refresh_git_status(state: &mut State) {
     use types::GitChangeType;
 
     // Check if git repo
-    let is_repo = Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    let is_repo =
+        Command::new("git").args(["rev-parse", "--git-dir"]).output().map(|o| o.status.success()).unwrap_or(false);
 
     let gs = GitState::get_mut(state);
     gs.git_is_repo = is_repo;
@@ -69,12 +66,7 @@ pub fn refresh_git_status(state: &mut State) {
                         GitChangeType::Modified
                     };
 
-                    file_changes.push(GitFileChange {
-                        path,
-                        additions,
-                        deletions,
-                        change_type,
-                    });
+                    file_changes.push(GitFileChange { path, additions, deletions, change_type });
                 }
             }
         }
@@ -95,12 +87,7 @@ pub fn refresh_git_status(state: &mut State) {
                         continue;
                     }
 
-                    file_changes.push(GitFileChange {
-                        path,
-                        additions,
-                        deletions,
-                        change_type: GitChangeType::Added,
-                    });
+                    file_changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
                 }
             }
         }
@@ -115,9 +102,7 @@ pub fn refresh_git_status(state: &mut State) {
                     continue;
                 }
                 // Count lines for untracked files
-                let line_count = std::fs::read_to_string(&path)
-                    .map(|c| c.lines().count() as i32)
-                    .unwrap_or(0);
+                let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count() as i32).unwrap_or(0);
 
                 file_changes.push(GitFileChange {
                     path,
@@ -132,7 +117,6 @@ pub fn refresh_git_status(state: &mut State) {
     let gs = GitState::get_mut(state);
     gs.git_file_changes = file_changes;
 }
-
 
 /// Timeout for git commands (seconds)
 pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
@@ -205,25 +189,23 @@ impl Module for GitModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        vec![
-            ToolDefinition {
-                id: "git_execute".to_string(),
-                name: "Git Execute".to_string(),
-                short_desc: "Run git commands".to_string(),
-                description: "Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) \
+        vec![ToolDefinition {
+            id: "git_execute".to_string(),
+            name: "Git Execute".to_string(),
+            short_desc: "Run git commands".to_string(),
+            description: "Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) \
                     create a dynamic result panel that auto-refreshes. Mutating commands (commit, push, pull, \
                     merge, rebase, etc.) execute directly and return output. Shell operators (|, ;, &&) are \
                     not allowed."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("command", ParamType::String)
-                        .desc("Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')")
-                        .required(),
-                ],
-                enabled: true,
-                category: "Git".to_string(),
-            },
-        ]
+                .to_string(),
+            params: vec![
+                ToolParam::new("command", ParamType::String)
+                    .desc("Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')")
+                    .required(),
+            ],
+            enabled: true,
+            category: "Git".to_string(),
+        }]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -234,24 +216,20 @@ impl Module for GitModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![
-            ("git_execute", visualize_git_output as ToolVisualizer),
-        ]
+        vec![("git_execute", visualize_git_output as ToolVisualizer)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![
-            cp_base::state::ContextTypeMeta {
-                context_type: "git_result",
-                icon_id: "git",
-                is_fixed: false,
-                needs_cache: true,
-                fixed_order: None,
-                display_name: "git-result",
-                short_name: "git-cmd",
-                needs_async_wait: false,
-            },
-        ]
+        vec![cp_base::state::ContextTypeMeta {
+            context_type: "git_result",
+            icon_id: "git",
+            is_fixed: false,
+            needs_cache: true,
+            fixed_order: None,
+            display_name: "git-result",
+            short_name: "git-cmd",
+            needs_async_wait: false,
+        }]
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {

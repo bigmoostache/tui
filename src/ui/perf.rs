@@ -309,12 +309,12 @@ pub struct PerfSnapshot {
     pub memory_mb: f64,
 }
 
+use super::helpers::Cell;
+use super::{chars, theme};
 use ratatui::{
     prelude::*,
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
-use super::helpers::Cell;
-use super::{chars, theme};
 
 pub(super) fn render_perf_overlay(frame: &mut Frame, area: Rect) {
     use super::helpers::render_table;
@@ -443,7 +443,13 @@ pub(super) fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 }
 
 fn frame_time_color(ms: f64) -> Color {
-    if ms < FRAME_BUDGET_60FPS { theme::success() } else if ms < FRAME_BUDGET_30FPS { theme::warning() } else { theme::error() }
+    if ms < FRAME_BUDGET_60FPS {
+        theme::success()
+    } else if ms < FRAME_BUDGET_30FPS {
+        theme::warning()
+    } else {
+        theme::error()
+    }
 }
 
 fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'static> {

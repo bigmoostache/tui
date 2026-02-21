@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::state::Action;
 use cp_base::config::theme;
 use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel};
+use cp_base::state::Action;
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
@@ -155,16 +155,15 @@ impl Panel for MemoryPanel {
 
             // Measure fixed column widths
             let id_width = closed.iter().map(|m| UnicodeWidthStr::width(m.id.as_str())).max().unwrap_or(2).max(2);
-            let imp_width = closed.iter()
-                .map(|m| UnicodeWidthStr::width(m.importance.as_str()))
-                .max().unwrap_or(10).max(10); // "Importance" header
-            let labels: Vec<String> = closed.iter()
-                .map(|m| if m.labels.is_empty() { String::new() } else { m.labels.join(", ") })
-                .collect();
+            let imp_width =
+                closed.iter().map(|m| UnicodeWidthStr::width(m.importance.as_str())).max().unwrap_or(10).max(10); // "Importance" header
+            let labels: Vec<String> =
+                closed.iter().map(|m| if m.labels.is_empty() { String::new() } else { m.labels.join(", ") }).collect();
             let labels_width = labels.iter().map(|l| UnicodeWidthStr::width(l.as_str())).max().unwrap_or(6).max(6);
 
             let viewport = state.last_viewport_width as usize;
-            let fixed_width = indent + id_width + separator_width + separator_width + imp_width + separator_width + labels_width;
+            let fixed_width =
+                indent + id_width + separator_width + separator_width + imp_width + separator_width + labels_width;
             let summary_max = if viewport > fixed_width + 20 {
                 viewport - fixed_width
             } else {

@@ -1,6 +1,6 @@
 use crate::app::panels::paginate_content;
-use crate::state::{State, estimate_tokens};
 use crate::infra::tools::{ToolResult, ToolUse};
+use crate::state::{State, estimate_tokens};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("panel_id").and_then(|v| v.as_str()) {
@@ -26,11 +26,19 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if ctx.total_pages <= 1 {
-        return ToolResult::new(tool.id.clone(), format!("Panel '{}' has only 1 page — no pagination needed", panel_id), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Panel '{}' has only 1 page — no pagination needed", panel_id),
+            true,
+        );
     }
 
     if page < 1 || page as usize > ctx.total_pages {
-        return ToolResult::new(tool.id.clone(), format!("Page {} out of range for panel '{}' (valid: 1-{})", page, panel_id, ctx.total_pages), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Page {} out of range for panel '{}' (valid: 1-{})", page, panel_id, ctx.total_pages),
+            true,
+        );
     }
 
     ctx.current_page = (page - 1) as usize;
@@ -41,5 +49,9 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         ctx.token_count = estimate_tokens(&page_content);
     }
 
-    ToolResult::new(tool.id.clone(), format!("Panel '{}' now showing page {}/{}", panel_id, page, ctx.total_pages), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Panel '{}' now showing page {}/{}", panel_id, page, ctx.total_pages),
+        false,
+    )
 }
