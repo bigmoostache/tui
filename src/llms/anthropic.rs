@@ -84,7 +84,10 @@ impl LlmClient for AnthropicClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
-        let client = Client::new();
+        // timeout(None) prevents reqwest from killing long-running SSE streams.
+        // Without this, blocking Client may use system TCP timeouts, causing
+        // silent stream drops mid-response (same fix applied to Claude Code providers).
+        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // Build API messages
         let include_tool_uses = request.tool_results.is_some();

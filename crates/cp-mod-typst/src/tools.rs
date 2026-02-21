@@ -141,10 +141,17 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     elem.set_meta("file_path", &source_path);
     state.context.push(elem);
 
+    // Compile the initial PDF so the target exists immediately
+    let compile_msg = match crate::compiler::compile_and_write(&source_path, &target) {
+        Ok(msg) => format!("\n{}", msg),
+        Err(e) => format!("\nWarning: initial compile failed: {}", e),
+    };
+
     let mut result_msg = format!("Created document '{}'\n  Source: {}\n  Target: {}\n", name, source_path, target);
     if let Some(tpl) = &template {
         result_msg.push_str(&format!("  Template: {}\n", tpl));
     }
+    result_msg.push_str(&compile_msg);
     result_msg.push_str(&format!("\nFile opened: {}\nUse Edit tool to write the document content.", source_path));
 
     ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false, tool_name: tool.name.clone() }
