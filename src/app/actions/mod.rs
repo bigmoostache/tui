@@ -74,6 +74,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     }
                     word_start -= 1;
                 }
+                // Ensure we land on a valid char boundary (backward scan is byte-level)
+                while word_start < before_space && !state.input.is_char_boundary(word_start) {
+                    word_start += 1;
+                }
                 let word = &state.input[word_start..before_space];
                 if let Some(cmd_name) = word.strip_prefix('/') {
                     let cmd_content =
