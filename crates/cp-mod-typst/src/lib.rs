@@ -1,3 +1,4 @@
+// Silent callback test
 pub mod cli_parser;
 pub mod compiler;
 pub mod packages;

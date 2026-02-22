@@ -66,7 +66,7 @@ language = "en"
 # i.e. [[lang.ru]]
 # each section must contains the following fields
 [lang.en]
-    header_quote = "Experienced Data Analyst looking for a full time job starting from now"
+    header_quote = "Experienced Pirate Captain looking for a full time pillaging position starting from now"
     cv_footer = "Curriculum vitae"
     letter_footer = "Cover letter"
 
