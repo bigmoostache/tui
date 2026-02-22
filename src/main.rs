@@ -172,7 +172,8 @@ fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
     }
 
     if affected.is_empty() {
-        return Ok(());
+        // Exit 7 = "nothing to do" — callback system treats this as silent success
+        std::process::exit(7);
     }
 
     // Recompile each affected document (and update deps)

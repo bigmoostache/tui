@@ -218,6 +218,20 @@ impl Watcher for CallbackWatcher {
 
         let exit_code = handle.get_status().exit_code().unwrap_or(-1);
 
+        // Exit code 7 = "nothing to do" — silent success, suppress entirely.
+        // Used by callbacks that fire broadly (e.g., pattern "*") but often have nothing to do.
+        // Returning None consumes the watcher without producing any visible result.
+        if exit_code == 7 {
+            return Some(WatcherResult {
+                description: String::new(),
+                panel_id: None,
+                tool_use_id: self.tool_use_id.clone(),
+                close_panel: false,
+                create_panel: None,
+                processed_already: true,
+            });
+        }
+
         if exit_code == 0 {
             let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
             let log_path_str = log_path.to_string_lossy();

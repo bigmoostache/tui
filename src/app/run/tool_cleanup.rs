@@ -137,6 +137,7 @@ impl App {
                         .iter()
                         .filter(|r| r.tool_use_id.as_deref() == Some(sentinel_id.as_str()))
                         .map(|r| r.description.as_str())
+                        .filter(|d| !d.is_empty())
                         .collect();
                     let merged_descriptions = all_matched.join("\n");
                     // Append to existing Callbacks block if present, else create new one
