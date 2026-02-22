@@ -20,7 +20,8 @@ use crate::packages;
 ///
 /// `source_path` is relative to the project root (which is the current directory).
 /// Returns Ok(pdf_bytes) on success, Err(error_message) on failure.
-pub fn compile_to_pdf(source_path: &str) -> Result<Vec<u8>, String> {
+/// Returns Ok((pdf_bytes, warnings_text)) or Err(error_message).
+pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String), String> {
     let abs_path = PathBuf::from(source_path)
         .canonicalize()
         .map_err(|e| format!("Cannot resolve path '{}': {}", source_path, e))?;
@@ -51,10 +52,13 @@ pub fn compile_to_pdf(source_path: &str) -> Result<Vec<u8>, String> {
                 }
                 msg
             })?;
+            // Include warnings in the success message (never eprintln — it corrupts the TUI)
+            let mut result_msg = String::new();
             if !warnings.is_empty() {
-                eprintln!("{}", warnings.join("\n"));
+                result_msg.push_str(&warnings.join("\n"));
+                result_msg.push('\n');
             }
-            Ok(pdf_bytes)
+            Ok((pdf_bytes, result_msg))
         }
         Err(errors) => {
             let mut msg = String::new();
@@ -75,7 +79,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<Vec<u8>, String> {
 
 /// Compile a `.typ` file and write the PDF to the output path.
 pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String, String> {
-    let pdf_bytes = compile_to_pdf(source_path)?;
+    let (pdf_bytes, warnings) = compile_to_pdf(source_path)?;
 
     // Write to output path
     if let Some(parent) = Path::new(output_path).parent() {
@@ -83,7 +87,12 @@ pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String,
     }
     fs::write(output_path, &pdf_bytes).map_err(|e| format!("write {}: {}", output_path, e))?;
 
-    Ok(format!("✓ Compiled {} ({} bytes)", output_path, pdf_bytes.len()))
+    let mut msg = format!("✓ Compiled {} ({} bytes)", output_path, pdf_bytes.len());
+    if !warnings.is_empty() {
+        msg.push('\n');
+        msg.push_str(&warnings);
+    }
+    Ok(msg)
 }
 
 /// Find the project root by walking up and looking for .context-pilot/
