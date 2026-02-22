@@ -2,9 +2,10 @@
 //!
 //! Implements a minimal `typst::World` for compiling `.typ` files to PDF.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime};
@@ -19,9 +20,8 @@ use crate::packages;
 /// Compile a `.typ` file to PDF bytes.
 ///
 /// `source_path` is relative to the project root (which is the current directory).
-/// Returns Ok(pdf_bytes) on success, Err(error_message) on failure.
-/// Returns Ok((pdf_bytes, warnings_text)) or Err(error_message).
-pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String), String> {
+/// Returns Ok((pdf_bytes, warnings_text, accessed_files)) or Err(error_message).
+pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
     let abs_path = PathBuf::from(source_path)
         .canonicalize()
         .map_err(|e| format!("Cannot resolve path '{}': {}", source_path, e))?;
@@ -58,7 +58,9 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String), String> {
                 result_msg.push_str(&warnings.join("\n"));
                 result_msg.push('\n');
             }
-            Ok((pdf_bytes, result_msg))
+            // Extract accessed files for dependency tracking
+            let deps = world.accessed_files.lock().map(|set| set.iter().cloned().collect()).unwrap_or_default();
+            Ok((pdf_bytes, result_msg, deps))
         }
         Err(errors) => {
             let mut msg = String::new();
@@ -79,7 +81,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String), String> {
 
 /// Compile a `.typ` file and write the PDF to the output path.
 pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String, String> {
-    let (pdf_bytes, warnings) = compile_to_pdf(source_path)?;
+    let (pdf_bytes, warnings, _deps) = compile_to_pdf(source_path)?;
 
     // Write to output path
     if let Some(parent) = Path::new(output_path).parent() {
@@ -122,6 +124,8 @@ struct ContextPilotWorld {
     fonts: Vec<Font>,
     /// Source file cache
     sources: HashMap<FileId, Source>,
+    /// All file paths accessed during compilation (for dependency tracking)
+    accessed_files: Mutex<HashSet<PathBuf>>,
 }
 
 impl ContextPilotWorld {
@@ -154,6 +158,7 @@ impl ContextPilotWorld {
             book: LazyHash::new(book),
             fonts,
             sources: HashMap::new(),
+            accessed_files: Mutex::new(HashSet::new()),
         };
 
         // Pre-load the main source
@@ -231,6 +236,9 @@ impl World for ContextPilotWorld {
 
         // Resolve via our unified path resolver (handles local + packages)
         let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
+        if let Ok(mut set) = self.accessed_files.lock() {
+            set.insert(path.clone());
+        }
         let content = fs::read_to_string(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Source::new(id, content))
     }
@@ -238,6 +246,9 @@ impl World for ContextPilotWorld {
     fn file(&self, id: FileId) -> FileResult<Bytes> {
         // Resolve via our unified path resolver (handles local + packages)
         let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
+        if let Ok(mut set) = self.accessed_files.lock() {
+            set.insert(path.clone());
+        }
         let data = fs::read(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Bytes::new(data))
     }
@@ -267,7 +278,7 @@ impl World for ContextPilotWorld {
 }
 
 /// Load fonts from a directory recursively.
-fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
+pub(crate) fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
@@ -288,13 +299,13 @@ fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
 }
 
 /// Check if a file looks like a font file.
-fn is_font_file(path: &Path) -> bool {
+pub(crate) fn is_font_file(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| matches!(e.to_lowercase().as_str(), "ttf" | "otf" | "ttc" | "woff" | "woff2"))
 }
 
 /// Get the home directory.
-fn dirs_home() -> Option<PathBuf> {
+pub(crate) fn dirs_home() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(PathBuf::from)
 }

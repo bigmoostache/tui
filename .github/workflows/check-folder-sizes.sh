@@ -21,5 +21,8 @@ done < <(find . -mindepth 1 -type d \
   -not -path './.context-pilot/*' \
   -not -path './website/*' \
   -not -path './docs' \
-  -not -path './docs/*')
+  -not -path './docs/*' \
+  -not -path './brilliant-cv/*' \
+  -not -path './graceful-genetics/*' \
+  -not -path './test-typst/*')
 exit $exit_code

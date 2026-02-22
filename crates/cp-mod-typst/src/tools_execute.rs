@@ -11,31 +11,26 @@ use std::path::{Path, PathBuf};
 use crate::cli_parser::{self, TypstCommand};
 use crate::packages;
 
+/// Helper to build a ToolResult from a tool and content.
+fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
+    ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
+}
+
+fn err_result(tool: &ToolUse, content: String) -> ToolResult {
+    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
+}
+
 /// Execute the typst_execute tool — parse command string and dispatch to subcommand handler.
 pub fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: missing required 'command' parameter".to_string(),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
+        None => return err_result(tool, "Error: missing required 'command' parameter".to_string()),
     };
 
     // Parse the command
     let parsed = match cli_parser::parse_command(&command) {
         Ok(cmd) => cmd,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error: {}", e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
+        Err(e) => return err_result(tool, format!("Error: {}", e)),
     };
 
     // Dispatch to subcommand handler
@@ -47,6 +42,9 @@ pub fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
         TypstCommand::Fonts { variants } => exec_fonts(tool, state, variants),
         TypstCommand::Query { input, selector, field } => exec_query(tool, state, &input, &selector, field.as_deref()),
         TypstCommand::Update { package } => exec_update(tool, package.as_deref()),
+        TypstCommand::Watch { input, output } => exec_watch(tool, &input, output.as_deref()),
+        TypstCommand::Unwatch { input } => exec_unwatch(tool, &input),
+        TypstCommand::Watchlist => exec_watchlist(tool),
     }
 }
 
@@ -68,15 +66,8 @@ fn exec_compile(
     };
 
     match crate::compiler::compile_and_write(input, &output_path) {
-        Ok(msg) => {
-            ToolResult { tool_use_id: tool.id.clone(), content: msg, is_error: false, tool_name: tool.name.clone() }
-        }
-        Err(e) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Compile error:\n{}", e),
-            is_error: true,
-            tool_name: tool.name.clone(),
-        },
+        Ok(msg) => ok_result(tool, msg),
+        Err(e) => err_result(tool, format!("Compile error:\n{}", e)),
     }
 }
 
@@ -86,26 +77,17 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
     let spec = match packages::PackageSpec::parse(template_spec) {
         Ok(s) => s,
         Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error: {}\nUsage: typst init @preview/template-name:version [directory]", e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
+            return err_result(
+                tool,
+                format!("Error: {}\nUsage: typst init @preview/template-name:version [directory]", e),
+            );
         }
     };
 
     // Download/resolve the package
     let pkg_dir = match packages::resolve_package(&spec) {
         Ok(d) => d,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error downloading package: {}", e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
+        Err(e) => return err_result(tool, format!("Error downloading package: {}", e)),
     };
 
     // Determine target directory
@@ -116,12 +98,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
 
     // Create the target directory
     if let Err(e) = fs::create_dir_all(&target_dir) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Error creating directory '{}': {}", target_dir, e),
-            is_error: true,
-            tool_name: tool.name.clone(),
-        };
+        return err_result(tool, format!("Error creating directory '{}': {}", target_dir, e));
     }
 
     // Look for a template entry point in the package
@@ -137,12 +114,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         let main_content = format!("#import \"{}\": *\n\n// Your content here\n", spec.to_spec_string());
         let main_path = format!("{}/main.typ", target_dir);
         if let Err(e) = fs::write(&main_path, &main_content) {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error writing {}: {}", main_path, e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
+            return err_result(tool, format!("Error writing {}: {}", main_path, e));
         }
         files_copied.push("main.typ".to_string());
     }
@@ -158,7 +130,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         result.push_str(&format!("  {}\n", f));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: result, is_error: false, tool_name: tool.name.clone() }
+    ok_result(tool, result)
 }
 
 /// Subcommand: fonts — list available system fonts.
@@ -168,8 +140,8 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
     let font_dirs = [
         PathBuf::from("/usr/share/fonts"),
         PathBuf::from("/usr/local/share/fonts"),
-        dirs_home().map(|h| h.join(".fonts")).unwrap_or_default(),
-        dirs_home().map(|h| h.join(".local/share/fonts")).unwrap_or_default(),
+        crate::compiler::dirs_home().map(|h| h.join(".fonts")).unwrap_or_default(),
+        crate::compiler::dirs_home().map(|h| h.join(".local/share/fonts")).unwrap_or_default(),
     ];
 
     let mut font_entries: Vec<(String, String, String)> = Vec::new(); // (family, style, path)
@@ -246,17 +218,15 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
     elem.set_meta("dynamic_label", &"typst-fonts".to_string());
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!(
+    ok_result(
+        tool,
+        format!(
             "Found {} font {}. Results shown in panel {}.",
             count,
             if variants { "variants" } else { "families" },
             context_id
         ),
-        is_error: false,
-        tool_name: tool.name.clone(),
-    }
+    )
 }
 
 /// Subcommand: query — query document metadata/labels.
@@ -265,14 +235,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
     // Compile the document to get metadata
     let abs_path = match PathBuf::from(input).canonicalize() {
         Ok(p) => p,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error: cannot resolve '{}': {}", input, e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
+        Err(e) => return err_result(tool, format!("Error: cannot resolve '{}': {}", input, e)),
     };
 
     // For now, return a basic message about query support
@@ -316,12 +279,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
     elem.set_meta("dynamic_label", &"typst-query".to_string());
     state.context.push(elem);
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Query result shown in panel {}.", context_id),
-        is_error: false,
-        tool_name: tool.name.clone(),
-    }
+    ok_result(tool, format!("Query result shown in panel {}.", context_id))
 }
 
 /// Subcommand: update — re-download cached packages.
@@ -330,14 +288,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
         // Update a specific package
         let spec = match packages::PackageSpec::parse(pkg_spec) {
             Ok(s) => s,
-            Err(e) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Error: {}", e),
-                    is_error: true,
-                    tool_name: tool.name.clone(),
-                };
-            }
+            Err(e) => return err_result(tool, format!("Error: {}", e)),
         };
 
         // Remove cached version and re-download
@@ -347,31 +298,21 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
         }
 
         match packages::download_package(&spec) {
-            Ok(()) => ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("✓ Updated {} (re-downloaded to {})", spec.to_spec_string(), cache_dir.display()),
-                is_error: false,
-                tool_name: tool.name.clone(),
-            },
-            Err(e) => ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error updating {}: {}", spec.to_spec_string(), e),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            },
+            Ok(()) => ok_result(
+                tool,
+                format!("✓ Updated {} (re-downloaded to {})", spec.to_spec_string(), cache_dir.display()),
+            ),
+            Err(e) => err_result(tool, format!("Error updating {}: {}", spec.to_spec_string(), e)),
         }
     } else {
         // List all cached packages
         let cached = packages::list_cached_packages();
         if cached.is_empty() {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content:
-                    "No cached packages to update.\nUse 'typst init @preview/package:version' to download packages."
-                        .to_string(),
-                is_error: false,
-                tool_name: tool.name.clone(),
-            };
+            return ok_result(
+                tool,
+                "No cached packages to update.\nUse 'typst init @preview/package:version' to download packages."
+                    .to_string(),
+            );
         }
 
         let mut result = format!("Cached packages ({}):\n", cached.len());
@@ -379,8 +320,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
             result.push_str(&format!("  @{}/{}:{}\n", ns, name, ver));
         }
         result.push_str("\nUse 'typst update @preview/name:version' to re-download a specific package.");
-
-        ToolResult { tool_use_id: tool.id.clone(), content: result, is_error: false, tool_name: tool.name.clone() }
+        ok_result(tool, result)
     }
 }
 
@@ -436,7 +376,7 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
         let path = entry.path();
         if path.is_dir() {
             collect_font_info(&path, entries);
-        } else if is_font_file(&path)
+        } else if crate::compiler::is_font_file(&path)
             && let Ok(data) = fs::read(&path)
         {
             let bytes = Bytes::new(data);
@@ -449,14 +389,56 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
     }
 }
 
-/// Check if a file is a font file.
-fn is_font_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| matches!(e.to_lowercase().as_str(), "ttf" | "otf" | "ttc" | "woff" | "woff2"))
+/// Subcommand: watch — add a .typ document to the auto-compile watchlist.
+/// Compiles immediately and records dependency tree for future change detection.
+fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
+    // Default output: same name with .pdf extension
+    let output_path = match output {
+        Some(o) => o.to_string(),
+        None => {
+            let p = Path::new(input);
+            p.with_extension("pdf").to_string_lossy().to_string()
+        }
+    };
+
+    // Compile + update deps in the watchlist
+    match crate::watchlist::compile_and_update_deps(input, &output_path) {
+        Ok(msg) => {
+            let watchlist = crate::watchlist::Watchlist::load();
+            let dep_count = watchlist.entries.get(input).map(|e| e.deps.len()).unwrap_or(0);
+            ok_result(
+                tool,
+                format!(
+                    "✓ Now watching '{}' → '{}'\n{}\n\nThe document and its {} dependencies will auto-recompile when any dependency is edited.",
+                    input, output_path, msg, dep_count
+                ),
+            )
+        }
+        Err(e) => err_result(tool, format!("Error compiling '{}': {}\nDocument was NOT added to watchlist.", input, e)),
+    }
 }
 
-/// Get the home directory.
-fn dirs_home() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(PathBuf::from)
+/// Subcommand: unwatch — remove a document from the auto-compile watchlist.
+fn exec_unwatch(tool: &ToolUse, input: &str) -> ToolResult {
+    let mut watchlist = crate::watchlist::Watchlist::load();
+    if watchlist.unwatch(input) {
+        ok_result(tool, format!("✓ Removed '{}' from watchlist. It will no longer auto-recompile.", input))
+    } else {
+        ok_result(tool, format!("'{}' was not in the watchlist.\nUse 'typst watchlist' to see current entries.", input))
+    }
+}
+
+/// Subcommand: watchlist — list all watched documents and their dependency counts.
+fn exec_watchlist(tool: &ToolUse) -> ToolResult {
+    let watchlist = crate::watchlist::Watchlist::load();
+    if watchlist.entries.is_empty() {
+        return ok_result(tool, "No documents in watchlist.\nUse 'typst watch <file.typ>' to add one.".to_string());
+    }
+
+    let mut output = format!("Typst Watchlist ({} documents):\n\n", watchlist.entries.len());
+    for (source, entry) in watchlist.list() {
+        output.push_str(&format!("  {} → {} ({} deps)\n", source, entry.output, entry.deps.len()));
+    }
+    output.push_str("\nUse 'typst unwatch <file.typ>' to remove.");
+    ok_result(tool, output)
 }

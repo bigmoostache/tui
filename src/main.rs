@@ -31,8 +31,8 @@ fn main() -> io::Result<()> {
         match args[1].as_str() {
             // Compile a .typ → .pdf in the same directory
             "typst-compile" => return run_typst_compile(&args[2..]),
-            // Recompile all .typ files that import a changed template
-            "typst-recompile-dependents" => return run_typst_recompile_dependents(&args[2..]),
+            // Recompile watched documents whose dependencies changed
+            "typst-recompile-watched" => return run_typst_recompile_watched(&args[2..]),
             _ => {}
         }
     }
@@ -145,46 +145,40 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
     }
 }
 
-/// Recompile all .typ files in the project that import any of the changed templates.
-/// Used by the typst-template-recompile callback via $CP_CHANGED_FILES.
-/// Usage: cpilot typst-recompile-dependents <template1.typ> [template2.typ ...]
-fn run_typst_recompile_dependents(args: &[String]) -> io::Result<()> {
+/// Recompile all watched .typ documents whose dependencies include any of the changed files.
+/// Used by the typst-watchlist callback via $CP_CHANGED_FILES.
+/// Usage: cpilot typst-recompile-watched <changed_file1> [changed_file2 ...]
+fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
     if args.is_empty() {
-        eprintln!("Usage: cpilot typst-recompile-dependents <template1.typ> [template2.typ ...]");
-        std::process::exit(1);
-    }
-
-    // Extract just the filename stems from the changed templates
-    // e.g., ".context-pilot/shared/typst-templates/report.typ" → "report"
-    let changed_stems: Vec<String> = args
-        .iter()
-        .filter_map(|a| std::path::Path::new(a).file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()))
-        .collect();
-
-    if changed_stems.is_empty() {
-        println!("No template stems to match.");
         return Ok(());
     }
 
-    // Scan all .typ files in the project, excluding templates dir and target/
-    let project_root = std::env::current_dir().unwrap_or_default();
-    let mut dependents: Vec<std::path::PathBuf> = Vec::new();
-    find_typ_dependents(&project_root, &changed_stems, &mut dependents);
-
-    if dependents.is_empty() {
-        println!("No .typ files import changed templates: {:?}", changed_stems);
+    let watchlist = cp_mod_typst::watchlist::Watchlist::load();
+    if watchlist.entries.is_empty() {
         return Ok(());
     }
 
-    // Recompile each dependent
+    // Find all watched documents affected by the changed files
+    let mut affected: Vec<(String, String)> = Vec::new();
+    for changed_file in args {
+        if changed_file.is_empty() {
+            continue;
+        }
+        for (source, output) in watchlist.find_affected(changed_file) {
+            if !affected.iter().any(|(s, _)| s == &source) {
+                affected.push((source, output));
+            }
+        }
+    }
+
+    if affected.is_empty() {
+        return Ok(());
+    }
+
+    // Recompile each affected document (and update deps)
     let mut had_error = false;
-    for dep in &dependents {
-        let source = dep.to_string_lossy().to_string();
-        let stem = dep.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
-        let parent = dep.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
-        let out = if parent.is_empty() { format!("{}.pdf", stem) } else { format!("{}/{}.pdf", parent, stem) };
-
-        match cp_mod_typst::compiler::compile_and_write(&source, &out) {
+    for (source, output) in &affected {
+        match cp_mod_typst::watchlist::compile_and_update_deps(source, output) {
             Ok(msg) => println!("{}", msg),
             Err(err) => {
                 eprint!("Error compiling {}: {}", source, err);
@@ -197,56 +191,4 @@ fn run_typst_recompile_dependents(args: &[String]) -> io::Result<()> {
         std::process::exit(1);
     }
     Ok(())
-}
-
-/// Recursively find .typ files that import any of the given template stems.
-/// Skips target/, .context-pilot/shared/typst-templates/, and hidden dirs.
-fn find_typ_dependents(dir: &std::path::Path, template_stems: &[String], results: &mut Vec<std::path::PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-
-        if path.is_dir() {
-            // Skip target, .git, and the templates directory itself
-            if name == "target" || name == ".git" || name == "node_modules" {
-                continue;
-            }
-            if path.ends_with(".context-pilot/shared/typst-templates") {
-                continue;
-            }
-            find_typ_dependents(&path, template_stems, results);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("typ") {
-            // Check if this file imports any of the changed templates
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && imports_any_template(&content, template_stems)
-            {
-                results.push(path);
-            }
-        }
-    }
-}
-
-/// Check if a .typ file's content imports any of the given template stems.
-/// Looks for patterns like:
-///   #import ".../<stem>.typ": *
-///   #import ".../<stem>.typ": func1, func2
-///   #import "@local/templates/<stem>.typ"
-fn imports_any_template(content: &str, template_stems: &[String]) -> bool {
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if !trimmed.starts_with("#import") {
-            continue;
-        }
-        for stem in template_stems {
-            // Match imports that reference the template filename
-            let pattern = format!("{}.typ", stem);
-            if trimmed.contains(&pattern) {
-                return true;
-            }
-        }
-    }
-    false
 }

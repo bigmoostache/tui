@@ -3,6 +3,7 @@ pub mod compiler;
 pub mod packages;
 pub mod templates;
 mod tools_execute;
+pub mod watchlist;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
@@ -57,7 +58,7 @@ impl Module for TypstModule {
             id: "typst_execute".to_string(),
             name: "Execute Typst Command".to_string(),
             short_desc: "Run typst commands via embedded compiler".to_string(),
-            description: "Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update. Read-only commands (fonts, query) create a dynamic result panel. Mutating commands (compile, init, update) return output directly. Example: 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts'.".to_string(),
+            description: "Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update, watch, unwatch, watchlist. Read-only commands (fonts, query) create a dynamic result panel. Mutating commands (compile, init, update) return output directly. Use 'typst watch <file.typ>' to add a document to the auto-compile watchlist — it will recompile automatically whenever any dependency (imports, images, bib files) is edited. Example: 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst watch brilliant-cv/cv.typ'.".to_string(),
             params: vec![
                 ToolParam::new("command", ParamType::String)
                     .desc("Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')")
@@ -84,10 +85,8 @@ impl Module for TypstModule {
     }
 }
 
-/// Ensure the typst callbacks exist in CallbackState.
-/// Two built-in callbacks:
-/// 1. typst-compile: *.typ (excluding templates dir) → compile .typ → .pdf in same directory
-/// 2. typst-template-recompile: .context-pilot/shared/typst-templates/*.typ → recompile dependents
+/// Ensure the typst watchlist callback exists in CallbackState.
+/// Single callback that watches ALL files (*) and checks against the watchlist's dependency trees.
 fn ensure_typst_callback(state: &mut State) {
     use cp_mod_callback::types::{CallbackDefinition, CallbackState};
 
@@ -95,60 +94,35 @@ fn ensure_typst_callback(state: &mut State) {
 
     let binary_path = std::env::current_exe().unwrap_or_default().to_string_lossy().to_string();
 
-    // Remove old callbacks from previous design, then re-add fresh
+    // Remove old callbacks from previous designs
     cs.definitions.retain(|d| {
-        d.name != "typst-compile" && d.name != "typst-compile-template" && d.name != "typst-template-recompile"
+        d.name != "typst-compile"
+            && d.name != "typst-compile-template"
+            && d.name != "typst-template-recompile"
+            && d.name != "typst-watchlist"
     });
     cs.active_set.retain(|id| cs.definitions.iter().any(|d| &d.id == id));
 
-    // Callback 1: compile any *.typ → *.pdf (same dir), skip templates dir
-    let cb1_id = format!("CB{}", cs.next_id);
+    // Single callback: watches ALL files, checks watchlist to find affected docs
+    let cb_id = format!("CB{}", cs.next_id);
     cs.next_id += 1;
 
-    let script1 = format!(
-        r#"bash -c 'COMPILED=0; echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
-  [ -z "$FILE" ] && continue
-  case "$FILE" in .context-pilot/shared/typst-templates/*) continue;; esac
-  {} typst-compile "$FILE"
-  COMPILED=$((COMPILED+1))
-done
-if [ "$COMPILED" = 0 ]; then echo "(skipped — template files only)"; fi'"#,
-        binary_path
-    );
+    // The CLI subcommand reads the watchlist, checks if any changed files are dependencies,
+    // and recompiles affected documents (updating deps at the same time).
+    let script = format!(r#"bash -c '{} typst-recompile-watched $CP_CHANGED_FILES'"#, binary_path);
 
     cs.definitions.push(CallbackDefinition {
-        id: cb1_id.clone(),
-        name: "typst-compile".to_string(),
-        description: "Auto-compile .typ → .pdf (same directory) on edit".to_string(),
-        pattern: "*.typ".to_string(),
+        id: cb_id.clone(),
+        name: "typst-watchlist".to_string(),
+        description: "Recompile watched .typ documents when their dependencies change".to_string(),
+        pattern: "*".to_string(),
         blocking: true,
-        timeout_secs: Some(30),
+        timeout_secs: Some(60),
         success_message: None,
         cwd: None,
         one_at_a_time: false,
         built_in: true,
-        built_in_command: Some(script1),
+        built_in_command: Some(script),
     });
-    cs.active_set.insert(cb1_id);
-
-    // Callback 2: when templates change, recompile all .typ files that import them
-    let cb2_id = format!("CB{}", cs.next_id);
-    cs.next_id += 1;
-
-    let script2 = format!(r#"bash -c '{} typst-recompile-dependents $CP_CHANGED_FILES'"#, binary_path);
-
-    cs.definitions.push(CallbackDefinition {
-        id: cb2_id.clone(),
-        name: "typst-template-recompile".to_string(),
-        description: "Recompile .typ files that import changed templates".to_string(),
-        pattern: ".context-pilot/shared/typst-templates/*.typ".to_string(),
-        blocking: true,
-        timeout_secs: Some(60),
-        success_message: Some("✓ Dependents recompiled".to_string()),
-        cwd: None,
-        one_at_a_time: false,
-        built_in: true,
-        built_in_command: Some(script2),
-    });
-    cs.active_set.insert(cb2_id);
+    cs.active_set.insert(cb_id);
 }

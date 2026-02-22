@@ -15,6 +15,12 @@ pub enum TypstCommand {
     Fonts { variants: bool },
     /// `typst update [<package>]`
     Update { package: Option<String> },
+    /// `typst watch <input> [-o <output>]` — add document to auto-compile watchlist
+    Watch { input: String, output: Option<String> },
+    /// `typst unwatch <input>` — remove document from watchlist
+    Unwatch { input: String },
+    /// `typst watchlist` — list all watched documents
+    Watchlist,
 }
 
 /// Parse a typst command string into a structured TypstCommand.
@@ -43,12 +49,11 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
         "query" => parse_query(args),
         "fonts" => parse_fonts(args),
         "update" => parse_update(args),
-        "watch" | "w" => Err(
-            "Watch mode is not supported in the embedded compiler. Use file edit callbacks for auto-compilation instead."
-                .to_string(),
-        ),
+        "watch" | "w" => parse_watch(args),
+        "unwatch" => parse_unwatch(args),
+        "watchlist" => Ok(TypstCommand::Watchlist),
         other => Err(format!(
-            "Unknown subcommand '{}'. Available: compile, init, query, fonts, update",
+            "Unknown subcommand '{}'. Available: compile, init, query, fonts, update, watch, unwatch, watchlist",
             other
         )),
     }
@@ -143,6 +148,47 @@ fn parse_fonts(args: &[String]) -> Result<TypstCommand, String> {
 fn parse_update(args: &[String]) -> Result<TypstCommand, String> {
     let package = args.first().cloned();
     Ok(TypstCommand::Update { package })
+}
+
+fn parse_watch(args: &[String]) -> Result<TypstCommand, String> {
+    if args.is_empty() {
+        return Err("Usage: typst watch <input.typ> [-o <output.pdf>]".to_string());
+    }
+
+    let mut input = None;
+    let mut output = None;
+    let mut i = 0;
+
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" | "--output" => {
+                i += 1;
+                if i >= args.len() {
+                    return Err("Missing value for -o/--output".to_string());
+                }
+                output = Some(args[i].clone());
+            }
+            arg if arg.starts_with('-') => {}
+            _ => {
+                if input.is_none() {
+                    input = Some(args[i].clone());
+                } else if output.is_none() {
+                    output = Some(args[i].clone());
+                }
+            }
+        }
+        i += 1;
+    }
+
+    let input = input.ok_or("Missing input file. Usage: typst watch <input.typ>")?;
+    Ok(TypstCommand::Watch { input, output })
+}
+
+fn parse_unwatch(args: &[String]) -> Result<TypstCommand, String> {
+    if args.is_empty() {
+        return Err("Usage: typst unwatch <input.typ>".to_string());
+    }
+    Ok(TypstCommand::Unwatch { input: args[0].clone() })
 }
 
 /// Basic shell-like string splitting that respects quotes.
@@ -263,10 +309,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_watch_rejected() {
-        let result = parse_command("typst watch doc.typ");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not supported"));
+    fn test_parse_watch() {
+        let cmd = parse_command("typst watch doc.typ").unwrap();
+        match cmd {
+            TypstCommand::Watch { input, output } => {
+                assert_eq!(input, "doc.typ");
+                assert!(output.is_none());
+            }
+            _ => panic!("Expected Watch"),
+        }
     }
 
     #[test]
