@@ -1,2 +1,0 @@
-Testing timeout callback — round 2!
-This cannonball should explode after 5 seconds.

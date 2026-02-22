@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::Path;
 
-const TEMPLATES_DIR: &str = ".context-pilot/typst-templates";
+const TEMPLATES_DIR: &str = ".context-pilot/shared/typst-templates";
 
-/// Seed built-in templates to .context-pilot/typst-templates/ if they don't already exist.
+/// Seed built-in templates to .context-pilot/shared/typst-templates/ if they don't already exist.
 pub fn seed_templates() {
     let _ = fs::create_dir_all(TEMPLATES_DIR);
 

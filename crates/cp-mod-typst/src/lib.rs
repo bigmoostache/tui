@@ -12,8 +12,8 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 pub struct TypstModule;
 
-/// Templates live here — excluded from the auto-compile callback.
-pub const TEMPLATES_DIR: &str = ".context-pilot/typst-templates";
+/// Templates live here — in the shared (version-controlled) folder.
+pub const TEMPLATES_DIR: &str = ".context-pilot/shared/typst-templates";
 
 impl Module for TypstModule {
     fn id(&self) -> &'static str {
@@ -37,6 +37,7 @@ impl Module for TypstModule {
     }
 
     fn init_state(&self, state: &mut State) {
+        cp_base::shared::ensure_shared_dir();
         ensure_typst_callback(state);
         templates::seed_templates();
     }
@@ -46,7 +47,7 @@ impl Module for TypstModule {
     }
 
     fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
-        // Re-register callback on every load (in case it was deleted externally)
+        cp_base::shared::ensure_shared_dir();
         ensure_typst_callback(state);
         templates::seed_templates();
     }
@@ -110,7 +111,7 @@ fn ensure_typst_callback(state: &mut State) {
     let script = format!(
         r#"bash -c 'echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
   [ -z "$FILE" ] && continue
-  case "$FILE" in .context-pilot/typst-templates/*) continue;; esac
+  case "$FILE" in .context-pilot/shared/typst-templates/*) continue;; esac
   {} typst-compile "$FILE"
 done'"#,
         binary_path
