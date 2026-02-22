@@ -84,9 +84,10 @@ impl Module for TypstModule {
     }
 }
 
-/// Ensure the typst-compile callback exists in CallbackState.
-/// Single callback: *.typ (excluding templates dir). Uses $CP_CHANGED_FILES
-/// to compile each changed .typ → .pdf in the same directory.
+/// Ensure the typst callbacks exist in CallbackState.
+/// Two built-in callbacks:
+/// 1. typst-compile: *.typ (excluding templates dir) → compile .typ → .pdf in same directory
+/// 2. typst-template-recompile: .context-pilot/shared/typst-templates/*.typ → recompile dependents
 fn ensure_typst_callback(state: &mut State) {
     use cp_mod_callback::types::{CallbackDefinition, CallbackState};
 
@@ -94,16 +95,17 @@ fn ensure_typst_callback(state: &mut State) {
 
     let binary_path = std::env::current_exe().unwrap_or_default().to_string_lossy().to_string();
 
-    // Remove old callbacks from previous design (pdf/documents, pdf/templates patterns)
-    cs.definitions.retain(|d| d.name != "typst-compile" && d.name != "typst-compile-template");
+    // Remove old callbacks from previous design, then re-add fresh
+    cs.definitions.retain(|d| {
+        d.name != "typst-compile" && d.name != "typst-compile-template" && d.name != "typst-template-recompile"
+    });
     cs.active_set.retain(|id| cs.definitions.iter().any(|d| &d.id == id));
 
-    // Single callback: compile any *.typ → *.pdf (same dir)
-    // The script skips files under the templates dir.
-    let cb_id = format!("CB{}", cs.next_id);
+    // Callback 1: compile any *.typ → *.pdf (same dir), skip templates dir
+    let cb1_id = format!("CB{}", cs.next_id);
     cs.next_id += 1;
 
-    let script = format!(
+    let script1 = format!(
         r#"bash -c 'echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
   [ -z "$FILE" ] && continue
   case "$FILE" in .context-pilot/shared/typst-templates/*) continue;; esac
@@ -113,7 +115,7 @@ done'"#,
     );
 
     cs.definitions.push(CallbackDefinition {
-        id: cb_id.clone(),
+        id: cb1_id.clone(),
         name: "typst-compile".to_string(),
         description: "Auto-compile .typ → .pdf (same directory) on edit".to_string(),
         pattern: "*.typ".to_string(),
@@ -123,7 +125,28 @@ done'"#,
         cwd: None,
         one_at_a_time: false,
         built_in: true,
-        built_in_command: Some(script),
+        built_in_command: Some(script1),
     });
-    cs.active_set.insert(cb_id);
+    cs.active_set.insert(cb1_id);
+
+    // Callback 2: when templates change, recompile all .typ files that import them
+    let cb2_id = format!("CB{}", cs.next_id);
+    cs.next_id += 1;
+
+    let script2 = format!(r#"bash -c '{} typst-recompile-dependents $CP_CHANGED_FILES'"#, binary_path);
+
+    cs.definitions.push(CallbackDefinition {
+        id: cb2_id.clone(),
+        name: "typst-template-recompile".to_string(),
+        description: "Recompile .typ files that import changed templates".to_string(),
+        pattern: ".context-pilot/shared/typst-templates/*.typ".to_string(),
+        blocking: true,
+        timeout_secs: Some(60),
+        success_message: Some("✓ Dependents recompiled".to_string()),
+        cwd: None,
+        one_at_a_time: false,
+        built_in: true,
+        built_in_command: Some(script2),
+    });
+    cs.active_set.insert(cb2_id);
 }
