@@ -57,7 +57,7 @@ pub enum ContinuationAction {
 }
 
 /// Configuration for spine module (per-worker, persisted)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SpineConfig {
     /// Whether to continue until all todos are done
     #[serde(default)]
@@ -95,23 +95,6 @@ pub struct SpineConfig {
     /// Timestamp when autonomous operation started (for duration guard)
     #[serde(default)]
     pub autonomous_start_ms: Option<u64>,
-}
-
-impl Default for SpineConfig {
-    fn default() -> Self {
-        Self {
-            continue_until_todos_done: false,
-            max_output_tokens: None,
-            max_cost: None,
-            max_stream_cost: None,
-            max_duration_secs: None,
-            max_messages: None,
-            max_auto_retries: None,
-            user_stopped: false,
-            auto_continuation_count: 0,
-            autonomous_start_ms: None,
-        }
-    }
 }
 
 /// Module-owned state for the Spine module

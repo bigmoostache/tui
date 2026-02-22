@@ -175,10 +175,10 @@ fn lookup_typst_target_from_config(source_path: &str) -> Option<String> {
     let documents = root.get("modules")?.get("typst")?.get("documents")?.as_object()?;
 
     for (_name, doc) in documents {
-        if let Some(src) = doc.get("source").and_then(|v| v.as_str()) {
-            if src == source_path {
-                return doc.get("target").and_then(|v| v.as_str()).map(|s| s.to_string());
-            }
+        if let Some(src) = doc.get("source").and_then(|v| v.as_str())
+            && src == source_path
+        {
+            return doc.get("target").and_then(|v| v.as_str()).map(|s| s.to_string());
         }
     }
     None
@@ -197,10 +197,7 @@ fn run_typst_compile_template(args: &[String]) -> io::Result<()> {
     let template_path = &args[0];
 
     // Extract template name from path (e.g., ".context-pilot/pdf/templates/report.typ" → "report")
-    let template_name = std::path::Path::new(template_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let template_name = std::path::Path::new(template_path).file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
     if template_name.is_empty() {
         eprintln!("Could not extract template name from: {}", template_path);
@@ -224,7 +221,12 @@ fn run_typst_compile_template(args: &[String]) -> io::Result<()> {
         }
     };
 
-    let documents = match root.get("modules").and_then(|m| m.get("typst")).and_then(|t| t.get("documents")).and_then(|d| d.as_object()) {
+    let documents = match root
+        .get("modules")
+        .and_then(|m| m.get("typst"))
+        .and_then(|t| t.get("documents"))
+        .and_then(|d| d.as_object())
+    {
         Some(d) => d,
         None => {
             println!("No typst documents found in config.json");

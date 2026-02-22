@@ -54,10 +54,10 @@ impl Module for TypstModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = TypstState::get_mut(state);
-        if let Some(docs) = data.get("documents") {
-            if let Ok(d) = serde_json::from_value(docs.clone()) {
-                ts.documents = d;
-            }
+        if let Some(docs) = data.get("documents")
+            && let Ok(d) = serde_json::from_value(docs.clone())
+        {
+            ts.documents = d;
         }
         if let Some(v) = data.get("templates_seeded").and_then(|v| v.as_bool()) {
             ts.templates_seeded = v;

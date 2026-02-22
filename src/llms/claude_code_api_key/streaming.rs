@@ -193,10 +193,44 @@ pub(super) fn parse_sse_stream(
                     }
                 }
                 "message_stop" => break,
+                "error" => {
+                    // Log the raw SSE error event to disk for debugging.
+                    // Don't alter the return flow — caller still gets Ok(...)
+                    // so StreamEvent::Done fires as before, but now we have a trace.
+                    log_sse_error(json_str, total_bytes, line_count, &last_lines);
+                    break;
+                }
                 _ => {}
             }
         }
     }
 
     Ok((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason))
+}
+
+/// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.
+/// Appends to `sse_errors.log` so multiple occurrences are visible.
+fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
+    use std::io::Write;
+
+    let dir = std::path::Path::new(".context-pilot").join("errors");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("sse_errors.log");
+
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
+    let entry = format!(
+        "[{}] SSE error event (claude_code_api_key)\n\
+         Stream position: {} bytes, {} lines\n\
+         Error data: {}\n\
+         Last SSE lines:\n{}\n\
+         ---\n",
+        ts, total_bytes, line_count, json_str, recent
+    );
+
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(entry.as_bytes()));
 }

@@ -252,6 +252,10 @@ impl LlmClient for AnthropicClient {
                         }
                     }
                     "message_stop" => break,
+                    "error" => {
+                        log_sse_error(json_str, total_bytes, line_count, &last_lines);
+                        break;
+                    }
                     _ => {}
                 }
             }
@@ -508,4 +512,31 @@ fn messages_to_api(
     }
 
     api_messages
+}
+
+/// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.
+/// Appends to `sse_errors.log` so multiple occurrences are visible.
+fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
+    use std::io::Write;
+
+    let dir = std::path::Path::new(".context-pilot").join("errors");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("sse_errors.log");
+
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
+    let entry = format!(
+        "[{}] SSE error event (anthropic)\n\
+         Stream position: {} bytes, {} lines\n\
+         Error data: {}\n\
+         Last SSE lines:\n{}\n\
+         ---\n",
+        ts, total_bytes, line_count, json_str, recent
+    );
+
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(entry.as_bytes()));
 }

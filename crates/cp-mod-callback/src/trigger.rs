@@ -92,7 +92,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
     // Validate skip_callbacks names across all files
     let all_skip_names: Vec<&str> =
         changed_files.iter().flat_map(|f| f.skip_callbacks.iter().map(|s| s.as_str())).collect();
-    validate_skip_names(&cs, &all_skip_names, &mut warnings);
+    validate_skip_names(cs, &all_skip_names, &mut warnings);
 
     for def in &cs.definitions {
         // Only fire active callbacks

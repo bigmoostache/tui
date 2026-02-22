@@ -159,16 +159,16 @@ pub fn find_or_create_server() -> Result<(), String> {
 /// comparing against known session keys.
 pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
     let list = serde_json::json!({"cmd": "list"});
-    if let Ok(resp) = server_request(&list) {
-        if let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array()) {
-            for session in sessions {
-                if let Some(key) = session.get("key").and_then(|v| v.as_str()) {
-                    if !known_keys.contains(key) {
-                        // Orphan — remove it from server (kills process)
-                        let remove = serde_json::json!({"cmd": "remove", "key": key});
-                        let _ = server_request(&remove);
-                    }
-                }
+    if let Ok(resp) = server_request(&list)
+        && let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array())
+    {
+        for session in sessions {
+            if let Some(key) = session.get("key").and_then(|v| v.as_str())
+                && !known_keys.contains(key)
+            {
+                // Orphan — remove it from server (kills process)
+                let remove = serde_json::json!({"cmd": "remove", "key": key});
+                let _ = server_request(&remove);
             }
         }
     }

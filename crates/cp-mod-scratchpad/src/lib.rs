@@ -183,7 +183,7 @@ fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<ratatui::text
             Style::default().fg(info_color)
         } else if line.starts_with("Deleted") {
             Style::default().fg(error_color)
-        } else if line.starts_with("C") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+        } else if line.starts_with("C") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Cell IDs like C1, C2
             Style::default().fg(info_color)
         } else if line.contains(":") {

@@ -139,10 +139,11 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
         days += if is_leap_year(y) { 366 } else { 365 };
     }
     let month_days = [31, if is_leap_year(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for m in 0..(month - 1) as usize {
-        if m < 12 {
-            days += month_days[m] as i64;
+    for day_count in month_days.iter().take((month - 1) as usize) {
+        if month > 12 {
+            break;
         }
+        days += *day_count as i64;
     }
     days += day - 1;
 

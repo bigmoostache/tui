@@ -24,6 +24,12 @@ pub struct TypstState {
     pub templates_seeded: bool,
 }
 
+impl Default for TypstState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypstState {
     pub fn new() -> Self {
         Self { documents: HashMap::new(), templates_seeded: false }

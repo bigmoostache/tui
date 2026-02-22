@@ -197,10 +197,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!(
-                "Deleted document '{}'\n  Removed: {}\n  Removed: {}",
-                name, doc.source, doc.target
-            ),
+            content: format!("Deleted document '{}'\n  Removed: {}\n  Removed: {}", name, doc.source, doc.target),
             is_error: false,
             tool_name: tool.name.clone(),
         };
@@ -214,10 +211,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             None => {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!(
-                        "Error: document '{}' not found. Use pdf_create to create a new document.",
-                        name
-                    ),
+                    content: format!("Error: document '{}' not found. Use pdf_create to create a new document.", name),
                     is_error: true,
                     tool_name: tool.name.clone(),
                 };
@@ -285,10 +279,10 @@ fn list_templates() -> String {
     if let Ok(entries) = fs::read_dir(templates_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "typ") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    names.push(stem.to_string());
-                }
+            if path.extension().is_some_and(|e| e == "typ")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            {
+                names.push(stem.to_string());
             }
         }
     }

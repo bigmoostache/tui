@@ -87,18 +87,11 @@ impl Module for SpineModule {
         if let Some(coucous) = data.get("pending_coucous")
             && let Ok(coucou_list) = serde_json::from_value::<Vec<coucou::CoucouData>>(coucous.clone())
         {
-            let now = cp_base::panels::now_ms();
             let registry = cp_base::watchers::WatcherRegistry::get_mut(state);
             for cd in coucou_list {
-                // Only re-register if the coucou hasn't already expired
-                if cd.fire_at_ms > now {
-                    registry.register(Box::new(cd.into_watcher()));
-                }
-                // If it expired during reload, it will fire on next poll_all
-                // and create a notification — which is the desired behavior
-                else {
-                    registry.register(Box::new(cd.into_watcher()));
-                }
+                // Register all coucous — expired ones will fire on next poll_all
+                // and create a notification, which is the desired behavior
+                registry.register(Box::new(cd.into_watcher()));
             }
         }
     }
@@ -254,7 +247,7 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<ratatui::text::Lin
         } else if line.contains("=") || line.contains(":") {
             // Config key-value pairs
             Style::default().fg(info_color)
-        } else if line.starts_with("N") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+        } else if line.starts_with("N") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Notification IDs like N1, N2
             Style::default().fg(warning_color)
         } else {

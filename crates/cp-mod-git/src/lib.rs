@@ -50,67 +50,67 @@ pub fn refresh_git_status(state: &mut State) {
     let mut file_changes: Vec<GitFileChange> = Vec::new();
 
     // Tracked changes (diff against HEAD or base)
-    if let Ok(output) = Command::new("git").args(&diff_args).output() {
-        if output.status.success() {
-            for line in String::from_utf8_lossy(&output.stdout).lines() {
-                let parts: Vec<&str> = line.split('\t').collect();
-                if parts.len() >= 3 {
-                    let additions = parts[0].parse::<i32>().unwrap_or(0);
-                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
-                    let path = parts[2].to_string();
+    if let Ok(output) = Command::new("git").args(&diff_args).output()
+        && output.status.success()
+    {
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 3 {
+                let additions = parts[0].parse::<i32>().unwrap_or(0);
+                let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                let path = parts[2].to_string();
 
-                    // Check if file exists to determine if deleted
-                    let change_type = if !std::path::Path::new(&path).exists() {
-                        GitChangeType::Deleted
-                    } else {
-                        GitChangeType::Modified
-                    };
+                // Check if file exists to determine if deleted
+                let change_type = if !std::path::Path::new(&path).exists() {
+                    GitChangeType::Deleted
+                } else {
+                    GitChangeType::Modified
+                };
 
-                    file_changes.push(GitFileChange { path, additions, deletions, change_type });
-                }
+                file_changes.push(GitFileChange { path, additions, deletions, change_type });
             }
         }
     }
 
     // Staged changes (diff --cached)
-    if let Ok(output) = Command::new("git").args(["diff", "--numstat", "--cached"]).output() {
-        if output.status.success() {
-            for line in String::from_utf8_lossy(&output.stdout).lines() {
-                let parts: Vec<&str> = line.split('\t').collect();
-                if parts.len() >= 3 {
-                    let additions = parts[0].parse::<i32>().unwrap_or(0);
-                    let deletions = parts[1].parse::<i32>().unwrap_or(0);
-                    let path = parts[2].to_string();
+    if let Ok(output) = Command::new("git").args(["diff", "--numstat", "--cached"]).output()
+        && output.status.success()
+    {
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 3 {
+                let additions = parts[0].parse::<i32>().unwrap_or(0);
+                let deletions = parts[1].parse::<i32>().unwrap_or(0);
+                let path = parts[2].to_string();
 
-                    // Skip if already in the list
-                    if file_changes.iter().any(|f| f.path == path) {
-                        continue;
-                    }
-
-                    file_changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
+                // Skip if already in the list
+                if file_changes.iter().any(|f| f.path == path) {
+                    continue;
                 }
+
+                file_changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
             }
         }
     }
 
     // Untracked files
-    if let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output() {
-        if output.status.success() {
-            for line in String::from_utf8_lossy(&output.stdout).lines() {
-                let path = line.trim().to_string();
-                if path.is_empty() {
-                    continue;
-                }
-                // Count lines for untracked files
-                let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count() as i32).unwrap_or(0);
-
-                file_changes.push(GitFileChange {
-                    path,
-                    additions: line_count,
-                    deletions: 0,
-                    change_type: GitChangeType::Untracked,
-                });
+    if let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output()
+        && output.status.success()
+    {
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let path = line.trim().to_string();
+            if path.is_empty() {
+                continue;
             }
+            // Count lines for untracked files
+            let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count() as i32).unwrap_or(0);
+
+            file_changes.push(GitFileChange {
+                path,
+                additions: line_count,
+                deletions: 0,
+                change_type: GitChangeType::Untracked,
+            });
         }
     }
 

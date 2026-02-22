@@ -179,7 +179,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             .messages
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| estimate_message_tokens(m))
+            .map(estimate_message_tokens)
             .sum();
 
         // 2. Quick check: if we can't possibly satisfy both chunk minimums
@@ -226,7 +226,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
         let remaining_tokens: usize = state.messages[boundary..]
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| estimate_message_tokens(m))
+            .map(estimate_message_tokens)
             .sum();
 
         if remaining_active < DETACH_KEEP_MIN_MESSAGES || remaining_tokens < DETACH_KEEP_MIN_TOKENS {

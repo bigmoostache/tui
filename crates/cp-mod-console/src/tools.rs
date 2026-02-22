@@ -29,7 +29,7 @@ const BASH_MAX_EXECUTION_SECS: u64 = 10;
 /// Returns Some(error_message) if blocked, None if allowed.
 fn check_git_gh_guardrail(input: &str) -> Option<String> {
     // Split on shell operators to handle chained commands
-    let segments: Vec<&str> = input.split(|c| c == '|' || c == ';' || c == '&' || c == '\n').collect();
+    let segments: Vec<&str> = input.split(['|', ';', '&', '\n']).collect();
 
     for segment in &segments {
         let trimmed = segment.trim();
@@ -38,8 +38,7 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
             continue;
         }
         // Strip leading env vars (KEY=VAL) to find the actual command
-        let cmd_part =
-            trimmed.split_whitespace().skip_while(|w| w.contains('=') && !w.starts_with('=')).next().unwrap_or("");
+        let cmd_part = trimmed.split_whitespace().find(|w| !w.contains('=') || w.starts_with('=')).unwrap_or("");
 
         // Check the actual binary name (could be a path like /usr/bin/git)
         let binary = cmd_part.rsplit('/').next().unwrap_or(cmd_part);

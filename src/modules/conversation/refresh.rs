@@ -30,7 +30,7 @@ pub fn refresh_conversation_context(state: &mut State) {
         .messages
         .iter()
         .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-        .map(|m| estimate_message_tokens(m))
+        .map(estimate_message_tokens)
         .sum();
 
     // Update the Conversation context element's token count

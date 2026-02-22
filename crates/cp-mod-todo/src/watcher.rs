@@ -20,6 +20,12 @@ pub struct TodoWatcher {
     pub desc: String,
 }
 
+impl Default for TodoWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TodoWatcher {
     pub fn new() -> Self {
         let now = now_ms();

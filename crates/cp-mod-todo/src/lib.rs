@@ -217,7 +217,7 @@ fn visualize_todo_output(content: &str, width: usize) -> Vec<ratatui::text::Line
             Style::default().fg(error_color)
         } else if line.contains("Updated") {
             Style::default().fg(success_color)
-        } else if line.starts_with("X") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+        } else if line.starts_with("X") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Todo IDs like X1, X2
             Style::default().fg(info_color)
         } else if line.contains("→") {

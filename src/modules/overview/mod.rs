@@ -320,7 +320,7 @@ fn visualize_core_output(content: &str, width: usize) -> Vec<ratatui::text::Line
             Style::default().fg(warning_color)
         } else if line.contains("Reloading") || line.contains("TUI") {
             Style::default().fg(info_color)
-        } else if line.starts_with("P") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+        } else if line.starts_with("P") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Panel IDs like P1, P2
             Style::default().fg(info_color)
         } else {

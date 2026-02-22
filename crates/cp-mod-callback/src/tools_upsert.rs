@@ -270,7 +270,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if !current_script.contains(old_str) {
             return ToolResult::new(
                 tool.id.clone(),
-                format!("old_string not found in script file. Use Callback_open_editor to view current content."),
+                "old_string not found in script file. Use Callback_open_editor to view current content.".to_string(),
                 true,
             );
         }
@@ -283,13 +283,13 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Handle name rename (move script file)
-    if let Some(new_name) = tool.input.get("name").and_then(|v| v.as_str()) {
-        if new_name != vessel_name {
-            let old_path = scripts_dir.join(format!("{}.sh", vessel_name));
-            let new_path = scripts_dir.join(format!("{}.sh", new_name));
-            if old_path.exists() {
-                let _ = fs::rename(&old_path, &new_path);
-            }
+    if let Some(new_name) = tool.input.get("name").and_then(|v| v.as_str())
+        && new_name != vessel_name
+    {
+        let old_path = scripts_dir.join(format!("{}.sh", vessel_name));
+        let new_path = scripts_dir.join(format!("{}.sh", new_name));
+        if old_path.exists() {
+            let _ = fs::rename(&old_path, &new_path);
         }
     }
 

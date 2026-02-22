@@ -29,7 +29,8 @@ pub fn compile_to_pdf(source_path: &str) -> Result<Vec<u8>, String> {
     // not just the document's directory. Walk up to find .context-pilot/
     let project_root = find_project_root(&abs_path).unwrap_or_else(|| root.clone());
 
-    let rel_path = abs_path.strip_prefix(&project_root).map_err(|_| format!("Source path not under project root"))?;
+    let rel_path =
+        abs_path.strip_prefix(&project_root).map_err(|_| "Source path not under project root".to_string())?;
 
     let main_id = FileId::new(None, VirtualPath::new(rel_path));
     let world = ContextPilotWorld::new(project_root, main_id)?;
@@ -230,14 +231,14 @@ fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
         let path = entry.path();
         if path.is_dir() {
             load_fonts_from_dir(&path, book, fonts);
-        } else if is_font_file(&path) {
-            if let Ok(data) = fs::read(&path) {
-                let bytes = Bytes::new(data);
-                for (i, info) in FontInfo::iter(&bytes).enumerate() {
-                    book.push(info);
-                    if let Some(font) = Font::new(bytes.clone(), i as u32) {
-                        fonts.push(font);
-                    }
+        } else if is_font_file(&path)
+            && let Ok(data) = fs::read(&path)
+        {
+            let bytes = Bytes::new(data);
+            for (i, info) in FontInfo::iter(&bytes).enumerate() {
+                book.push(info);
+                if let Some(font) = Font::new(bytes.clone(), i as u32) {
+                    fonts.push(font);
                 }
             }
         }

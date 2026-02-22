@@ -216,7 +216,7 @@ fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Li
             Style::default().fg(medium_color)
         } else if line.contains("low") {
             Style::default().fg(low_color)
-        } else if line.starts_with("M") && line.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
+        } else if line.starts_with("M") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Memory IDs like M1, M2
             Style::default().fg(low_color)
         } else {

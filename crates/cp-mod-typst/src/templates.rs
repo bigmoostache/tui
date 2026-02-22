@@ -18,6 +18,7 @@ pub fn seed_templates() {
 }
 
 /// List available template names from the templates directory.
+#[allow(dead_code)]
 pub fn list_template_names() -> Vec<String> {
     let templates_dir = Path::new(TEMPLATES_DIR);
     if !templates_dir.exists() {
@@ -27,10 +28,10 @@ pub fn list_template_names() -> Vec<String> {
     if let Ok(entries) = fs::read_dir(templates_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "typ") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    names.push(stem.to_string());
-                }
+            if path.extension().is_some_and(|e| e == "typ")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            {
+                names.push(stem.to_string());
             }
         }
     }

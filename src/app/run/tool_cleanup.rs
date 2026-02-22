@@ -62,15 +62,15 @@ impl App {
                     result.description.push_str(&format!("\nSee panel {} for full output.", panel_id));
                 }
                 // Auto-close panels for watchers that request it
-                if result.close_panel {
-                    if let Some(ref panel_id) = result.panel_id {
-                        if let Some(ctx) = self.state.context.iter().find(|c| c.id == *panel_id) {
-                            if let Some(name) = ctx.get_meta::<String>("console_name") {
-                                cp_mod_console::types::ConsoleState::kill_session(&mut self.state, &name);
-                            }
-                        }
-                        self.state.context.retain(|c| c.id != *panel_id);
+                if result.close_panel
+                    && let Some(ref panel_id) = result.panel_id
+                {
+                    if let Some(ctx) = self.state.context.iter().find(|c| c.id == *panel_id)
+                        && let Some(name) = ctx.get_meta::<String>("console_name")
+                    {
+                        cp_mod_console::types::ConsoleState::kill_session(&mut self.state, &name);
                     }
+                    self.state.context.retain(|c| c.id != *panel_id);
                 }
             }
 
@@ -282,13 +282,7 @@ impl App {
             .iter()
             .map(|r| {
                 // Strip any callback blocking sentinel prefix from content
-                let content = if r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
-                    interrupted_msg.to_string()
-                } else if r.content == "__QUESTION_PENDING__" {
-                    interrupted_msg.to_string()
-                } else {
-                    interrupted_msg.to_string()
-                };
+                let content = interrupted_msg.to_string();
                 ToolResultRecord {
                     tool_use_id: r.tool_use_id.clone(),
                     content,

@@ -248,8 +248,7 @@ fn style_callback_line(
     }
 
     // "· name passed ..." or "· name FAILED ..." or "· name running"
-    if trimmed.starts_with("· ") {
-        let rest = &trimmed[3..]; // skip "· " (middle dot 2 bytes + space 1 byte = 3 bytes)
+    if let Some(rest) = trimmed.strip_prefix("· ") {
         let mut spans = Vec::new();
         spans.push(Span::styled("· ", Style::default().fg(dim)));
 
