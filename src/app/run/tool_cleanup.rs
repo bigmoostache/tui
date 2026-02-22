@@ -95,6 +95,21 @@ impl App {
             return;
         }
 
+        // Accumulate partial blocking results into App-level storage.
+        // Multiple blocking callbacks share one sentinel_id but complete at different times.
+        // We must wait for ALL of them before resuming the pipeline.
+        self.accumulated_blocking_results.extend(blocking_results);
+
+        // Check if there are STILL blocking watchers pending in the registry.
+        // If so, don't resume yet — more results are coming.
+        let registry = WatcherRegistry::get(&self.state);
+        if registry.has_blocking_watchers() {
+            return;
+        }
+
+        // All blocking watchers done — merge accumulated results and resume pipeline.
+        let blocking_results = std::mem::take(&mut self.accumulated_blocking_results);
+
         let mut tool_results = self.pending_console_wait_tool_results.take().unwrap();
 
         // Replace sentinels with real results
@@ -117,11 +132,18 @@ impl App {
                 if let Some(result) = matched_result {
                     let sentinel_id = result.tool_use_id.as_ref().unwrap();
                     let original_content = &after_sentinel[sentinel_id.len()..];
+                    // Collect ALL blocking results for this sentinel (multiple callbacks)
+                    let all_matched: Vec<&str> = blocking_results
+                        .iter()
+                        .filter(|r| r.tool_use_id.as_deref() == Some(sentinel_id.as_str()))
+                        .map(|r| r.description.as_str())
+                        .collect();
+                    let merged_descriptions = all_matched.join("\n");
                     // Append to existing Callbacks block if present, else create new one
                     if original_content.contains("\nCallbacks:\n") {
-                        tr.content = format!("{}\n{}", original_content, result.description,);
+                        tr.content = format!("{}\n{}", original_content, merged_descriptions);
                     } else {
-                        tr.content = format!("{}\nCallbacks:\n{}", original_content, result.description,);
+                        tr.content = format!("{}\nCallbacks:\n{}", original_content, merged_descriptions);
                     }
                 }
             }
@@ -267,6 +289,9 @@ impl App {
 
         // Also clean up the question form state if it was pending
         self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>());
+
+        // Clear any accumulated blocking results from partial callback completions
+        self.accumulated_blocking_results.clear();
 
         if all_pending.is_empty() {
             return;

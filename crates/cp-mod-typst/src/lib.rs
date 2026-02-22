@@ -37,7 +37,7 @@ impl Module for TypstModule {
     }
 
     fn init_state(&self, state: &mut State) {
-        cp_base::shared::ensure_shared_dir();
+        cp_base::config::constants::ensure_shared_dir();
         ensure_typst_callback(state);
         templates::seed_templates();
     }
@@ -47,7 +47,7 @@ impl Module for TypstModule {
     }
 
     fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
-        cp_base::shared::ensure_shared_dir();
+        cp_base::config::constants::ensure_shared_dir();
         ensure_typst_callback(state);
         templates::seed_templates();
     }
@@ -92,15 +92,10 @@ fn ensure_typst_callback(state: &mut State) {
 
     let cs = CallbackState::get_mut(state);
 
-    let binary_path = std::env::current_exe()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
+    let binary_path = std::env::current_exe().unwrap_or_default().to_string_lossy().to_string();
 
     // Remove old callbacks from previous design (pdf/documents, pdf/templates patterns)
-    cs.definitions.retain(|d| {
-        d.name != "typst-compile" && d.name != "typst-compile-template"
-    });
+    cs.definitions.retain(|d| d.name != "typst-compile" && d.name != "typst-compile-template");
     cs.active_set.retain(|id| cs.definitions.iter().any(|d| &d.id == id));
 
     // Single callback: compile any *.typ → *.pdf (same dir)

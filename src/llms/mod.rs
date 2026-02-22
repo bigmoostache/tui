@@ -279,6 +279,38 @@ pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMes
         .collect()
 }
 
+/// Log an SSE error event to `.context-pilot/errors/sse_errors.log` for post-mortem debugging.
+pub(crate) fn log_sse_error(
+    provider: &str,
+    json_str: &str,
+    total_bytes: usize,
+    line_count: usize,
+    last_lines: &[String],
+) {
+    use std::io::Write;
+
+    let dir = std::path::Path::new(".context-pilot").join("errors");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("sse_errors.log");
+
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
+    let entry = format!(
+        "[{}] SSE error event ({})\n\
+         Stream position: {} bytes, {} lines\n\
+         Error data: {}\n\
+         Last SSE lines:\n{}\n\
+         ---\n",
+        ts, provider, total_bytes, line_count, json_str, recent
+    );
+
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(entry.as_bytes()));
+}
+
 pub mod error {
     use std::fmt;
 

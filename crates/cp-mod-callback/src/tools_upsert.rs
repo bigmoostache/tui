@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use globset::Glob;
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::constants::STORE_DIR;
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 

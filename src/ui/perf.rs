@@ -8,12 +8,11 @@ use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
-/// Number of recent samples to keep for trend analysis
+/// Number of recent samples for trend analysis / ring buffer size
 const SAMPLE_RING_SIZE: usize = 64;
 
 /// Frame budget for 60fps (milliseconds)
 pub const FRAME_BUDGET_60FPS: f64 = 16.67;
-
 /// Frame budget for 30fps (milliseconds)
 pub const FRAME_BUDGET_30FPS: f64 = 33.33;
 
@@ -362,12 +361,10 @@ pub(super) fn render_perf_overlay(frame: &mut Frame, area: Rect) {
     // Budget bars
     lines.push(render_budget_bar(snapshot.frame_avg_ms, "60fps", FRAME_BUDGET_60FPS));
     lines.push(render_budget_bar(snapshot.frame_avg_ms, "30fps", FRAME_BUDGET_30FPS));
-
     // Sparkline
     lines.push(Line::from(""));
     lines.push(render_sparkline(&snapshot.frame_times_ms));
     lines.push(Line::from(""));
-
     // Operation table using render_table
     let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
 
@@ -386,7 +383,8 @@ pub(super) fn render_perf_overlay(frame: &mut Frame, area: Rect) {
             let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
             let is_hotspot = pct > 30.0;
 
-            let name = truncate_op_name(op.name, 24);
+            let name =
+                if op.name.len() <= 24 { op.name.to_string() } else { format!("..{}", &op.name[op.name.len() - 22..]) };
             let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
 
             let name_style = if is_hotspot {
@@ -499,8 +497,4 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
         Span::styled(" Recent: ", Style::default().fg(theme::text_muted())),
         Span::styled(sparkline, Style::default().fg(theme::accent())),
     ])
-}
-
-fn truncate_op_name(name: &str, max_len: usize) -> String {
-    if name.len() <= max_len { name.to_string() } else { format!("..{}", &name[name.len() - max_len + 2..]) }
 }

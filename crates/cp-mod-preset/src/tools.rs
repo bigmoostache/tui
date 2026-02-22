@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::constants::STORE_DIR;
 
 use crate::PRESETS_DIR;
 use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};

@@ -65,6 +65,8 @@ pub struct App {
     pending_question_tool_results: Option<Vec<ToolResult>>,
     /// Pending tool results when a console blocking wait is active
     pending_console_wait_tool_results: Option<Vec<ToolResult>>,
+    /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete
+    accumulated_blocking_results: Vec<cp_base::watchers::WatcherResult>,
 }
 
 impl App {
@@ -98,6 +100,7 @@ impl App {
             last_poll_ms: std::collections::HashMap::new(),
             pending_question_tool_results: None,
             pending_console_wait_tool_results: None,
+            accumulated_blocking_results: Vec::new(),
         }
     }
 

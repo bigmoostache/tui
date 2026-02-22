@@ -163,13 +163,15 @@ fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
 // Global Configuration (Lazy Static — embedded at compile time)
 // ============================================================================
 
+pub mod constants;
+
 pub static PROMPTS: LazyLock<PromptsConfig> =
-    LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../../../yamls/prompts.yaml")));
+    LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../../../../yamls/prompts.yaml")));
 pub static LIBRARY: LazyLock<LibraryConfig> =
-    LazyLock::new(|| parse_yaml("library.yaml", include_str!("../../../yamls/library.yaml")));
-pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../../../yamls/ui.yaml")));
+    LazyLock::new(|| parse_yaml("library.yaml", include_str!("../../../../yamls/library.yaml")));
+pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../../../../yamls/ui.yaml")));
 pub static THEMES: LazyLock<ThemesConfig> =
-    LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../../../yamls/themes.yaml")));
+    LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../../../../yamls/themes.yaml")));
 
 /// Get a theme by ID, falling back to default if not found
 pub fn get_theme(theme_id: &str) -> &'static Theme {

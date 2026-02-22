@@ -355,12 +355,7 @@ impl ClaudeCodeClient {
                     line_count += 1;
                 }
                 Err(e) => {
-                    // Walk the error source chain to find the real cause.
-                    // reqwest wraps errors: io::Error(Other) → "error decoding response body" → real cause
-                    // Known causes:
-                    //   TimedOut → model took too long generating output (fix: Client::builder().timeout(None))
-                    //   ConnectionReset → server killed the connection
-                    //   UnexpectedEof → chunked transfer ended prematurely
+                    // Walk error source chain. Known causes: TimedOut, ConnectionReset, UnexpectedEof
                     let error_kind = format!("{:?}", e.kind());
                     let mut root_cause = String::new();
                     let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
@@ -480,7 +475,7 @@ impl ClaudeCodeClient {
                     }
                     "message_stop" => break,
                     "error" => {
-                        log_sse_error(json_str, total_bytes, line_count, &last_lines);
+                        crate::llms::log_sse_error("claude_code", json_str, total_bytes, line_count, &last_lines);
                         break;
                     }
                     _ => {}
@@ -497,31 +492,4 @@ impl ClaudeCodeClient {
         });
         Ok(())
     }
-}
-
-/// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.
-/// Appends to `sse_errors.log` so multiple occurrences are visible.
-fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
-    use std::io::Write;
-
-    let dir = std::path::Path::new(".context-pilot").join("errors");
-    let _ = std::fs::create_dir_all(&dir);
-    let path = dir.join("sse_errors.log");
-
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
-    let entry = format!(
-        "[{}] SSE error event (claude_code)\n\
-         Stream position: {} bytes, {} lines\n\
-         Error data: {}\n\
-         Last SSE lines:\n{}\n\
-         ---\n",
-        ts, total_bytes, line_count, json_str, recent
-    );
-
-    let _ = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .and_then(|mut f| f.write_all(entry.as_bytes()));
 }

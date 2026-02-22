@@ -122,7 +122,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
-    use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
+    use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     if total_pages <= 1 {
         return full_content.to_string();

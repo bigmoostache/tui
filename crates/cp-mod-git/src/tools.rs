@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use super::GIT_CMD_TIMEOUT_SECS;
-use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};

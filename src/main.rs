@@ -123,19 +123,10 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
     let source_path = &args[0];
 
     // Output: same directory, same name, .pdf extension
-    let stem = std::path::Path::new(source_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("output");
-    let parent = std::path::Path::new(source_path)
-        .parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let out = if parent.is_empty() {
-        format!("{}.pdf", stem)
-    } else {
-        format!("{}/{}.pdf", parent, stem)
-    };
+    let stem = std::path::Path::new(source_path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
+    let parent =
+        std::path::Path::new(source_path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let out = if parent.is_empty() { format!("{}.pdf", stem) } else { format!("{}/{}.pdf", parent, stem) };
 
     match cp_mod_typst::compiler::compile_and_write(source_path, &out) {
         Ok(msg) => {
@@ -148,4 +139,3 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
         }
     }
 }
-

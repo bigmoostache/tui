@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use cp_base::constants::STORE_DIR;
+use cp_base::config::constants::STORE_DIR;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};

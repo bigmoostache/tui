@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
+use cp_base::config::constants::STORE_DIR;
 use cp_base::config::theme;
-use cp_base::constants::STORE_DIR;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, render_table};
