@@ -106,11 +106,13 @@ fn ensure_typst_callback(state: &mut State) {
     cs.next_id += 1;
 
     let script1 = format!(
-        r#"bash -c 'echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
+        r#"bash -c 'COMPILED=0; echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
   [ -z "$FILE" ] && continue
   case "$FILE" in .context-pilot/shared/typst-templates/*) continue;; esac
   {} typst-compile "$FILE"
-done'"#,
+  COMPILED=$((COMPILED+1))
+done
+if [ "$COMPILED" = 0 ]; then echo "(skipped — template files only)"; fi'"#,
         binary_path
     );
 
@@ -121,7 +123,7 @@ done'"#,
         pattern: "*.typ".to_string(),
         blocking: true,
         timeout_secs: Some(30),
-        success_message: Some("✓ PDF compiled".to_string()),
+        success_message: None,
         cwd: None,
         one_at_a_time: false,
         built_in: true,
