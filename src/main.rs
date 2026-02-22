@@ -27,13 +27,9 @@ fn main() -> io::Result<()> {
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
     // Handle typst-compile subcommand (used by callback script)
+    // Compiles .typ → .pdf in the same directory.
     if args.len() >= 2 && args[1] == "typst-compile" {
         return run_typst_compile(&args[2..]);
-    }
-
-    // Handle typst-compile-template subcommand (recompile all docs using a template)
-    if args.len() >= 2 && args[1] == "typst-compile-template" {
-        return run_typst_compile_template(&args[2..]);
     }
 
     // Panic hook: restore terminal state and log the panic to disk.
@@ -115,44 +111,31 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-/// Run the typst-compile subcommand: compile a .typ file to PDF.
-/// Used by the typst-compile callback.
-/// Usage: cpilot typst-compile <source.typ> [--output <out.pdf>] [--target <target.pdf>]
-///
-/// If --target is not provided, looks up the target in config.json under modules.typst.documents.
+/// Run the typst-compile subcommand: compile a .typ file to PDF in the same directory.
+/// Used by the typst-compile callback via $CP_CHANGED_FILES.
+/// Usage: cpilot typst-compile <source.typ>
 fn run_typst_compile(args: &[String]) -> io::Result<()> {
     if args.is_empty() {
-        eprintln!("Usage: cpilot typst-compile <source.typ> [--output <out.pdf>]");
+        eprintln!("Usage: cpilot typst-compile <source.typ>");
         std::process::exit(1);
     }
 
     let source_path = &args[0];
-    let mut output_path: Option<String> = None;
 
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--output" if i + 1 < args.len() => {
-                output_path = Some(args[i + 1].clone());
-                i += 2;
-            }
-            _ => {
-                eprintln!("Unknown argument: {}", args[i]);
-                std::process::exit(1);
-            }
-        }
-    }
-
-    // Determine output: explicit --output > target from config.json > default
-    let out = output_path.unwrap_or_else(|| {
-        // Try to find target from config.json
-        if let Some(target) = lookup_typst_target_from_config(source_path) {
-            return target;
-        }
-        // Fallback: same directory as source, with .pdf extension
-        let stem = std::path::Path::new(source_path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
+    // Output: same directory, same name, .pdf extension
+    let stem = std::path::Path::new(source_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let parent = std::path::Path::new(source_path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let out = if parent.is_empty() {
         format!("{}.pdf", stem)
-    });
+    } else {
+        format!("{}/{}.pdf", parent, stem)
+    };
 
     match cp_mod_typst::compiler::compile_and_write(source_path, &out) {
         Ok(msg) => {
@@ -166,118 +149,3 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
     }
 }
 
-/// Look up the target PDF path for a source .typ file from config.json.
-/// Reads .context-pilot/config.json → modules.typst.documents → find matching source → return target.
-fn lookup_typst_target_from_config(source_path: &str) -> Option<String> {
-    let config_path = std::path::Path::new(".context-pilot/config.json");
-    let content = std::fs::read_to_string(config_path).ok()?;
-    let root: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let documents = root.get("modules")?.get("typst")?.get("documents")?.as_object()?;
-
-    for (_name, doc) in documents {
-        if let Some(src) = doc.get("source").and_then(|v| v.as_str())
-            && src == source_path
-        {
-            return doc.get("target").and_then(|v| v.as_str()).map(|s| s.to_string());
-        }
-    }
-    None
-}
-
-/// Run the typst-compile-template subcommand: recompile all documents that use a given template.
-/// Usage: cpilot typst-compile-template <template.typ>
-///
-/// Reads config.json → modules.typst.documents, finds all docs with matching template, compiles each.
-fn run_typst_compile_template(args: &[String]) -> io::Result<()> {
-    if args.is_empty() {
-        eprintln!("Usage: cpilot typst-compile-template <template.typ>");
-        std::process::exit(1);
-    }
-
-    let template_path = &args[0];
-
-    // Extract template name from path (e.g., ".context-pilot/pdf/templates/report.typ" → "report")
-    let template_name = std::path::Path::new(template_path).file_stem().and_then(|s| s.to_str()).unwrap_or("");
-
-    if template_name.is_empty() {
-        eprintln!("Could not extract template name from: {}", template_path);
-        std::process::exit(1);
-    }
-
-    // Read config.json to find documents using this template
-    let config_path = std::path::Path::new(".context-pilot/config.json");
-    let content = match std::fs::read_to_string(config_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Cannot read config.json: {}", e);
-            std::process::exit(1);
-        }
-    };
-    let root: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("Cannot parse config.json: {}", e);
-            std::process::exit(1);
-        }
-    };
-
-    let documents = match root
-        .get("modules")
-        .and_then(|m| m.get("typst"))
-        .and_then(|t| t.get("documents"))
-        .and_then(|d| d.as_object())
-    {
-        Some(d) => d,
-        None => {
-            println!("No typst documents found in config.json");
-            return Ok(());
-        }
-    };
-
-    let mut compiled = 0;
-    let mut errors = 0;
-
-    for (_name, doc) in documents {
-        let doc_template = doc.get("template").and_then(|v| v.as_str()).unwrap_or("");
-        if doc_template != template_name {
-            continue;
-        }
-
-        let source = match doc.get("source").and_then(|v| v.as_str()) {
-            Some(s) => s,
-            None => continue,
-        };
-        let target = doc.get("target").and_then(|v| v.as_str());
-
-        // Write directly to target path (no intermediate output dir)
-        let output = match target {
-            Some(t) => t.to_string(),
-            None => {
-                let stem = std::path::Path::new(source).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
-                format!("{}.pdf", stem)
-            }
-        };
-
-        match cp_mod_typst::compiler::compile_and_write(source, &output) {
-            Ok(msg) => {
-                println!("{}", msg);
-                compiled += 1;
-            }
-            Err(err) => {
-                eprintln!("Error compiling {}: {}", source, err);
-                errors += 1;
-            }
-        }
-    }
-
-    if errors > 0 {
-        eprintln!("Template '{}': {} compiled, {} failed", template_name, compiled, errors);
-        std::process::exit(1);
-    } else if compiled == 0 {
-        println!("No documents use template '{}'", template_name);
-    } else {
-        println!("Template '{}': {} document(s) recompiled", template_name, compiled);
-    }
-
-    Ok(())
-}

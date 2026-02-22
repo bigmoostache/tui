@@ -1,12 +1,8 @@
 pub mod cli_parser;
 pub mod compiler;
 pub mod packages;
-mod templates;
-mod tools;
+pub mod templates;
 mod tools_execute;
-pub mod types;
-
-use serde_json::json;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
@@ -14,9 +10,10 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::types::TypstState;
-
 pub struct TypstModule;
+
+/// Templates live here — excluded from the auto-compile callback.
+pub const TEMPLATES_DIR: &str = ".context-pilot/typst-templates";
 
 impl Module for TypstModule {
     fn id(&self) -> &'static str {
@@ -32,120 +29,105 @@ impl Module for TypstModule {
     }
 
     fn dependencies(&self) -> &[&'static str] {
-        &["core", "callback", "tree"]
+        &["core", "callback"]
     }
 
     fn is_global(&self) -> bool {
-        true // Documents config is shared across workers
+        true
     }
 
     fn init_state(&self, state: &mut State) {
-        state.set_ext(TypstState::new());
+        ensure_typst_callback(state);
+        templates::seed_templates();
     }
 
-    fn reset_state(&self, state: &mut State) {
-        state.set_ext(TypstState::new());
+    fn reset_state(&self, _state: &mut State) {
+        // No state to reset — stateless module
     }
 
-    fn save_module_data(&self, state: &State) -> serde_json::Value {
-        let ts = TypstState::get(state);
-        json!({
-            "documents": ts.documents,
-            "templates_seeded": ts.templates_seeded,
-        })
-    }
-
-    fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        let ts = TypstState::get_mut(state);
-        if let Some(docs) = data.get("documents")
-            && let Ok(d) = serde_json::from_value(docs.clone())
-        {
-            ts.documents = d;
-        }
-        if let Some(v) = data.get("templates_seeded").and_then(|v| v.as_bool()) {
-            ts.templates_seeded = v;
-        }
-        // Always ensure the typst-compile callback is registered at startup.
-        // Don't trust a boolean flag — verify the callback actually exists in CallbackState.
-        tools::ensure_typst_callback(state);
+    fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
+        // Re-register callback on every load (in case it was deleted externally)
+        ensure_typst_callback(state);
+        templates::seed_templates();
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        vec![
-            ToolDefinition {
-                id: "pdf_create".to_string(),
-                name: "Create PDF Document".to_string(),
-                short_desc: "Create a new Typst document".to_string(),
-                description: "Creates a new .typ document in .context-pilot/pdf/documents/, registers it with a target PDF path, and opens the file for editing. Use the standard Edit tool to write content afterward.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String)
-                        .desc("Document name (used as filename and identifier)")
-                        .required(),
-                    ToolParam::new("target", ParamType::String)
-                        .desc("Target path for the compiled PDF (e.g., './reports/q1.pdf')")
-                        .required(),
-                    ToolParam::new("template", ParamType::String)
-                        .desc("Template name to base the document on (e.g., 'report', 'invoice', 'letter')"),
-                ],
-                enabled: true,
-                category: "PDF".to_string(),
-            },
-            ToolDefinition {
-                id: "pdf_edit".to_string(),
-                name: "Edit PDF Metadata".to_string(),
-                short_desc: "Update or delete PDF document config".to_string(),
-                description: "Updates document metadata (target path) or deletes a document (source, output, target, and config). Does NOT edit .typ content — use the standard Edit tool for that.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String)
-                        .desc("Document name")
-                        .required(),
-                    ToolParam::new("target", ParamType::String)
-                        .desc("New target path for the compiled PDF"),
-                    ToolParam::new("delete", ParamType::Boolean)
-                        .desc("Set true to delete this document (removes source, output, target PDF, and config entry)"),
-                ],
-                enabled: true,
-                category: "PDF".to_string(),
-            },
-            ToolDefinition {
-                id: "typst_execute".to_string(),
-                name: "Execute Typst Command".to_string(),
-                short_desc: "Run typst commands via embedded compiler".to_string(),
-                description: "Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update. Read-only commands (fonts, query) create a dynamic result panel. Mutating commands (compile, init, update) return output directly. Example: 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts'.".to_string(),
-                params: vec![
-                    ToolParam::new("command", ParamType::String)
-                        .desc("Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')")
-                        .required(),
-                ],
-                enabled: true,
-                category: "PDF".to_string(),
-            },
-        ]
+        vec![ToolDefinition {
+            id: "typst_execute".to_string(),
+            name: "Execute Typst Command".to_string(),
+            short_desc: "Run typst commands via embedded compiler".to_string(),
+            description: "Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update. Read-only commands (fonts, query) create a dynamic result panel. Mutating commands (compile, init, update) return output directly. Example: 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts'.".to_string(),
+            params: vec![
+                ToolParam::new("command", ParamType::String)
+                    .desc("Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')")
+                    .required(),
+            ],
+            enabled: true,
+            category: "PDF".to_string(),
+        }]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "pdf_create" => Some(tools::execute_create(tool, state)),
-            "pdf_edit" => Some(tools::execute_edit(tool, state)),
             "typst_execute" => Some(tools_execute::execute_typst(tool, state)),
             _ => None,
         }
     }
 
     fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
-        None // No custom panel — lean on tree integration
+        None
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("PDF", "Create and manage Typst PDF documents")]
     }
+}
 
-    fn overview_context_section(&self, state: &State) -> Option<String> {
-        let ts = TypstState::get(state);
-        if ts.documents.is_empty() {
-            return None;
-        }
-        let doc_list: Vec<String> = ts.documents.values().map(|d| format!("  {} → {}", d.name, d.target)).collect();
-        Some(format!("PDF Documents ({}):\n{}\n", ts.documents.len(), doc_list.join("\n")))
-    }
+/// Ensure the typst-compile callback exists in CallbackState.
+/// Single callback: *.typ (excluding templates dir). Uses $CP_CHANGED_FILES
+/// to compile each changed .typ → .pdf in the same directory.
+fn ensure_typst_callback(state: &mut State) {
+    use cp_mod_callback::types::{CallbackDefinition, CallbackState};
+
+    let cs = CallbackState::get_mut(state);
+
+    let binary_path = std::env::current_exe()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    // Remove old callbacks from previous design (pdf/documents, pdf/templates patterns)
+    cs.definitions.retain(|d| {
+        d.name != "typst-compile" && d.name != "typst-compile-template"
+    });
+    cs.active_set.retain(|id| cs.definitions.iter().any(|d| &d.id == id));
+
+    // Single callback: compile any *.typ → *.pdf (same dir)
+    // The script skips files under the templates dir.
+    let cb_id = format!("CB{}", cs.next_id);
+    cs.next_id += 1;
+
+    let script = format!(
+        r#"bash -c 'echo "$CP_CHANGED_FILES" | while IFS= read -r FILE; do
+  [ -z "$FILE" ] && continue
+  case "$FILE" in .context-pilot/typst-templates/*) continue;; esac
+  {} typst-compile "$FILE"
+done'"#,
+        binary_path
+    );
+
+    cs.definitions.push(CallbackDefinition {
+        id: cb_id.clone(),
+        name: "typst-compile".to_string(),
+        description: "Auto-compile .typ → .pdf (same directory) on edit".to_string(),
+        pattern: "*.typ".to_string(),
+        blocking: true,
+        timeout_secs: Some(30),
+        success_message: Some("✓ PDF compiled".to_string()),
+        cwd: None,
+        one_at_a_time: false,
+        built_in: true,
+        built_in_command: Some(script),
+    });
+    cs.active_set.insert(cb_id);
 }
