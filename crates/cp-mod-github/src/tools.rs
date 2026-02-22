@@ -2,7 +2,7 @@ use std::process::Command;
 
 use super::GH_CMD_TIMEOUT_SECS;
 use super::classify::CommandClass;
-use cp_base::config::MAX_RESULT_CONTENT_BYTES;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
 use cp_base::state::{ContextType, State, make_default_context_element};

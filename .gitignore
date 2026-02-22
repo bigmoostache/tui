@@ -13,3 +13,5 @@ test.md
 report/code-audit.md
 test
 output
+!.context-pilot/shared/
+test-typst

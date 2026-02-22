@@ -1,4 +1,5 @@
 pub mod config;
+pub mod constants;
 pub mod llm_types;
 pub mod modules;
 pub mod panels;

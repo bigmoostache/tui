@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::config::SCROLL_ARROW_AMOUNT;
+use cp_base::constants::SCROLL_ARROW_AMOUNT;
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel, now_ms};
 use cp_base::state::Action;

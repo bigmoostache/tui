@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use cp_base::config::STORE_DIR;
+use cp_base::constants::STORE_DIR;
 
 use crate::types::{PromptItem, PromptType};
 

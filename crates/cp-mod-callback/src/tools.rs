@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use cp_base::config::STORE_DIR;
+use cp_base::constants::STORE_DIR;
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 

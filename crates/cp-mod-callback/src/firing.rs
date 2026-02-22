@@ -2,7 +2,7 @@
 //!
 //! Separated from trigger.rs which handles file collection and pattern matching.
 
-use cp_base::config::STORE_DIR;
+use cp_base::constants::STORE_DIR;
 use cp_base::panels::now_ms;
 use cp_base::state::State;
 use cp_base::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};

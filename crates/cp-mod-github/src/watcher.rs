@@ -15,7 +15,7 @@ use std::thread::{self, JoinHandle};
 use crate::parse::{extract_poll_interval, parse_api_response, poll_branch_pr, redact_token, sha256_hex};
 use secrecy::{ExposeSecret, SecretBox};
 
-use cp_base::config::MAX_RESULT_CONTENT_BYTES;
+use cp_base::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::CacheUpdate;
 use cp_base::panels::now_ms;
