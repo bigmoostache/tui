@@ -1,6 +1,9 @@
+pub mod cli_parser;
 pub mod compiler;
+pub mod packages;
 mod templates;
 mod tools;
+mod tools_execute;
 pub mod types;
 
 use serde_json::json;
@@ -104,6 +107,19 @@ impl Module for TypstModule {
                 enabled: true,
                 category: "PDF".to_string(),
             },
+            ToolDefinition {
+                id: "typst_execute".to_string(),
+                name: "Execute Typst Command".to_string(),
+                short_desc: "Run typst commands via embedded compiler".to_string(),
+                description: "Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update. Read-only commands (fonts, query) create a dynamic result panel. Mutating commands (compile, init, update) return output directly. Example: 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts'.".to_string(),
+                params: vec![
+                    ToolParam::new("command", ParamType::String)
+                        .desc("Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')")
+                        .required(),
+                ],
+                enabled: true,
+                category: "PDF".to_string(),
+            },
         ]
     }
 
@@ -111,6 +127,7 @@ impl Module for TypstModule {
         match tool.name.as_str() {
             "pdf_create" => Some(tools::execute_create(tool, state)),
             "pdf_edit" => Some(tools::execute_edit(tool, state)),
+            "typst_execute" => Some(tools_execute::execute_typst(tool, state)),
             _ => None,
         }
     }

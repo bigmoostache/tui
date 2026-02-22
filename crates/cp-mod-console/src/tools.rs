@@ -57,6 +57,13 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
                     .to_string(),
             );
         }
+        if binary == "typst" {
+            return Some(
+                "Blocked: use the `typst_execute` tool instead — typst is embedded in the TUI.\n\
+                 Example: typst_execute with command=\"typst compile doc.typ -o out.pdf\""
+                    .to_string(),
+            );
+        }
     }
 
     None

@@ -9,10 +9,12 @@ use std::path::{Path, PathBuf};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime};
 use typst::layout::PagedDocument;
-use typst::syntax::{FileId, Source, VirtualPath};
+use typst::syntax::{FileId, Source, VirtualPath, package::PackageSpec as TypstPackageSpec};
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 use typst::{Library, World};
+
+use crate::packages;
 
 /// Compile a `.typ` file to PDF bytes.
 ///
@@ -164,9 +166,39 @@ impl ContextPilotWorld {
     }
 
     fn resolve_path(&self, id: FileId) -> Result<PathBuf, String> {
+        // Check if this FileId belongs to a package (@preview/name:version)
+        if let Some(pkg_spec) = id.package() {
+            return self.resolve_package_path(id, pkg_spec);
+        }
+
+        // Local file — resolve relative to project root
         let vpath = id.vpath();
         let path = vpath.resolve(&self.root).ok_or_else(|| format!("cannot resolve virtual path: {:?}", vpath))?;
         Ok(path)
+    }
+
+    /// Resolve a file path within a Typst Universe package.
+    /// Downloads the package if not already cached.
+    fn resolve_package_path(&self, id: FileId, pkg: &TypstPackageSpec) -> Result<PathBuf, String> {
+        let namespace = pkg.namespace.as_str();
+        let name = pkg.name.as_str();
+        let version = format!("{}", pkg.version);
+
+        let spec = packages::PackageSpec {
+            namespace: namespace.to_string(),
+            name: name.to_string(),
+            version: version.clone(),
+        };
+
+        let pkg_dir = packages::resolve_package(&spec)?;
+
+        // The VirtualPath within the package (e.g., /lib.typ)
+        let vpath = id.vpath();
+        let sub_path = vpath
+            .resolve(&pkg_dir)
+            .ok_or_else(|| format!("cannot resolve {:?} in package {}", vpath, spec.to_spec_string()))?;
+
+        Ok(sub_path)
     }
 }
 
@@ -188,14 +220,15 @@ impl World for ContextPilotWorld {
             return Ok(source.clone());
         }
 
-        // Resolve and load on the fly
-        let path = id.vpath().resolve(&self.root).ok_or(FileError::AccessDenied)?;
+        // Resolve via our unified path resolver (handles local + packages)
+        let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
         let content = fs::read_to_string(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Source::new(id, content))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        let path = id.vpath().resolve(&self.root).ok_or(FileError::AccessDenied)?;
+        // Resolve via our unified path resolver (handles local + packages)
+        let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
         let data = fs::read(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Bytes::new(data))
     }

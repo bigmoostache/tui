@@ -15,3 +15,6 @@ chrono.workspace = true
 typst = "0.13"
 typst-pdf = "0.13"
 comemo = "0.4"
+reqwest = { workspace = true }
+flate2 = "1"
+tar = "0.4"
