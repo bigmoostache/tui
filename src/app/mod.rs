@@ -49,6 +49,8 @@ pub struct App {
     resume_stream: bool,
     /// Command palette state
     pub command_palette: CommandPalette,
+    /// File-path autocomplete popup state
+    pub path_autocomplete: crate::ui::help::PathAutocomplete,
     /// Timestamp (ms) when wait_for_panels started (for timeout)
     wait_started_ms: u64,
     /// Deferred tool results waiting for sleep timer to expire
@@ -91,6 +93,7 @@ impl App {
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
+            path_autocomplete: crate::ui::help::PathAutocomplete::new(),
             wait_started_ms: 0,
             deferred_tool_sleep_until_ms: 0,
             deferred_tool_sleeping: false,

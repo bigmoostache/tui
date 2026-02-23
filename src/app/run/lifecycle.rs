@@ -103,19 +103,79 @@ impl App {
                     break;
                 };
 
+                // When path autocomplete is open, intercept navigation/selection keys
+                // before they reach normal input handling.
+                if self.path_autocomplete.is_open {
+                    use crossterm::event::{KeyCode, KeyModifiers};
+                    if let event::Event::Key(key) = &evt {
+                        let consumed = match key.code {
+                            KeyCode::Esc => {
+                                self.path_autocomplete.close();
+                                true
+                            }
+                            KeyCode::Up => {
+                                self.path_autocomplete.select_prev();
+                                true
+                            }
+                            KeyCode::Down => {
+                                self.path_autocomplete.select_next();
+                                true
+                            }
+                            KeyCode::Tab => {
+                                let path = self.path_autocomplete.get_selected().map(|s| s.to_string());
+                                if let Some(path) = path {
+                                    self.accept_path_autocomplete(&path);
+                                }
+                                true
+                            }
+                            // Enter accepts the selection; if nothing is selected fall through
+                            // to normal input handling (newline / submit).
+                            KeyCode::Enter
+                                if !key.modifiers.contains(KeyModifiers::SHIFT)
+                                    && !key.modifiers.contains(KeyModifiers::CONTROL)
+                                    && self.path_autocomplete.has_matches() =>
+                            {
+                                let path = self.path_autocomplete.get_selected().map(|s| s.to_string());
+                                if let Some(path) = path {
+                                    self.accept_path_autocomplete(&path);
+                                }
+                                true
+                            }
+                            _ => false,
+                        };
+
+                        if consumed {
+                            self.state.dirty = true;
+                            let pa = &self.path_autocomplete;
+                            terminal.draw(|frame| {
+                                ui::render(frame, &mut self.state);
+                                self.command_palette.render(frame, &self.state);
+                                pa.render(frame, frame.area());
+                            })?;
+                            self.state.dirty = false;
+                            self.last_render_ms = current_ms;
+                            continue;
+                        }
+                    }
+                }
+
                 // Check for Ctrl+P to open palette
                 if let Action::OpenCommandPalette = action {
                     self.command_palette.open(&self.state);
                     self.state.dirty = true;
                 } else {
                     self.handle_action(action, &tx, &tldr_tx);
+                    // After applying any input-modifying action, refresh autocomplete state
+                    self.update_path_autocomplete();
                 }
 
                 // Render immediately after input for instant feedback
                 if self.state.dirty {
+                    let pa = &self.path_autocomplete;
                     terminal.draw(|frame| {
                         ui::render(frame, &mut self.state);
                         self.command_palette.render(frame, &self.state);
+                        pa.render(frame, frame.area());
                     })?;
                     self.state.dirty = false;
                     self.last_render_ms = current_ms;
@@ -162,9 +222,11 @@ impl App {
 
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
+                let pa = &self.path_autocomplete;
                 terminal.draw(|frame| {
                     ui::render(frame, &mut self.state);
                     self.command_palette.render(frame, &self.state);
+                    pa.render(frame, frame.area());
                 })?;
                 self.state.dirty = false;
                 self.last_render_ms = current_ms;
@@ -337,5 +399,61 @@ impl App {
             // Mark dirty to trigger re-render with new spinner frame
             self.state.dirty = true;
         }
+    }
+
+    /// Check whether the text before the cursor contains an `@<query>` token and
+    /// open / update / close the path autocomplete accordingly.
+    fn update_path_autocomplete(&mut self) {
+        use crate::ui::help::get_at_token;
+
+        let cursor = self.state.input_cursor;
+        match get_at_token(&self.state.input, cursor) {
+            Some((at_pos, query)) => {
+                if self.path_autocomplete.is_open {
+                    // Already open — update query (may change the position if user
+                    // deleted back past the original @ and started a new one).
+                    self.path_autocomplete.at_pos = at_pos;
+                    self.path_autocomplete.update_query(query);
+                } else {
+                    // New @ token detected — open autocomplete
+                    self.path_autocomplete.open(at_pos, query);
+                }
+                self.state.dirty = true;
+            }
+            None => {
+                if self.path_autocomplete.is_open {
+                    self.path_autocomplete.close();
+                    self.state.dirty = true;
+                }
+            }
+        }
+    }
+
+    /// Replace the `@<query>` token in the input with `path`, then close
+    /// the autocomplete.
+    fn accept_path_autocomplete(&mut self, path: &str) {
+        let at_pos = self.path_autocomplete.at_pos;
+        let cursor = self.state.input_cursor;
+
+        // Safety: at_pos must be strictly before cursor and cursor ≤ input.len().
+        // (at_pos == cursor would mean the @ is at the cursor, so there's nothing
+        // to replace; at_pos > cursor means the state is corrupt.)
+        if at_pos >= cursor || cursor > self.state.input.len() {
+            self.path_autocomplete.close();
+            return;
+        }
+
+        // Replace from at_pos to cursor with the selected path
+        let before = self.state.input[..at_pos].to_string();
+        let after = self.state.input[cursor..].to_string();
+        self.state.input = format!("{}{}{}", before, path, after);
+        self.state.input_cursor = at_pos + path.len();
+
+        // Invalidate render caches that depend on the input
+        self.state.input_cache = None;
+        self.state.full_content_cache = None;
+
+        self.path_autocomplete.close();
+        self.state.dirty = true;
     }
 }
