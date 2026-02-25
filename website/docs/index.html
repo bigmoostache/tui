@@ -4,178 +4,157 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Documentation — Context Pilot</title>
-    <meta name="description" content="Context Pilot documentation. Learn to control your AI's context window with surgical precision.">
-    <link rel="stylesheet" href="docs.css">
+    <meta name="description" content="Context Pilot documentation: getting started, tools reference, modules, agents, and configuration.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="docs.css">
 </head>
 <body>
-    <header class="docs-header">
-        <div class="docs-header-inner">
-            <div style="display:flex;align-items:center;gap:1rem;">
-                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
-                <a href="../index.html" class="docs-logo">
-                    <span class="docs-logo-icon">⎈</span>
-                    <span>Context Pilot</span>
-                    <span class="docs-logo-sep">/</span>
-                    <span class="docs-logo-docs">Docs</span>
-                </a>
-            </div>
-            <div class="docs-header-links">
-                <a href="../index.html">Home</a>
-                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
-            </div>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="../" class="nav-logo">
+            <span class="nav-logo-icon">⚙</span>
+            <span>Context Pilot</span>
+        </a>
+        <div class="nav-links">
+            <a href="./" class="active">Docs</a>
+            <a href="getting-started.html">Get Started</a>
+            <a href="tools.html">Tools</a>
+            <a href="modules.html">Modules</a>
+            <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
         </div>
-    </header>
-
-    <div class="docs-overlay" onclick="toggleSidebar()"></div>
-
-    <div class="docs-layout">
-        <nav class="docs-sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Getting Started</div>
-                <a href="index.html" class="sidebar-link active">Overview</a>
-                <a href="index.html#installation" class="sidebar-link sub">Installation</a>
-                <a href="index.html#quickstart" class="sidebar-link sub">Quickstart</a>
-                <a href="index.html#concepts" class="sidebar-link sub">Core Concepts</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Core</div>
-                <a href="context.html" class="sidebar-link">Context System</a>
-                <a href="modules.html" class="sidebar-link">Modules</a>
-                <a href="tools.html" class="sidebar-link">Tool Reference</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Customization</div>
-                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
-                <a href="configuration.html" class="sidebar-link">Configuration</a>
-                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Advanced</div>
-                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
-            </div>
-        </nav>
-
-        <main class="docs-content">
-            <h1>Context Pilot <span class="gradient-text">Documentation</span></h1>
-            <p class="page-subtitle">
-                Everything you need to master Context Pilot — from installation to autonomous multi-hour coding sessions.
-            </p>
-
-            <h2 id="what">What is Context Pilot?</h2>
-            <p>Context Pilot is an <strong>AI-native terminal IDE</strong> built in Rust. It gives you full, transparent control over what your AI assistant sees — every file, diff, search result, and note is a <strong>context panel</strong> with a visible token count.</p>
-            <p>Unlike tools that hide context management behind abstractions, Context Pilot makes it the primary interface. You see exactly what the AI sees, in real-time. You decide what stays and what goes. No guessing, no surprises.</p>
-
-            <div class="info-box tip">
-                <div class="info-label">Key Insight</div>
-                <p>The quality of AI output is directly proportional to the quality of its context. Context Pilot gives you the instruments to tune that context precisely.</p>
-            </div>
-
-            <h2 id="installation">Installation</h2>
-
-            <h3>Prerequisites</h3>
-            <ul>
-                <li><strong>Rust toolchain</strong> — install via <a href="https://rustup.rs">rustup.rs</a></li>
-                <li><strong>tmux</strong> — required for console integration (<code>apt install tmux</code> or <code>brew install tmux</code>)</li>
-                <li><strong>An API key</strong> from a supported LLM provider (Anthropic, OpenAI, DeepSeek, Grok, Groq)</li>
-            </ul>
-
-            <h3>Build from source</h3>
-            <pre><code>git clone https://github.com/bigmoostache/context-pilot.git
-cd context-pilot
-cargo build --release</code></pre>
-
-            <p>The binary will be at <code>target/release/tui</code>. You can copy it to your PATH or create an alias.</p>
-
-            <h3>Configure your API key</h3>
-            <pre><code># Create .env in the directory where you'll run Context Pilot
-echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
-
-# Or set as environment variable
-export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
-
-            <div class="info-box note">
-                <div class="info-label">Multiple Providers</div>
-                <p>You can configure multiple providers simultaneously. See <a href="configuration.html">Configuration</a> for all supported environment variables.</p>
-            </div>
-
-            <h2 id="quickstart">Quickstart</h2>
-
-            <h3>Launch</h3>
-            <pre><code># Navigate to your project directory
-cd your-project
-
-# Launch inside tmux (required for console features)
-tmux new-session context-pilot
-
-# Or if already in a tmux session
-context-pilot</code></pre>
-
-            <h3>Your first interaction</h3>
-            <p>When Context Pilot starts, you'll see the sidebar on the left listing <strong>context panels</strong> (P0–P10 are built-in fixed panels), and the main conversation area on the right. Just start typing and press <kbd>Enter</kbd> to send your message.</p>
-            <p>The AI can see everything listed in the sidebar. It has access to 48 tools that can open files, run commands, search code, create todos, and more — all of which create or update context panels.</p>
-
-            <h3>Essential workflow</h3>
-            <ol>
-                <li><strong>Ask the AI to explore</strong> — e.g., "explore this codebase and tell me what you find"</li>
-                <li><strong>Watch context grow</strong> — new panels appear in the sidebar with live token counts</li>
-                <li><strong>Close what you don't need</strong> — select a panel with arrow keys and press <kbd>d</kbd> to close it, or let the AI close panels with the <code>context_close</code> tool</li>
-                <li><strong>Stay under budget</strong> — the token bar at the bottom shows real-time usage against your configured budget</li>
-            </ol>
-
-            <h2 id="concepts">Core Concepts</h2>
-
-            <h3>Context Panels</h3>
-            <p>Everything the AI sees is a <strong>panel</strong>. Panels have IDs (P0, P1, P7, P12…), a type, and a token count. Fixed panels (P0–P10) are always present. Dynamic panels are created by tools and can be closed.</p>
-
-            <table>
-                <thead>
-                    <tr><th>Panel</th><th>Type</th><th>Description</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>P0</code></td><td>System</td><td>Active agent (system prompt)</td></tr>
-                    <tr><td><code>P1</code></td><td>Chat</td><td>Current conversation</td></tr>
-                    <tr><td><code>P2</code></td><td>Tree</td><td>Directory structure</td></tr>
-                    <tr><td><code>P3</code></td><td>Todos</td><td>Task tracking</td></tr>
-                    <tr><td><code>P4</code></td><td>Memories</td><td>Persistent notes</td></tr>
-                    <tr><td><code>P5</code></td><td>Overview</td><td>Context usage &amp; stats</td></tr>
-                    <tr><td><code>P6</code></td><td>Git</td><td>Branch, status, diffs</td></tr>
-                    <tr><td><code>P7</code></td><td>Scratchpad</td><td>Temporary cells</td></tr>
-                    <tr><td><code>P8</code></td><td>Library</td><td>Agents, skills, commands</td></tr>
-                    <tr><td><code>P9</code></td><td>Spine</td><td>Notifications &amp; auto-continuation</td></tr>
-                    <tr><td><code>P10</code></td><td>Logs</td><td>Timestamped event log with tree-structured summarization</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Modules</h3>
-            <p>Modules are independent packages of functionality. Each module provides its own <strong>tools</strong> (things the AI can do) and <strong>panels</strong> (things the AI can see). You can activate or deactivate modules to control what's available. See <a href="modules.html">Modules</a> for the full list.</p>
-
-            <h3>Tools</h3>
-            <p>Tools are actions the AI can take — opening files, running git commands, creating todos. Tools are grouped by module and can be individually enabled or disabled. See <a href="tools.html">Tool Reference</a> for complete documentation.</p>
-
-            <h3>Agents &amp; Skills</h3>
-            <p><strong>Agents</strong> are system prompts that define the AI's behavior. <strong>Skills</strong> are knowledge documents loaded as context panels. <strong>Commands</strong> are text shortcuts expanded inline. See <a href="agents.html">Agents &amp; Skills</a>.</p>
-
-            <h3>Presets</h3>
-            <p>Presets snapshot your entire configuration — active agent, modules, disabled tools, panel state — into a named profile you can load instantly. Built-in presets include <em>Worker</em>, <em>Planner</em>, <em>Context Builder</em>, and <em>Context Cleaner</em>.</p>
-
-            <div class="page-nav">
-                <div></div>
-                <a href="context.html" class="next">
-                    <span class="nav-label">Next</span>
-                    <span class="nav-title">Context System →</span>
-                </a>
-            </div>
-        </main>
     </div>
+</nav>
 
-    <script>
-    function toggleSidebar() {
-        document.querySelector('.docs-sidebar').classList.toggle('open');
-        document.querySelector('.docs-overlay').classList.toggle('open');
-    }
-    </script>
+<div class="docs-layout">
+    <aside class="docs-sidebar">
+        <h3>Getting Started</h3>
+        <a href="getting-started.html">Installation</a>
+        <a href="getting-started.html#configuration">Configuration</a>
+        <a href="getting-started.html#first-session">First Session</a>
+
+        <h3>Core Concepts</h3>
+        <a href="context.html">Context Management</a>
+        <a href="modules.html">Modules</a>
+        <a href="tools.html">Tools</a>
+        <a href="agents.html">Agents & Skills</a>
+
+        <h3>Reference</h3>
+        <a href="tools.html">All 58 Tools</a>
+        <a href="modules.html">All 14 Modules</a>
+        <a href="keyboard.html">Keyboard Shortcuts</a>
+        <a href="configuration.html">Configuration</a>
+        <a href="advanced.html">Advanced Usage</a>
+    </aside>
+
+    <main class="docs-content">
+        <h1>Documentation</h1>
+        <p class="subtitle">
+            Everything you need to get started with Context Pilot — from installation
+            to advanced workflows.
+        </p>
+
+        <div class="doc-cards">
+            <a href="getting-started.html" class="doc-card">
+                <div class="doc-card-icon">🚀</div>
+                <h3>Getting Started</h3>
+                <p>Install Context Pilot, configure your LLM provider, and run your first session in under 2 minutes.</p>
+            </a>
+            <a href="context.html" class="doc-card">
+                <div class="doc-card-icon">🧭</div>
+                <h3>Context Management</h3>
+                <p>Understand how Context Pilot manages what your AI sees — panels, elements, tokens, and the context budget.</p>
+            </a>
+            <a href="tools.html" class="doc-card">
+                <div class="doc-card-icon">🛠</div>
+                <h3>Tools Reference</h3>
+                <p>All 58 tools organized by category — file editing, git, web search, memory, console, and more.</p>
+            </a>
+            <a href="modules.html" class="doc-card">
+                <div class="doc-card-icon">📦</div>
+                <h3>Modules</h3>
+                <p>14 independent modules that power Context Pilot — activate, deactivate, and configure each one.</p>
+            </a>
+            <a href="agents.html" class="doc-card">
+                <div class="doc-card-icon">👤</div>
+                <h3>Agents & Skills</h3>
+                <p>Custom system prompts, loadable knowledge skills, slash commands, and the library system.</p>
+            </a>
+            <a href="keyboard.html" class="doc-card">
+                <div class="doc-card-icon">⌨️</div>
+                <h3>Keyboard Shortcuts</h3>
+                <p>Navigate the TUI efficiently — panel switching, scrolling, configuration, and input shortcuts.</p>
+            </a>
+            <a href="advanced.html" class="doc-card">
+                <div class="doc-card-icon">⚡</div>
+                <h3>Advanced Usage</h3>
+                <p>Autonomous workflows, callbacks, presets, web search, PDF generation, and power-user tips.</p>
+            </a>
+            <a href="configuration.html" class="doc-card">
+                <div class="doc-card-icon">⚙️</div>
+                <h3>Configuration</h3>
+                <p>LLM providers, API keys, environment variables, and runtime settings.</p>
+            </a>
+        </div>
+
+        <h2>Quick Overview</h2>
+
+        <h3>What is Context Pilot?</h3>
+        <p>
+            Context Pilot is a terminal application (TUI) that wraps around LLM providers
+            to give AI coding assistants structured context management. It provides 58 specialized
+            tools, persistent memory, file edit callbacks, and a modular architecture — all in
+            ~15K lines of pure Rust.
+        </p>
+
+        <h3>Why does it exist?</h3>
+        <p>
+            Every AI coding assistant — Cursor, Copilot, Claude Code — starts each session blind.
+            No memory of past decisions. No structured view of your codebase. No automatic validation
+            of AI-generated edits. Context Pilot solves all three problems.
+        </p>
+
+        <h3>Key features</h3>
+        <ul>
+            <li><strong>Persistent memory</strong> — survives restarts, remembers architecture decisions and preferences</li>
+            <li><strong>Structured context</strong> — directory tree, file panels, git status, GitHub issues — all as managed context elements</li>
+            <li><strong>File edit callbacks</strong> — automatic compilation checks, tests, linters on every AI edit</li>
+            <li><strong>58 tools</strong> — file editing, git, web search, PDF generation, console management, and more</li>
+            <li><strong>5 LLM providers</strong> — Anthropic, Claude Code, DeepSeek, Grok, Groq</li>
+            <li><strong>Autonomous workflows</strong> — auto-continuation with cost/time/token guard rails</li>
+            <li><strong>Modular architecture</strong> — 14 independent crates, activate only what you need</li>
+        </ul>
+
+        <h3>Architecture</h3>
+        <p>
+            Context Pilot is organized as a Cargo workspace with 14 crates. Each module
+            (<code>cp-mod-*</code>) owns its tools, panels, and persistence. The core binary
+            orchestrates the TUI, LLM communication, and tool execution pipeline.
+        </p>
+        <pre><code>context-pilot/
+├── src/              # Core TUI binary (~15K lines)
+│   ├── app/          # Application state & event loop
+│   ├── modules/      # Module integration layer
+│   ├── llms/         # LLM provider implementations
+│   └── ui/           # Terminal rendering
+├── crates/
+│   ├── cp-base/      # Shared types & state
+│   ├── cp-mod-files/ # File management module
+│   ├── cp-mod-git/   # Git integration
+│   ├── cp-mod-memory/# Persistent memory
+│   ├── cp-mod-brave/ # Web search (Brave)
+│   └── ...           # 9 more modules
+└── yamls/            # Embedded config</code></pre>
+    </main>
+</div>
+
+<footer class="footer">
+    <div class="footer-inner">
+        <p>Built with 🦀 Rust and ❤️ by the Context Pilot contributors. <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a></p>
+    </div>
+</footer>
+
 </body>
 </html>

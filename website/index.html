@@ -3,842 +3,550 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Context Pilot — AI-Native Terminal IDE</title>
-    <meta name="description" content="Context Pilot is an AI-native terminal IDE that gives you full control over what your AI sees. Built with Rust and ratatui for blazing-fast performance.">
-    <link rel="canonical" href="https://bigmoostache.github.io/context-pilot/">
-    
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="Context Pilot — AI-Native Terminal IDE">
-    <meta property="og:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
+    <title>Context Pilot — The AI Coding Copilot That Manages Its Own Context</title>
+    <meta name="description" content="An open-source TUI that gives AI coding assistants persistent memory, structured context, and self-correcting workflows. 58 tools. 5 LLM providers. Pure Rust.">
+    <meta name="keywords" content="AI coding assistant, context management, TUI, Rust, open source, LLM tools, developer tools">
+    <meta property="og:title" content="Context Pilot — AI Coding Copilot">
+    <meta property="og:description" content="Give your AI persistent memory, structured context, and self-correcting workflows.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://bigmoostache.github.io/context-pilot/">
-    <meta property="og:site_name" content="Context Pilot">
-    <meta property="og:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Context Pilot - AI-Native Terminal IDE with visible context management">
-    
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Context Pilot — AI-Native Terminal IDE">
-    <meta name="twitter:description" content="You control what your AI sees. Terminal-native AI coding built in Rust.">
-    <meta name="twitter:image" content="https://bigmoostache.github.io/context-pilot/og-image.png">
-    <meta name="twitter:image:alt" content="Context Pilot - AI-Native Terminal IDE">
-    
-    <!-- Additional SEO Meta Tags -->
-    <meta name="author" content="Context Pilot">
-    <meta name="keywords" content="AI coding, terminal IDE, Rust, ratatui, AI assistant, context management, TUI, developer tools">
-    <meta name="theme-color" content="#0a0a0f">
-    <meta name="color-scheme" content="dark light">
-    
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Context Pilot",
-      "description": "AI-native terminal IDE that gives you full control over what your AI sees",
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Linux, macOS",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "author": {
-        "@type": "Organization",
-        "name": "Context Pilot",
-        "url": "https://github.com/bigmoostache/context-pilot"
-      }
-    }
-    </script>
-    
-    <link rel="stylesheet" href="style.css">
+    <meta property="og:url" content="https://context-pilot.dev">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Skip to main content for accessibility -->
-    <a href="#main-content" class="skip-to-content">Skip to main content</a>
-    
-    <!-- Header -->
-    <header class="header">
-        <nav class="nav container">
-            <a href="/" class="logo">
-                <span class="logo-icon">⎈</span>
-                <span class="logo-text">Context Pilot</span>
-            </a>
-            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
-            <div class="nav-links">
-                <a href="#features">Features</a>
-                <a href="#architecture">Architecture</a>
-                <a href="#comparison">Comparison</a>
-                <a href="#modules">Modules</a>
-                <a href="docs/index.html">Docs</a>
-                <a href="#getting-started">Get Started</a>
-                <button class="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle theme">
-                    <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
+
+<!-- Navigation -->
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-logo">
+            <span class="nav-logo-icon">⚙</span>
+            <span>Context Pilot</span>
+        </a>
+        <div class="nav-links">
+            <a href="docs/">Docs</a>
+            <a href="docs/getting-started.html">Get Started</a>
+            <a href="docs/tools.html">Tools</a>
+            <a href="docs/modules.html">Modules</a>
+            <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container">
+        <div class="hero-badge">Open Source · AGPL-3.0 · Pure Rust</div>
+        <h1 class="hero-title">
+            Your AI's<br><span class="gradient-text">copilot.</span>
+        </h1>
+        <p class="hero-subtitle">
+            AI coding assistants are powerful but forgetful.<br>
+            Context Pilot gives them persistent memory, structured context,<br>
+            and self-correcting workflows — all from your terminal.
+        </p>
+        <div class="hero-cta">
+            <div class="install-block">
+                <code class="install-cmd">
+                    <span class="install-prompt">$</span> git clone https://github.com/bigmoostache/context-pilot && cd context-pilot && ./deploy_local.sh
+                </code>
+                <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
-                <a href="https://github.com/bigmoostache/context-pilot" class="nav-github">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    GitHub
+            </div>
+            <div class="hero-buttons">
+                <a href="docs/getting-started.html" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/bigmoostache/context-pilot" target="_blank" class="btn btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    View on GitHub
                 </a>
             </div>
-        </nav>
-    </header>
+        </div>
+    </div>
+</section>
 
-    <!-- Hero -->
-    <section id="main-content" class="hero">
-        <div class="container">
-            <div class="hero-badge">AI-Native Terminal IDE</div>
-            <h1 class="hero-title">
-                You control what<br>
-                <span class="gradient-text">your AI sees.</span>
-            </h1>
-            <p class="hero-subtitle">
-                Context Pilot is a terminal-native AI coding environment built in Rust. 
-                Unlike other tools where context is a black box, <strong>you</strong> decide exactly what context your AI receives — 
-                files, git diffs, todos, memories, and more — all through an elegant TUI with real-time token tracking.
-            </p>
-            <div class="hero-actions">
-                <a href="#getting-started" class="btn btn-primary">Get Started</a>
-                <a href="https://github.com/bigmoostache/context-pilot" class="btn btn-secondary">View on GitHub</a>
+<!-- Stats Bar -->
+<section class="stats">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat">
+                <span class="stat-number">58</span>
+                <span class="stat-label">Tools</span>
             </div>
-            <div class="hero-terminal">
-                <div class="terminal-bar">
-                    <span class="terminal-dot red"></span>
-                    <span class="terminal-dot yellow"></span>
-                    <span class="terminal-dot green"></span>
-                    <span class="terminal-title">context-pilot</span>
-                    <button class="terminal-pause" id="terminal-pause" aria-label="Pause animation" title="Pause/Resume animation">
-                        <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <rect x="6" y="4" width="4" height="16"></rect>
-                            <rect x="14" y="4" width="4" height="16"></rect>
-                        </svg>
-                        <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                    </button>
-                </div>
-                <div class="terminal-body">
-                    <pre class="terminal-content" id="terminal-anim"></pre>
-                </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number">5</span>
+                <span class="stat-label">LLM Providers</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number">15K</span>
+                <span class="stat-label">Lines of Rust</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number">14</span>
+                <span class="stat-label">Modules</span>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Architecture -->
-    <section id="architecture" class="architecture">
-        <div class="container">
-            <h2 class="section-title">How It Works</h2>
-            <p class="section-subtitle">Everything flows through context panels — structured blocks of information your AI can see.</p>
+<!-- Problem → Solution -->
+<section class="problem-solution">
+    <div class="container">
+        <div class="section-label">The Problem</div>
+        <h2 class="section-title">AI coding tools are brilliant.<br>But they have amnesia.</h2>
+        <p class="section-subtitle">
+            Every AI coding assistant — Cursor, Copilot, Claude Code — starts each session blind.
+            No memory of your architecture. No understanding of your conventions.
+            No awareness of what it broke last time. You spend half your time re-explaining context
+            that should already be there.
+        </p>
+        <div class="problem-cards">
+            <div class="problem-card">
+                <div class="problem-icon">🧠</div>
+                <h3>No Memory</h3>
+                <p>Every session starts from zero. Decisions, preferences, architecture patterns — all lost.</p>
+            </div>
+            <div class="problem-card">
+                <div class="problem-icon">📂</div>
+                <h3>Context Chaos</h3>
+                <p>Files opened randomly. Stale context piling up. No systematic way to manage what the AI sees.</p>
+            </div>
+            <div class="problem-card">
+                <div class="problem-icon">💥</div>
+                <h3>Silent Breakage</h3>
+                <p>AI edits your code. Compilation breaks. Tests fail. You only find out minutes later.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-            <div class="arch-diagram">
-                <div class="arch-col arch-col-left">
-                    <div class="arch-box arch-you">
-                        <div class="arch-label">You</div>
-                        <div class="arch-desc">Open files, run commands, create todos, tweak filters</div>
-                    </div>
-                    <div class="arch-arrow">↓</div>
-                    <div class="arch-box arch-panels">
-                        <div class="arch-label">Context Panels</div>
-                        <div class="arch-panel-list">
-                            <span class="arch-pill">P1 Chat</span>
-                            <span class="arch-pill">P2 Tree</span>
-                            <span class="arch-pill">P3 Todos</span>
-                            <span class="arch-pill">P4 Memories</span>
-                            <span class="arch-pill">P6 Git</span>
-                            <span class="arch-pill arch-pill-dynamic">P7 file.rs</span>
-                            <span class="arch-pill arch-pill-dynamic">P8 grep</span>
-                            <span class="arch-pill arch-pill-dynamic">P9 console</span>
+<!-- Solution -->
+<section class="solution">
+    <div class="container">
+        <div class="section-label">The Solution</div>
+        <h2 class="section-title">Context Pilot doesn't replace your AI.<br>It makes your AI <span class="gradient-text">competent.</span></h2>
+        <p class="section-subtitle">
+            A terminal application that wraps around any LLM, giving it structured context management,
+            persistent memory, file editing callbacks, and 58 specialized tools — all orchestrated
+            through a beautiful TUI.
+        </p>
+    </div>
+</section>
+
+<!-- Use Cases (Problem-Oriented) -->
+<section class="use-cases">
+    <div class="container">
+        <div class="use-case">
+            <div class="use-case-content">
+                <div class="use-case-label">Use Case 01</div>
+                <h3>Lost in a massive codebase?</h3>
+                <p>
+                    Context Pilot gives your AI a structured view of your entire project.
+                    Interactive directory tree with descriptions, smart file opening,
+                    git integration, and GitHub issue/PR awareness. Your AI always knows
+                    where it is and what changed.
+                </p>
+                <div class="use-case-tools">
+                    <span class="tool-tag">Directory Tree</span>
+                    <span class="tool-tag">File Management</span>
+                    <span class="tool-tag">Git Integration</span>
+                    <span class="tool-tag">GitHub CLI</span>
+                    <span class="tool-tag">Web Search</span>
+                </div>
+            </div>
+            <div class="use-case-terminal">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
                         </div>
-                        <div class="arch-desc">Each panel has a token count. You control what stays.</div>
+                        <span class="terminal-title">context-pilot</span>
                     </div>
-                    <div class="arch-arrow">↓</div>
-                    <div class="arch-box arch-llm">
-                        <div class="arch-label">LLM API</div>
-                        <div class="arch-desc">All visible panels sent as structured context. Nothing hidden.</div>
-                    </div>
+                    <pre class="terminal-body"><code><span class="t-dim">├──</span> <span class="t-blue">▼ src/</span>  <span class="t-dim">Main source: ~15K lines</span>
+<span class="t-dim">│   ├──</span> <span class="t-blue">▼ app/</span>
+<span class="t-dim">│   │   ├──</span> <span class="t-cyan">context.rs</span>
+<span class="t-dim">│   │   ├──</span> <span class="t-cyan">events.rs</span>
+<span class="t-dim">│   │   └──</span> <span class="t-cyan">mod.rs</span>
+<span class="t-dim">│   ├──</span> <span class="t-blue">▼ modules/</span>  <span class="t-dim">14 modules</span>
+<span class="t-dim">│   └──</span> <span class="t-cyan">main.rs</span>
+<span class="t-dim">├──</span> <span class="t-green">Cargo.toml</span>
+<span class="t-dim">└──</span> <span class="t-green">README.md</span></code></pre>
                 </div>
-                <div class="arch-col arch-col-right">
-                    <div class="arch-box arch-modules">
-                        <div class="arch-label">Modules</div>
-                        <div class="arch-module-list">
-                            <div class="arch-mod"><span>📁</span> Files</div>
-                            <div class="arch-mod"><span>🌳</span> Tree</div>
-                            <div class="arch-mod"><span>🔀</span> Git</div>
-                            <div class="arch-mod"><span>🖥️</span> Console</div>
-                            <div class="arch-mod"><span>✅</span> Todo</div>
-                            <div class="arch-mod"><span>🧠</span> Memory</div>
-                            <div class="arch-mod"><span>🦴</span> Spine</div>
+            </div>
+        </div>
+
+        <div class="use-case use-case-reverse">
+            <div class="use-case-content">
+                <div class="use-case-label">Use Case 02</div>
+                <h3>AI forgets everything between sessions?</h3>
+                <p>
+                    Persistent memory, timestamped logs, conversation history, and scratchpads
+                    survive across sessions and even TUI restarts. Your AI remembers architecture
+                    decisions, user preferences, project conventions, and past mistakes.
+                </p>
+                <div class="use-case-tools">
+                    <span class="tool-tag">Memory</span>
+                    <span class="tool-tag">Logs</span>
+                    <span class="tool-tag">Conversation History</span>
+                    <span class="tool-tag">Scratchpad</span>
+                    <span class="tool-tag">Presets</span>
+                </div>
+            </div>
+            <div class="use-case-terminal">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
                         </div>
-                        <div class="arch-desc">Each module adds tools + panels. Activate only what you need.</div>
+                        <span class="terminal-title">memories</span>
                     </div>
+                    <pre class="terminal-body"><code><span class="t-purple">M1</span> <span class="t-white">Project uses workspace with 14 crates</span>  <span class="t-yellow">high</span>
+<span class="t-purple">M2</span> <span class="t-white">User prefers explicit error handling</span>  <span class="t-yellow">high</span>
+<span class="t-purple">M3</span> <span class="t-white">Always run clippy before committing</span>  <span class="t-red">critical</span>
+<span class="t-purple">M4</span> <span class="t-white">API keys stored in .env, never committed</span>  <span class="t-yellow">high</span>
+<span class="t-purple">M5</span> <span class="t-white">Deploy via deploy_local.sh script</span>  <span class="t-dim">medium</span></code></pre>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Features -->
-    <section id="features" class="features">
-        <div class="container">
-            <h2 class="section-title">Why Context Pilot?</h2>
-            <p class="section-subtitle">Every token matters. Context Pilot gives you surgical control over your AI's context window.</p>
-            
-            <div class="feature-grid">
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">🎯</div>
-                    <h3>Context Control</h3>
-                    <p>Open files, git diffs, grep results, and more as context panels. See exactly what your AI sees — token counts and all. Close what you don't need.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Blazing Fast</h3>
-                    <p>Built in Rust with ratatui. Sub-millisecond rendering. Instant file operations. No Electron, no web browser, no bloat — just raw terminal performance.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">🔌</div>
-                    <h3>Modular Architecture</h3>
-                    <p>Activate only the modules you need. Git, GitHub, files, tree, console, todos, memory, scratchpad — each module adds its own tools and panels.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">🤖</div>
-                    <h3>Multi-Provider</h3>
-                    <p>Works with Anthropic Claude, OpenAI, DeepSeek, Grok (xAI), and Groq. Switch providers and models mid-conversation with a single keystroke.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">🧠</div>
-                    <h3>Persistent Memory</h3>
-                    <p>Memories and todos persist across conversations. The AI remembers your preferences, project conventions, and ongoing tasks.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">🔄</div>
-                    <h3>Auto-Continuation</h3>
-                    <p>The Spine module handles stream control with configurable guard rails — max tokens, cost limits, and automatic continuation for long tasks.</p>
+        <div class="use-case">
+            <div class="use-case-content">
+                <div class="use-case-label">Use Case 03</div>
+                <h3>Can't trust AI edits?</h3>
+                <p>
+                    File edit callbacks automatically trigger on every change — run cargo check,
+                    clippy, tests, formatters, or any custom script. Blocking callbacks halt the AI
+                    until the check passes. Your AI self-corrects before you even notice the bug.
+                </p>
+                <div class="use-case-tools">
+                    <span class="tool-tag">Callbacks</span>
+                    <span class="tool-tag">Auto-Check</span>
+                    <span class="tool-tag">Auto-Test</span>
+                    <span class="tool-tag">Blocking Mode</span>
+                    <span class="tool-tag">Pattern Matching</span>
                 </div>
             </div>
-        </div>
-    </section>
-
-    <!-- Modules -->
-    <section id="modules" class="modules">
-        <div class="container">
-            <h2 class="section-title">Modular by Design</h2>
-            <p class="section-subtitle">Activate what you need. Deactivate what you don't. Each module is independent.</p>
-            
-            <div class="module-grid">
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">📁</span>
-                        <h3>Files</h3>
-                    </div>
-                    <p>Open, edit, and write files. Full file context with syntax awareness. Precise edits with search-and-replace.</p>
-                    <div class="module-tools">
-                        <code>file_open</code> <code>file_edit</code> <code>file_write</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🌳</span>
-                        <h3>Tree</h3>
-                    </div>
-                    <p>Directory tree with gitignore-style filtering. Annotate files with descriptions. Open and close folders.</p>
-                    <div class="module-tools">
-                        <code>tree_filter</code> <code>tree_toggle</code> <code>tree_describe</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🔀</span>
-                        <h3>Git</h3>
-                    </div>
-                    <p>Full git integration. Status, diffs, log, blame — all as live-updating context panels.</p>
-                    <div class="module-tools">
-                        <code>git_execute</code> <code>git_configure_p6</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🐙</span>
-                        <h3>GitHub</h3>
-                    </div>
-                    <p>GitHub CLI integration. View PRs, issues, create releases — all without leaving the terminal.</p>
-                    <div class="module-tools">
-                        <code>gh_execute</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🖥️</span>
-                        <h3>Console (tmux)</h3>
-                    </div>
-                    <p>Monitor terminal output in real-time. Run builds, tests, servers — the AI sees what you see.</p>
-                    <div class="module-tools">
-                        <code>console_create</code> <code>console_send_keys</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">✅</span>
-                        <h3>Todo</h3>
-                    </div>
-                    <p>Task tracking with nested todos. Plan work, track progress, and let the AI work through tasks autonomously.</p>
-                    <div class="module-tools">
-                        <code>todo_create</code> <code>todo_update</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🧠</span>
-                        <h3>Memory</h3>
-                    </div>
-                    <p>Persistent memories across conversations. Store preferences, conventions, and important context.</p>
-                    <div class="module-tools">
-                        <code>memory_create</code> <code>memory_update</code>
-                    </div>
-                </div>
-                <div class="module-card fade-in">
-                    <div class="module-header">
-                        <span class="module-icon">🦴</span>
-                        <h3>Spine</h3>
-                    </div>
-                    <p>Central nervous system. Manages notifications, auto-continuation, and guard rails for autonomous operation.</p>
-                    <div class="module-tools">
-                        <code>spine_configure</code> <code>notification_mark_processed</code>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Comparison -->
-    <section id="comparison" class="comparison">
-        <div class="container">
-            <h2 class="section-title">How It Compares</h2>
-            <p class="section-subtitle">Context Pilot takes a fundamentally different approach to AI coding.</p>
-
-            <div class="comparison-table-wrap">
-                <table class="comparison-table">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th class="comp-highlight">Context Pilot</th>
-                            <th>Cursor</th>
-                            <th>Claude Code</th>
-                            <th>GitHub Copilot</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="comp-feature">Context control</td>
-                            <td class="comp-highlight">You choose every panel</td>
-                            <td>Automatic</td>
-                            <td>Automatic</td>
-                            <td>Automatic</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">See what AI sees</td>
-                            <td class="comp-highlight">✓ Token-level</td>
-                            <td>Partial</td>
-                            <td>✗</td>
-                            <td>✗</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Terminal-native</td>
-                            <td class="comp-highlight">✓ TUI (ratatui)</td>
-                            <td>✗ Electron</td>
-                            <td>✓ CLI</td>
-                            <td>✗ VS Code</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Multi-provider</td>
-                            <td class="comp-highlight">✓ 5+ providers</td>
-                            <td>✓</td>
-                            <td>✗ Claude only</td>
-                            <td>✗ GPT only</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Persistent memory</td>
-                            <td class="comp-highlight">✓ Cross-session</td>
-                            <td>Partial</td>
-                            <td>✗</td>
-                            <td>✗</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Modular tools</td>
-                            <td class="comp-highlight">✓ Enable/disable</td>
-                            <td>✗ Fixed</td>
-                            <td>✗ Fixed</td>
-                            <td>✗ Fixed</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Open source</td>
-                            <td class="comp-highlight">✓ GPL-3.0</td>
-                            <td>✗</td>
-                            <td>✗</td>
-                            <td>✗</td>
-                        </tr>
-                        <tr>
-                            <td class="comp-feature">Cost</td>
-                            <td class="comp-highlight">Free (bring API key)</td>
-                            <td>$20/mo+</td>
-                            <td>$20/mo+</td>
-                            <td>$10/mo+</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <!-- Agents & Presets -->
-    <section class="presets">
-        <div class="container">
-            <h2 class="section-title">Agents & Presets</h2>
-            <p class="section-subtitle">Switch AI personalities and tool configurations instantly.</p>
-            
-            <div class="preset-grid">
-                <div class="preset-card fade-in">
-                    <div class="preset-name">🏗️ Worker</div>
-                    <p>Focused implementation mode. File editing, git, and console. No exploration overhead.</p>
-                </div>
-                <div class="preset-card fade-in">
-                    <div class="preset-name">📋 Planner</div>
-                    <p>Task planning with todos and scratchpad. File writes disabled to prevent accidental changes.</p>
-                </div>
-                <div class="preset-card fade-in">
-                    <div class="preset-name">🔍 Context Builder</div>
-                    <p>All modules active for codebase exploration. Full read access, clean slate.</p>
-                </div>
-                <div class="preset-card fade-in">
-                    <div class="preset-name">🧹 Context Cleaner</div>
-                    <p>Minimal read-only mode. Clean up context, close panels, manage message history.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Keyboard Shortcuts -->
-    <section id="shortcuts" class="shortcuts">
-        <div class="container">
-            <h2 class="section-title">Keyboard-First</h2>
-            <p class="section-subtitle">Everything is a keystroke away. No menus, no clicking.</p>
-
-            <div class="shortcut-grid">
-                <div class="shortcut-group">
-                    <h3>Navigation</h3>
-                    <div class="shortcut-row"><kbd>Ctrl+P</kbd> <span>Command palette</span></div>
-                    <div class="shortcut-row"><kbd>Ctrl+N</kbd> <span>Next context panel</span></div>
-                    <div class="shortcut-row"><kbd>↑ ↓</kbd> <span>Scroll active panel</span></div>
-                    <div class="shortcut-row"><kbd>PgUp/PgDn</kbd> <span>Fast scroll</span></div>
-                </div>
-                <div class="shortcut-group">
-                    <h3>Chat</h3>
-                    <div class="shortcut-row"><kbd>Enter</kbd> <span>Send message</span></div>
-                    <div class="shortcut-row"><kbd>Shift+Enter</kbd> <span>New line</span></div>
-                    <div class="shortcut-row"><kbd>Ctrl+L</kbd> <span>Clear conversation</span></div>
-                    <div class="shortcut-row"><kbd>Esc</kbd> <span>Stop streaming</span></div>
-                </div>
-                <div class="shortcut-group">
-                    <h3>Context</h3>
-                    <div class="shortcut-row"><kbd>p1</kbd>–<kbd>p99</kbd> <span>Jump to panel</span></div>
-                    <div class="shortcut-row"><kbd>/cmd</kbd> <span>Run command</span></div>
-                    <div class="shortcut-row"><kbd>Ctrl+Q</kbd> <span>Quit</span></div>
-                    <div class="shortcut-row"><kbd>F12</kbd> <span>Performance overlay</span></div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Getting Started -->
-    <section id="getting-started" class="getting-started">
-        <div class="container">
-            <h2 class="section-title">Getting Started</h2>
-            <p class="section-subtitle">Up and running in minutes.</p>
-            
-            <!-- Main Terminal Content -->
-            <div class="terminal-wrapper" id="terminal-wrapper">
-                <!-- Boot Sequence (shown first) -->
-                <div id="boot-sequence" class="boot-sequence">
-                    <pre id="boot-text"></pre>
-                </div>
-
-                <!-- Main Interface (shown after boot) -->
-                <div id="main-interface" class="main-interface hidden">
-                    <!-- Header Bar -->
-                    <div class="header-bar">
-                        <span class="logo">⎈ CONTEXT-PILOT v2.0.1</span>
-                        <span class="status-bar">
-                            <span id="user-xp">XP: 0</span>
-                            <span id="user-level">LEVEL: 1</span>
-                            <span class="blink">●</span>
-                        </span>
-                    </div>
-
-                    <!-- Main Content Area with Sidebar -->
-                    <div class="main-content">
-                        <!-- Sidebar Panel List -->
-                        <div class="sidebar">
-                            <div class="panel-header">═ PANELS ═</div>
-                            <div class="panel-list" id="panel-list">
-                                <div class="panel-item active" data-panel="welcome">
-                                    <span class="panel-id">P1</span> WELCOME
-                                </div>
-                                <div class="panel-item locked" data-panel="features">
-                                    <span class="panel-id">P2</span> FEATURES <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="modules">
-                                    <span class="panel-id">P3</span> MODULES <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="demo">
-                                    <span class="panel-id">P4</span> DEMO <span class="lock">🔒</span>
-                                </div>
-                                <div class="panel-item locked" data-panel="install">
-                                    <span class="panel-id">P5</span> INSTALL <span class="lock">🔒</span>
-                                </div>
-                            </div>
-                            <div class="panel-footer">
-                                <div class="achievement-count">🏆 <span id="achievement-count">0</span>/10</div>
-                            </div>
+            <div class="use-case-terminal">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
                         </div>
-
-                        <!-- Main Panel Content -->
-                        <div class="panel-content">
-                            <div class="content-display" id="content-display">
-                                <!-- Content will be dynamically inserted here -->
-                            </div>
-
-                            <!-- Terminal Input at Bottom -->
-                            <div class="terminal-input-area">
-                                <div class="input-prompt">
-                                    <span class="prompt-symbol">❯</span>
-                                    <input type="text" id="command-input" class="command-input" autocomplete="off" spellcheck="false" placeholder="Type 'help' for commands...">
-                                </div>
-                                <div class="hint-bar" id="hint-bar">
-                                    💡 TIP: Type commands to navigate • Try: <span class="cmd-hint">help</span>, <span class="cmd-hint">next</span>, <span class="cmd-hint">demo</span>
-                                </div>
-                            </div>
-                        </div>
+                        <span class="terminal-title">callbacks</span>
                     </div>
+                    <pre class="terminal-body"><code><span class="t-green">CB1</span> <span class="t-white">rust-check</span>    <span class="t-dim">*.rs</span>     <span class="t-green">✓ Build passed</span>
+<span class="t-green">CB2</span> <span class="t-white">structure</span>     <span class="t-dim">*</span>        <span class="t-green">✓ Checks passed</span>
+<span class="t-green">CB3</span> <span class="t-white">test-suite</span>    <span class="t-dim">*.rs</span>     <span class="t-yellow">⟳ Running...</span>
+<span class="t-green">CB4</span> <span class="t-white">typst-watch</span>   <span class="t-dim">*.typ</span>    <span class="t-green">✓ Compiled</span>
 
-                    <!-- Achievement Notification -->
-                    <div class="achievement-popup hidden" id="achievement-popup">
-                        <div class="achievement-content">
-                            <div class="achievement-icon">🏆</div>
-                            <div class="achievement-text">
-                                <div class="achievement-title">ACHIEVEMENT UNLOCKED!</div>
-                                <div class="achievement-name" id="achievement-name"></div>
-                                <div class="achievement-xp">+<span id="achievement-xp">100</span> XP</div>
-                            </div>
-                        </div>
-                    </div>
+<span class="t-dim">── AI edits main.rs → CB1 fires → error →</span>
+<span class="t-dim">── AI sees error → fixes → CB1 fires → </span><span class="t-green">✓</span></code></pre>
                 </div>
-            </div>
-
-            <div class="requirements">
-                <h3>Requirements</h3>
-                <ul>
-                    <li><strong>Rust 1.83+</strong> — Install via <a href="https://rustup.rs" style="color: inherit; text-decoration: underline;">rustup.rs</a></li>
-                    <li><strong>tmux</strong> — Required for console integration (<code>apt install tmux</code> or <code>brew install tmux</code>)</li>
-                    <li><strong>API key</strong> — From Anthropic, OpenAI, DeepSeek, Grok (xAI), or Groq</li>
-                </ul>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <span class="logo-icon">⎈</span>
-                    <span class="logo-text">Context Pilot</span>
-                    <p class="footer-tagline">AI-native terminal IDE. You control the context.</p>
-                </div>
-                <div class="footer-links">
-                    <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
-                    <a href="https://github.com/bigmoostache/context-pilot/issues">Issues</a>
-                    <a href="https://github.com/bigmoostache/context-pilot/blob/master/CONTRIBUTING.md">Contributing</a>
-                    <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE">License (GPL-3.0)</a>
+<!-- Feature Bento Grid -->
+<section class="features">
+    <div class="container">
+        <div class="section-label">Everything Included</div>
+        <h2 class="section-title">58 tools. 14 modules.<br>One terminal.</h2>
+        <div class="bento-grid">
+            <div class="bento-card bento-large">
+                <div class="bento-icon">🛠</div>
+                <h3>58 Specialized Tools</h3>
+                <p>File editing, git operations, web search, PDF generation, console management, memory, todos — every tool your AI needs, designed for LLM consumption.</p>
+                <div class="bento-tags">
+                    <span>Edit</span><span>Write</span><span>Open</span><span>git</span><span>gh</span>
+                    <span>brave_search</span><span>typst</span><span>console</span><span>memory</span>
                 </div>
             </div>
-            <div class="footer-bottom">
-                <p>Built with 🦀 Rust + ratatui. Open source forever.</p>
+            <div class="bento-card">
+                <div class="bento-icon">🤖</div>
+                <h3>5 LLM Providers</h3>
+                <p>Anthropic, Claude Code, DeepSeek, Grok, Groq. Switch providers without changing your workflow.</p>
+            </div>
+            <div class="bento-card">
+                <div class="bento-icon">👤</div>
+                <h3>Agents & Skills</h3>
+                <p>Custom system prompts, loadable knowledge skills, and slash commands. Shape your AI's personality and expertise.</p>
+            </div>
+            <div class="bento-card">
+                <div class="bento-icon">🌐</div>
+                <h3>Web Search & Scrape</h3>
+                <p>Brave Search + Firecrawl integration. Your AI can research, read documentation, and scrape any website.</p>
+            </div>
+            <div class="bento-card">
+                <div class="bento-icon">📄</div>
+                <h3>PDF Generation</h3>
+                <p>Embedded Typst compiler. Create reports, invoices, and documents from code. Auto-recompile on edit.</p>
+            </div>
+            <div class="bento-card bento-large">
+                <div class="bento-icon">🔄</div>
+                <h3>Autonomous Workflows</h3>
+                <p>Auto-continuation with guard rails (cost, tokens, time, messages). The AI works through your todo list while you review. Spine notifications keep you informed.</p>
+                <div class="bento-tags">
+                    <span>spine_configure</span><span>todo_create</span><span>coucou</span><span>console_watch</span>
+                </div>
             </div>
         </div>
-    </footer>
+    </div>
+</section>
 
-    <!-- Back to Top Button -->
-    <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="18 15 12 9 6 15"></polyline>
-        </svg>
-    </button>
+<!-- How It Works -->
+<section class="how-it-works">
+    <div class="container">
+        <div class="section-label">How It Works</div>
+        <h2 class="section-title">Up and running in 2 minutes.</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">01</div>
+                <h3>Install</h3>
+                <code>git clone && ./deploy_local.sh</code>
+                <p>One command. Compiles from source. Installs to /usr/local/bin.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">02</div>
+                <h3>Configure</h3>
+                <code>export ANTHROPIC_API_KEY=sk-...</code>
+                <p>Add your API key. Pick your LLM provider. That's it.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">03</div>
+                <h3>Navigate to your project</h3>
+                <code>cd your-project && cpilot</code>
+                <p>Context Pilot reads your project structure and initializes.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">04</div>
+                <h3>Code with AI</h3>
+                <code>Talk to your AI. It manages its own context.</code>
+                <p>Memory persists. Callbacks catch errors. Context stays clean.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-    <!-- Copy Buttons -->
-    <script>
-    (function() {
-        document.querySelectorAll('.code-block').forEach(block => {
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = 'Copy';
-            btn.addEventListener('click', () => {
-                const code = block.querySelector('code').textContent;
-                navigator.clipboard.writeText(code).then(() => {
-                    btn.textContent = 'Copied!';
-                    btn.classList.add('copied');
-                    setTimeout(() => {
-                        btn.textContent = 'Copy';
-                        btn.classList.remove('copied');
-                    }, 2000);
-                });
-            });
-            block.style.position = 'relative';
-            block.appendChild(btn);
-        });
-    })();
-    </script>
+<!-- Comparison -->
+<section class="comparison">
+    <div class="container">
+        <div class="section-label">How It Compares</div>
+        <h2 class="section-title">Not a replacement. A force multiplier.</h2>
+        <p class="section-subtitle">
+            Context Pilot isn't another AI editor. It's the infrastructure layer that
+            makes any AI coding assistant dramatically more effective.
+        </p>
+        <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Cursor</th>
+                        <th>Aider</th>
+                        <th>Claude Code</th>
+                        <th class="highlight-col">Context Pilot</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Persistent memory across sessions</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="partial">~</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Structured context management</td>
+                        <td class="partial">~</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>File edit callbacks (auto-check)</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Multiple LLM providers</td>
+                        <td class="partial">~</td>
+                        <td class="yes">✓</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Web search & scraping</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>PDF / document generation</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Autonomous workflows with guard rails</td>
+                        <td class="no">✗</td>
+                        <td class="no">✗</td>
+                        <td class="partial">~</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Open source (AGPL-3.0)</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Terminal-native (no Electron)</td>
+                        <td class="no">✗</td>
+                        <td class="yes">✓</td>
+                        <td class="yes">✓</td>
+                        <td class="yes">✓</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
-    <!-- Navigation Toggle Script -->
-    <script>
-    (function() {
-        const navToggle = document.getElementById('nav-toggle');
-        const navLinks = document.querySelector('.nav-links');
-        
-        if (navToggle && navLinks) {
-            navToggle.addEventListener('click', () => {
-                const isOpen = navToggle.classList.contains('active');
-                navToggle.classList.toggle('active');
-                navToggle.setAttribute('aria-expanded', !isOpen);
-                navLinks.classList.toggle('nav-open');
-            });
-        }
-    })();
-    </script>
+<!-- Architecture -->
+<section class="architecture">
+    <div class="container">
+        <div class="section-label">Architecture</div>
+        <h2 class="section-title">Built for developers who read the source.</h2>
+        <div class="arch-grid">
+            <div class="arch-item">
+                <h4>Pure Rust</h4>
+                <p>~15K lines. Ratatui TUI framework. No Electron. No Node. Just fast, reliable Rust.</p>
+            </div>
+            <div class="arch-item">
+                <h4>Modular Workspace</h4>
+                <p>14 independent crates in a Cargo workspace. Activate only what you need. Each module owns its tools, panels, and state.</p>
+            </div>
+            <div class="arch-item">
+                <h4>Context Elements</h4>
+                <p>Everything the AI sees is a context element — files, panels, memories, tools. All visible, all manageable, all measurable in tokens.</p>
+            </div>
+            <div class="arch-item">
+                <h4>Persistence Layer</h4>
+                <p>State serialized to .context-pilot/. Memories, logs, todos, conversation history — everything survives restarts.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-    <!-- Scroll Animations -->
-    <script>
-    (function() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(e => {
-                if (e.isIntersecting) {
-                    e.target.classList.add('visible');
-                    observer.unobserve(e.target);
-                }
-            });
-        }, { threshold: 0.1 });
-        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-    })();
-    </script>
+<!-- FAQ -->
+<section class="faq">
+    <div class="container">
+        <div class="section-label">FAQ</div>
+        <h2 class="section-title">Frequently asked questions.</h2>
+        <div class="faq-list">
+            <details class="faq-item">
+                <summary>What LLM providers are supported?</summary>
+                <p>Anthropic (Claude), Claude Code (API key), DeepSeek, Grok (xAI), and Groq. You bring your own API key. No vendor lock-in.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Does it work on macOS / Windows?</summary>
+                <p>Currently Linux-native. macOS support is planned. Windows users can run it via WSL2 with zero code changes.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Is it free?</summary>
+                <p>Yes. Context Pilot is open source under AGPL-3.0. You only pay for LLM API usage (your own keys).</p>
+            </details>
+            <details class="faq-item">
+                <summary>How is this different from Cursor?</summary>
+                <p>Cursor is an IDE with built-in AI. Context Pilot is infrastructure that manages AI context — persistent memory, callbacks, structured tools. It's terminal-native, open source, and works with any LLM provider.</p>
+            </details>
+            <details class="faq-item">
+                <summary>How is this different from Aider?</summary>
+                <p>Aider is great for quick edits. Context Pilot adds structured context management (14 modules, 58 tools), persistent memory, file edit callbacks, web search, PDF generation, autonomous workflows, and a full TUI with real-time panels.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Can I use my own LLM / local models?</summary>
+                <p>Currently requires cloud API keys. Local model support (Ollama, LM Studio) is on the roadmap.</p>
+            </details>
+            <details class="faq-item">
+                <summary>How does the callback system work?</summary>
+                <p>You define callbacks with glob patterns (e.g., <code>*.rs</code>) and a bash script. When the AI edits a matching file, the script fires automatically. In blocking mode, the AI waits for the result and self-corrects if the check fails.</p>
+            </details>
+        </div>
+    </div>
+</section>
 
-    <!-- Terminal Animation -->
-    <script>
-    (function() {
-        const el = document.getElementById('terminal-anim');
-        const pauseBtn = document.getElementById('terminal-pause');
-        if (!el || !pauseBtn) return;
+<!-- Final CTA -->
+<section class="final-cta">
+    <div class="container">
+        <h2 class="section-title">Ready to give your AI a memory?</h2>
+        <p class="section-subtitle">
+            Open source. Free forever. Install in 2 minutes.
+        </p>
+        <div class="install-block install-block-large">
+            <code class="install-cmd">
+                <span class="install-prompt">$</span> git clone https://github.com/bigmoostache/context-pilot && cd context-pilot && ./deploy_local.sh
+            </code>
+            <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+        </div>
+        <div class="hero-buttons" style="margin-top: 2rem;">
+            <a href="docs/getting-started.html" class="btn btn-primary">Read the Docs</a>
+            <a href="https://github.com/bigmoostache/context-pilot" target="_blank" class="btn btn-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                Star on GitHub
+            </a>
+        </div>
+    </div>
+</section>
 
-        let isPaused = false;
-        let animationTimeout = null;
+<!-- Footer -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <span class="nav-logo-icon">⚙</span>
+                <span>Context Pilot</span>
+                <p class="footer-tagline">Your AI's copilot.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Product</h4>
+                <a href="docs/getting-started.html">Getting Started</a>
+                <a href="docs/tools.html">Tools Reference</a>
+                <a href="docs/modules.html">Modules</a>
+                <a href="docs/">Documentation</a>
+            </div>
+            <div class="footer-links">
+                <h4>Community</h4>
+                <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+                <a href="https://github.com/bigmoostache/context-pilot/issues" target="_blank">Issues</a>
+                <a href="https://github.com/bigmoostache/context-pilot/blob/master/CONTRIBUTING.md" target="_blank">Contributing</a>
+                <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License (AGPL-3.0)</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>Built with 🦀 Rust and ❤️ by the Context Pilot contributors.</p>
+        </div>
+    </div>
+</footer>
 
-        const C = (cls, text) => `<span class="${cls}">${text}</span>`;
-        const dim = t => C('t-dim', t);
-        const cyan = t => C('t-cyan', t);
-        const green = t => C('t-green', t);
-        const yellow = t => C('t-yellow', t);
-
-        // Scene 1: Panel list appears line by line
-        const panels = [
-            dim('┌─ Context Panels ──────────────────────────────────┐'),
-            `${cyan('P1')} ${green('Chat')}         ${dim('│')} 250 tokens   ${dim('│')} Conversation`,
-            `${cyan('P2')} ${green('Tree')}         ${dim('│')} 1,884 tokens ${dim('│')} Directory structure`,
-            `${cyan('P3')} ${green('Todos')}        ${dim('│')} 316 tokens   ${dim('│')} Task tracking`,
-            `${cyan('P4')} ${green('Memories')}     ${dim('│')} 279 tokens   ${dim('│')} Persistent notes`,
-            `${cyan('P5')} ${green('Overview')}     ${dim('│')} 1,104 tokens ${dim('│')} Context usage`,
-            `${cyan('P6')} ${green('Git')}          ${dim('│')} 11 tokens    ${dim('│')} Status &amp; diffs`,
-            dim('└────────────────────────────────────────────────────┘'),
-            dim('  Context: 5,092 / 200,000 tokens (2.5%)'),
-        ];
-
-        // Scene 2: User types a message
-        const userMsg = 'refactor the auth module to use async traits';
-
-        // Scene 3: AI response streams
-        const aiLines = [
-            `${dim('───────────────────────────────────────────────────')}`,
-            `${green('⚙')} Opening ${cyan('src/auth/mod.rs')}...`,
-            `${green('⚙')} Opening ${cyan('src/auth/provider.rs')}...`,
-            `${green('✓')} Replaced ${yellow('3')} sync trait methods with async fn`,
-            `${green('✓')} Updated ${yellow('12')} call sites across ${yellow('4')} files`,
-            `${green('✓')} All tests passing`,
-        ];
-
-        let lines = [];
-        let phase = 0;
-        let idx = 0;
-        let charIdx = 0;
-        let typingLine = '';
-
-        function render() {
-            let out = lines.join('\n');
-            if (typingLine) {
-                out += (lines.length ? '\n' : '') + typingLine;
-            }
-            // Always show cursor
-            out += (lines.length || typingLine ? '\n' : '') + `${yellow('❯')} ${C('t-blink', '█')}`;
-            el.innerHTML = out;
-        }
-
-        function tick() {
-            if (isPaused) return;
-
-            if (phase === 0) {
-                // Phase 0: panels appear one by one
-                if (idx < panels.length) {
-                    lines.push(panels[idx]);
-                    idx++;
-                    render();
-                    animationTimeout = setTimeout(tick, 80);
-                } else {
-                    phase = 1;
-                    idx = 0;
-                    charIdx = 0;
-                    render();
-                    animationTimeout = setTimeout(tick, 600);
-                }
-            } else if (phase === 1) {
-                // Phase 1: user types message
-                if (charIdx < userMsg.length) {
-                    charIdx++;
-                    // Replace cursor line with typing
-                    const typed = userMsg.slice(0, charIdx);
-                    el.innerHTML = lines.join('\n') + '\n' + `${yellow('❯')} ${typed}${C('t-blink', '█')}`;
-                    animationTimeout = setTimeout(tick, 35 + Math.random() * 40);
-                } else {
-                    // "Submit" — add the user line to lines
-                    lines.push(`${yellow('❯')} ${userMsg}`);
-                    phase = 2;
-                    idx = 0;
-                    render();
-                    animationTimeout = setTimeout(tick, 400);
-                }
-            } else if (phase === 2) {
-                // Phase 2: AI response streams in
-                if (idx < aiLines.length) {
-                    lines.push(aiLines[idx]);
-                    idx++;
-                    render();
-                    animationTimeout = setTimeout(tick, 300 + Math.random() * 200);
-                } else {
-                    // Done — pause then restart
-                    animationTimeout = setTimeout(() => {
-                        lines = [];
-                        phase = 0;
-                        idx = 0;
-                        charIdx = 0;
-                        typingLine = '';
-                        render();
-                        animationTimeout = setTimeout(tick, 500);
-                    }, 4000);
-                }
-            }
-        }
-
-        // Pause/Resume button
-        pauseBtn.addEventListener('click', () => {
-            isPaused = !isPaused;
-            const pauseIcon = pauseBtn.querySelector('.pause-icon');
-            const playIcon = pauseBtn.querySelector('.play-icon');
-            
-            if (isPaused) {
-                if (animationTimeout) clearTimeout(animationTimeout);
-                pauseIcon.style.display = 'none';
-                playIcon.style.display = 'block';
-                pauseBtn.setAttribute('aria-label', 'Resume animation');
-            } else {
-                pauseIcon.style.display = 'block';
-                playIcon.style.display = 'none';
-                pauseBtn.setAttribute('aria-label', 'Pause animation');
-                tick();
-            }
-        });
-
-        // Start after a small delay
-        animationTimeout = setTimeout(tick, 800);
-        render();
-    })();
-    </script>
-
-    <!-- Theme Toggle Script -->
-    <script>
-    (function() {
-        const themeToggle = document.querySelector('.theme-toggle');
-        const html = document.documentElement;
-        
-        // Check for saved theme preference or default to system preference
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-        
-        // Apply the theme
-        html.setAttribute('data-theme', currentTheme);
-        
-        // Toggle theme
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-        
-        // Listen for system theme changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme')) {
-                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-            }
-        });
-    })();
-    </script>
-
-    <!-- Back to Top Button Script -->
-    <script>
-    (function() {
-        const backToTop = document.getElementById('back-to-top');
-        
-        // Show/hide button based on scroll position
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 400) {
-                backToTop.classList.add('visible');
-            } else {
-                backToTop.classList.remove('visible');
-            }
-        });
-        
-        // Scroll to top on click
-        backToTop.addEventListener('click', () => {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        });
-    })();
-    </script>
+<script src="script.js"></script>
 </body>
 </html>
