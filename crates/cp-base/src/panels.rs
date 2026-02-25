@@ -232,9 +232,13 @@ pub trait Panel {
     }
 
     /// Check whether this panel should automatically close itself.
-    /// Called periodically for panels that have been loading for >1s without
-    /// producing cached content.  Return `true` to kill the panel.
-    /// Default: `false` (panel stays alive).
+    /// Called every ~100ms for ALL panels. Implementations must be fast:
+    ///
+    /// - Default: instant `false`
+    /// - FilePanel: only checks disk if still loading (no cached_content)
+    /// - ConsolePanel: callback consoles check for newer siblings; others only check when loading
+    ///
+    /// Return `true` to kill the panel.
     fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
         false
     }

@@ -25,6 +25,10 @@ impl Panel for FilePanel {
     }
 
     fn suicide(&self, ctx: &ContextElement, _state: &State) -> bool {
+        // Only check when still loading — don't kill panels with content
+        if ctx.cached_content.is_some() {
+            return false;
+        }
         // If the file has been deleted from disk, close the panel
         if let Some(path) = ctx.get_meta_str("file_path") {
             return !PathBuf::from(path).exists();

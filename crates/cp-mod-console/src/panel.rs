@@ -31,12 +31,34 @@ impl Panel for ConsolePanel {
     }
 
     fn suicide(&self, ctx: &ContextElement, state: &State) -> bool {
-        // If the console session no longer exists (e.g. server reloaded), close the panel
-        if let Some(session_name) = ctx.get_meta_str("console_name") {
-            let cs = ConsoleState::get(state);
-            return !cs.sessions.contains_key(session_name);
+        let session_name = match ctx.get_meta_str("console_name") {
+            Some(n) => n,
+            None => return false,
+        };
+
+        // Callback consoles: suicide if a newer console with the same callback_id exists.
+        // This auto-closes stale failure panels when the callback re-fires.
+        if let Some(cb_id) = ctx.get_meta_str("callback_id") {
+            let my_ts = ctx.last_refresh_ms;
+            let has_newer = state.context.iter().any(|c| {
+                c.id != ctx.id
+                    && c.context_type == ContextType::new(ContextType::CONSOLE)
+                    && c.get_meta_str("callback_id") == Some(cb_id)
+                    && c.last_refresh_ms > my_ts
+            });
+            if has_newer {
+                return true;
+            }
         }
-        false
+
+        // Non-callback consoles (or no newer sibling): only check when loading
+        if ctx.cached_content.is_some() {
+            return false;
+        }
+
+        // If the console session no longer exists (e.g. server reloaded), close the panel
+        let cs = ConsoleState::get(state);
+        !cs.sessions.contains_key(session_name)
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {

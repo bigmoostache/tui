@@ -204,15 +204,12 @@ impl App {
         let mut suicide_indices: Vec<usize> = Vec::new();
 
         for (i, ctx) in self.state.context.iter().enumerate() {
-            // Suicide check: panels loading for >1s without content
-            if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {
-                let age_ms = current_ms.saturating_sub(ctx.last_refresh_ms);
-                if age_ms >= 1_000 {
-                    let panel = crate::app::panels::get_panel(&ctx.context_type);
-                    if panel.suicide(ctx, &self.state) {
-                        suicide_indices.push(i);
-                        continue;
-                    }
+            // Suicide check: ask panel if it wants to auto-close
+            {
+                let panel = crate::app::panels::get_panel(&ctx.context_type);
+                if panel.suicide(ctx, &self.state) {
+                    suicide_indices.push(i);
+                    continue;
                 }
             }
 
