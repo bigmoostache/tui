@@ -321,7 +321,6 @@ pub mod error {
         Network(String),
         Api { status: u16, body: String },
         StreamRead(String),
-        Parse(String),
     }
 
     impl fmt::Display for LlmError {
@@ -331,7 +330,6 @@ pub mod error {
                 LlmError::Network(msg) => write!(f, "Network error: {}", msg),
                 LlmError::Api { status, body } => write!(f, "API error {}: {}", status, body),
                 LlmError::StreamRead(msg) => write!(f, "Stream read error: {}", msg),
-                LlmError::Parse(msg) => write!(f, "Parse error: {}", msg),
             }
         }
     }
@@ -370,12 +368,6 @@ pub mod error {
         fn display_stream_read() {
             let e = LlmError::StreamRead("connection reset".into());
             assert_eq!(e.to_string(), "Stream read error: connection reset");
-        }
-
-        #[test]
-        fn display_parse() {
-            let e = LlmError::Parse("invalid json".into());
-            assert_eq!(e.to_string(), "Parse error: invalid json");
         }
     }
 }

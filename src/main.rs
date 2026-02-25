@@ -15,7 +15,6 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-use app::background::TlDrResult;
 use app::{App, ensure_default_agent, ensure_default_contexts};
 use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
@@ -102,12 +101,11 @@ fn main() -> io::Result<()> {
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();
-    let (tldr_tx, tldr_rx) = mpsc::channel::<TlDrResult>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, cache_rx)?;
+    app.run(&mut terminal, tx, rx, cache_rx)?;
 
     // Cleanup
     disable_raw_mode()?;

@@ -204,8 +204,7 @@ impl App {
             message_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
+
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
@@ -231,8 +230,7 @@ impl App {
             message_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
+
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
@@ -325,8 +323,7 @@ impl App {
             message_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
+
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,

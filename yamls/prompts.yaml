@@ -1,9 +1,5 @@
 # System prompts and panel messages
 
-# TL;DR summarization prompt
-tldr_prompt: "Summarize the following message in 1-2 short sentences (max 50 words). Be concise and capture the key point:\n\n"
-tldr_min_tokens: 25
-
 # Panel display messages
 panel:
   header: "Beginning of dynamic panel display. All content displayed below may be considered up to date."

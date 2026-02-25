@@ -233,10 +233,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
                 continue;
             }
 
-            let message_content = match msg.status {
-                MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
-                _ => msg.content.clone(),
-            };
+            let message_content = msg.content.clone();
 
             if !message_content.is_empty() {
                 json_messages.push(serde_json::json!({

@@ -1,10 +1,8 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::app::background::{TlDrResult, generate_tldr};
 use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
 use crate::infra::constants::{DEFAULT_WORKER_ID, MAX_API_RETRIES};
-use crate::state::persistence::build_message_op;
 
 use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
@@ -112,22 +110,6 @@ impl App {
         }
     }
 
-    pub(super) fn process_tldr_results(&mut self, tldr_rx: &Receiver<TlDrResult>) {
-        while let Ok(tldr) = tldr_rx.try_recv() {
-            {
-                let ts = cp_mod_tree::TreeState::get_mut(&mut self.state);
-                ts.pending_tldrs = ts.pending_tldrs.saturating_sub(1);
-            }
-            self.state.dirty = true;
-            if let Some(msg) = self.state.messages.iter_mut().find(|m| m.id == tldr.message_id) {
-                msg.tl_dr = Some(tldr.tl_dr);
-                msg.tl_dr_token_count = tldr.token_count;
-                let op = build_message_op(msg);
-                self.writer.send_message(op);
-            }
-        }
-    }
-
     pub(super) fn process_api_check_results(&mut self) {
         if let Some(rx) = &self.api_check_rx
             && let Ok(result) = rx.try_recv()
@@ -161,7 +143,7 @@ impl App {
         );
     }
 
-    pub(super) fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
+    pub(super) fn finalize_stream(&mut self) {
         if !self.state.is_streaming {
             return;
         }
@@ -198,17 +180,8 @@ impl App {
                 },
             ) {
                 ActionResult::SaveMessage(id) => {
-                    let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
+                    if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {
                         self.save_message_async(msg);
-                        if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
-                            Some((msg.id.clone(), msg.content.clone()))
-                        } else {
-                            None
-                        }
-                    });
-                    if let Some((msg_id, content)) = tldr_info {
-                        cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
-                        generate_tldr(msg_id, content, tldr_tx.clone());
                     }
                     self.save_state_async();
                 }

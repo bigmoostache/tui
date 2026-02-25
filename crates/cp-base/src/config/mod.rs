@@ -10,8 +10,6 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct PromptsConfig {
-    pub tldr_prompt: String,
-    pub tldr_min_tokens: usize,
     pub panel: PanelPrompts,
     #[serde(default)]
     pub context_threshold_notification: String,
@@ -319,9 +317,6 @@ pub mod icons {
     pub fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
     }
-    pub fn status_summarized() -> String {
-        normalize_icon(&active_theme().status.summarized)
-    }
     pub fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
     }
@@ -364,12 +359,6 @@ pub mod library {
 pub mod prompts {
     use crate::config::PROMPTS;
 
-    pub fn tldr_prompt() -> &'static str {
-        &PROMPTS.tldr_prompt
-    }
-    pub fn tldr_min_tokens() -> usize {
-        PROMPTS.tldr_min_tokens
-    }
     pub fn panel_header() -> &'static str {
         &PROMPTS.panel.header
     }

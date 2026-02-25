@@ -33,15 +33,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    let pending_tldrs = cp_mod_tree::TreeState::get(state).pending_tldrs;
-    if pending_tldrs > 0 {
-        spans.push(Span::styled(
-            format!(" {} SUMMARIZING {} ", spin, pending_tldrs),
-            Style::default().fg(theme::bg_base()).bg(theme::warning()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
     // Count loading context elements (those without cached content)
     let loading_count =
         state.context.iter().filter(|c| c.cached_content.is_none() && c.context_type.needs_cache()).count();
@@ -61,7 +52,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
-    } else if !state.is_streaming && pending_tldrs == 0 && loading_count == 0 {
+    } else if !state.is_streaming && loading_count == 0 {
         // If nothing active, show READY
         spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
         spans.push(Span::styled(" ", base_style));

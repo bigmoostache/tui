@@ -15,7 +15,6 @@ pub enum MessageType {
 pub enum MessageStatus {
     #[default]
     Full,
-    Summarized,
     Deleted,
     Detached,
 }
@@ -51,10 +50,6 @@ pub struct Message {
     pub content: String,
     #[serde(default)]
     pub content_token_count: usize,
-    #[serde(default)]
-    pub tl_dr: Option<String>,
-    #[serde(default)]
-    pub tl_dr_token_count: usize,
     /// Message status for context management
     #[serde(default)]
     pub status: MessageStatus,
@@ -82,8 +77,6 @@ impl Message {
             message_type: MessageType::TextMessage,
             content,
             content_token_count: token_count,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
@@ -101,8 +94,6 @@ impl Message {
             message_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
@@ -133,8 +124,6 @@ pub mod test_helpers {
                     message_type,
                     content: String::new(),
                     content_token_count: 0,
-                    tl_dr: None,
-                    tl_dr_token_count: 0,
                     status: MessageStatus::Full,
                     tool_uses: Vec::new(),
                     tool_results: Vec::new(),
@@ -191,11 +180,6 @@ pub mod test_helpers {
             self
         }
 
-        pub fn tl_dr(mut self, summary: &str) -> Self {
-            self.msg.tl_dr = Some(summary.to_string());
-            self
-        }
-
         pub fn build(self) -> Message {
             self.msg
         }
@@ -225,12 +209,8 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
                 }
             }
             MessageType::TextMessage => {
-                let content = match msg.status {
-                    MessageStatus::Summarized => msg.tl_dr.as_deref().unwrap_or(&msg.content),
-                    _ => &msg.content,
-                };
-                if !content.is_empty() {
-                    output += &format!("[{}]: {}\n", msg.role, content);
+                if !msg.content.is_empty() {
+                    output += &format!("[{}]: {}\n", msg.role, msg.content);
                 }
             }
         }
@@ -267,15 +247,6 @@ mod tests {
         assert!(chunk.contains("visible"));
         assert!(!chunk.contains("deleted"));
         assert!(!chunk.contains("detached"));
-    }
-
-    #[test]
-    fn format_summarized_uses_tldr() {
-        let msgs =
-            vec![MessageBuilder::assistant("long content").status(MessageStatus::Summarized).tl_dr("short").build()];
-        let chunk = format_messages_to_chunk(&msgs);
-        assert!(chunk.contains("[assistant]: short\n"));
-        assert!(!chunk.contains("long content"));
     }
 
     #[test]

@@ -63,10 +63,7 @@ pub(super) fn messages_to_api(
                 continue;
             }
         } else {
-            let message_content = match msg.status {
-                MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
-                _ => msg.content.clone(),
-            };
+            let message_content = msg.content.clone();
 
             if !message_content.is_empty() {
                 content_blocks.push(ContentBlock::Text { text: message_content });

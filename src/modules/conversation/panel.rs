@@ -26,17 +26,14 @@ impl ConversationPanel {
         // Include all fields that affect rendering
         let status_num = match msg.status {
             MessageStatus::Full => 0u8,
-            MessageStatus::Summarized => 1,
             MessageStatus::Deleted => 2,
             MessageStatus::Detached => 3,
         };
-        let tl_dr_str = msg.tl_dr.as_deref().unwrap_or("");
         let tool_uses_len = msg.tool_uses.len();
         let tool_results_len = msg.tool_results.len();
 
         hash_values(&[
             msg.content.as_str(),
-            tl_dr_str,
             &format!(
                 "{}{}{}{}{}{}",
                 status_num, viewport_width, dev_mode as u8, tool_uses_len, tool_results_len, msg.input_tokens
@@ -68,7 +65,6 @@ impl ConversationPanel {
             std::hash::Hash::hash(&msg.id, &mut hasher);
             std::hash::Hash::hash(&msg.content, &mut hasher);
             std::hash::Hash::hash(&msg.role, &mut hasher);
-            std::hash::Hash::hash(&msg.tl_dr, &mut hasher);
             std::hash::Hash::hash(&msg.status, &mut hasher);
             std::hash::Hash::hash(&msg.tool_uses.len(), &mut hasher);
             std::hash::Hash::hash(&msg.tool_results.len(), &mut hasher);

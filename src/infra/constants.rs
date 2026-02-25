@@ -2,14 +2,8 @@
 // API & MODELS
 // =============================================================================
 
-/// Model for TL;DR summarization
-pub const MODEL_TLDR: &str = "claude-opus-4-5";
-
 /// Maximum tokens for main response
 pub const MAX_RESPONSE_TOKENS: u32 = 128000;
-
-/// Maximum tokens for TL;DR summarization
-pub const MAX_TLDR_TOKENS: u32 = 100;
 
 /// Anthropic API endpoint
 pub const API_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
@@ -227,9 +221,6 @@ pub mod icons {
     pub fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
     }
-    pub fn status_summarized() -> String {
-        normalize_icon(&active_theme().status.summarized)
-    }
     pub fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
     }
@@ -251,12 +242,6 @@ pub mod library {
 pub mod prompts {
     use crate::infra::config::PROMPTS;
 
-    pub fn tldr_prompt() -> &'static str {
-        &PROMPTS.tldr_prompt
-    }
-    pub fn tldr_min_tokens() -> usize {
-        PROMPTS.tldr_min_tokens
-    }
     pub fn panel_header() -> &'static str {
         &PROMPTS.panel.header
     }

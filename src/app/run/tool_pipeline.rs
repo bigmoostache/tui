@@ -1,7 +1,6 @@
 use std::sync::mpsc::Sender;
 
 use crate::app::actions::clean_llm_id_prefix;
-use crate::app::background::{TlDrResult, generate_tldr};
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
 use crate::infra::tools::{execute_tool, perform_reload};
@@ -15,7 +14,7 @@ use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use crate::app::App;
 
 impl App {
-    pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
+    pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
         if !self.state.is_streaming
             || self.pending_done.is_none()
             || !self.typewriter.pending_chars.is_empty()
@@ -38,7 +37,6 @@ impl App {
         let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
 
         // Finalize current assistant message
-        let mut needs_tldr: Option<(String, String)> = None;
         if let Some(msg) = self.state.messages.last_mut()
             && msg.role == "assistant"
         {
@@ -46,13 +44,6 @@ impl App {
             msg.content = clean_llm_id_prefix(&msg.content);
             let op = build_message_op(msg);
             self.writer.send_message(op);
-            if !msg.content.trim().is_empty() && msg.tl_dr.is_none() {
-                needs_tldr = Some((msg.id.clone(), msg.content.clone()));
-            }
-        }
-        if let Some((id, content)) = needs_tldr {
-            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
-            generate_tldr(id, content, tldr_tx.clone());
         }
 
         // Create tool call messages
@@ -69,8 +60,6 @@ impl App {
                 message_type: MessageType::ToolCall,
                 content: String::new(),
                 content_token_count: 0,
-                tl_dr: None,
-                tl_dr_token_count: 0,
                 status: MessageStatus::Full,
                 tool_uses: vec![ToolUseRecord {
                     id: tool.id.clone(),
@@ -194,8 +183,6 @@ impl App {
             message_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
@@ -223,8 +210,6 @@ impl App {
             message_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
@@ -366,8 +351,6 @@ impl App {
             message_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
@@ -394,8 +377,6 @@ impl App {
             message_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            tl_dr: None,
-            tl_dr_token_count: 0,
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),

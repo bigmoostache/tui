@@ -143,14 +143,10 @@ pub(crate) fn render_message(
 
     let status_icon = match msg.status {
         MessageStatus::Full => icons::status_full(),
-        MessageStatus::Summarized => icons::status_summarized(),
         MessageStatus::Deleted | MessageStatus::Detached => icons::status_deleted(),
     };
 
-    let content = match msg.status {
-        MessageStatus::Summarized => msg.tl_dr.as_deref().unwrap_or(&msg.content),
-        _ => &msg.content,
-    };
+    let content = &msg.content;
 
     let prefix = format!("{}{} ", role_icon, status_icon);
     let prefix_width = prefix.chars().count();
@@ -265,13 +261,6 @@ pub(crate) fn render_message(
             }
             i += 1;
         }
-    }
-
-    if msg.status == MessageStatus::Summarized {
-        lines.push(Line::from(vec![
-            Span::styled(" ".repeat(prefix_width), base_style),
-            Span::styled(" TL;DR ".to_string(), Style::default().fg(theme::bg_base()).bg(theme::warning())),
-        ]));
     }
 
     // Dev mode: show token counts

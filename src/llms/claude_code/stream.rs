@@ -214,10 +214,7 @@ impl ClaudeCodeClient {
             }
 
             // Regular text message
-            let message_content = match msg.status {
-                MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
-                _ => msg.content.clone(),
-            };
+            let message_content = msg.content.clone();
 
             if !message_content.is_empty() {
                 // Use simple string content like Python example

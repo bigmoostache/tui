@@ -6,7 +6,6 @@ use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::app::background::{TlDrResult, generate_tldr};
 use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
 use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
@@ -25,8 +24,6 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
         tx: Sender<StreamEvent>,
         rx: Receiver<StreamEvent>,
-        tldr_tx: Sender<TlDrResult>,
-        tldr_rx: Receiver<TlDrResult>,
         cache_rx: Receiver<CacheUpdate>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
@@ -61,7 +58,7 @@ impl App {
                 // Handle command palette events first if it's open
                 if self.command_palette.is_open {
                     if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, &tx, &tldr_tx);
+                        self.handle_action(action, &tx);
                     }
                     self.state.dirty = true;
 
@@ -108,7 +105,7 @@ impl App {
                     self.command_palette.open(&self.state);
                     self.state.dirty = true;
                 } else {
-                    self.handle_action(action, &tx, &tldr_tx);
+                    self.handle_action(action, &tx);
                 }
 
                 // Render immediately after input for instant feedback
@@ -126,7 +123,6 @@ impl App {
             self.process_stream_events(&rx);
             self.handle_retry(&tx);
             self.process_typewriter();
-            self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
             // Check if we're waiting for panels and they're ready (non-blocking)
@@ -143,9 +139,9 @@ impl App {
                 self.sync_gh_watches();
             }
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx, &tldr_tx);
-            self.finalize_stream(&tldr_tx);
-            self.check_spine(&tx, &tldr_tx);
+            self.handle_tool_execution(&tx);
+            self.finalize_stream();
+            self.check_spine(&tx);
             self.process_api_check_results();
 
             // Check ownership periodically (every 1 second)
@@ -182,7 +178,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
+    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
         self.state.dirty = true;
         match apply_action(&mut self.state, action) {
@@ -218,20 +214,11 @@ impl App {
             ActionResult::Save => {
                 self.save_state_async();
                 // Check spine synchronously for responsive auto-continuation
-                self.check_spine(tx, tldr_tx);
+                self.check_spine(tx);
             }
             ActionResult::SaveMessage(id) => {
-                let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
+                if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {
                     self.save_message_async(msg);
-                    if msg.role == "assistant" && msg.tl_dr.is_none() && !msg.content.is_empty() {
-                        Some((msg.id.clone(), msg.content.clone()))
-                    } else {
-                        None
-                    }
-                });
-                if let Some((msg_id, content)) = tldr_info {
-                    cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
-                    generate_tldr(msg_id, content, tldr_tx.clone());
                 }
                 self.save_state_async();
             }
@@ -248,7 +235,7 @@ impl App {
     /// Check the spine for auto-continuation decisions.
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
-    fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
+    fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
         use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
         // Sync TodoWatcher: ensure it exists iff continue_until_todos_done is true
@@ -273,16 +260,6 @@ impl App {
                 if should_stream {
                     self.typewriter.reset();
                     self.pending_tools.clear();
-                    // Generate TL;DR for synthetic user message
-                    if self.state.messages.len() >= 2 {
-                        let user_msg = &self.state.messages[self.state.messages.len() - 2];
-                        if user_msg.role == "user" && user_msg.tl_dr.is_none() {
-                            let tldr_id = user_msg.id.clone();
-                            let tldr_content = user_msg.content.clone();
-                            cp_mod_tree::TreeState::get_mut(&mut self.state).pending_tldrs += 1;
-                            generate_tldr(tldr_id, tldr_content, tldr_tx.clone());
-                        }
-                    }
                     let ctx = prepare_stream_context(&mut self.state, false);
                     let system_prompt = get_active_agent_content(&self.state);
                     start_streaming(
@@ -330,7 +307,6 @@ impl App {
 
         // Check if there's any active operation that needs spinner animation
         let has_active_spinner = self.state.is_streaming
-            || cp_mod_tree::TreeState::get(&self.state).pending_tldrs > 0
             || self.state.api_check_in_progress
             || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 

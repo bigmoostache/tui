@@ -31,7 +31,6 @@ pub struct TreeState {
     pub tree_filter: String,
     pub tree_open_folders: Vec<String>,
     pub tree_descriptions: Vec<TreeFileDescription>,
-    pub pending_tldrs: usize,
 }
 
 impl Default for TreeState {
@@ -46,7 +45,6 @@ impl TreeState {
             tree_filter: DEFAULT_TREE_FILTER.to_string(),
             tree_open_folders: vec![".".to_string()],
             tree_descriptions: vec![],
-            pending_tldrs: 0,
         }
     }
 

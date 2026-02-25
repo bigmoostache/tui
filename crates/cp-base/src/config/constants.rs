@@ -2,14 +2,8 @@
 // API & MODELS
 // =============================================================================
 
-/// Model for TL;DR summarization
-pub const MODEL_TLDR: &str = "claude-opus-4-5";
-
 /// Maximum tokens for main response
 pub const MAX_RESPONSE_TOKENS: u32 = 16384;
-
-/// Maximum tokens for TL;DR summarization
-pub const MAX_TLDR_TOKENS: u32 = 100;
 
 /// Anthropic API endpoint
 pub const API_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
