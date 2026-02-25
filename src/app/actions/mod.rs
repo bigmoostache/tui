@@ -471,6 +471,21 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.dirty = true;
             ActionResult::Save
         }
+        Action::ConfigSelectSecondaryProvider(provider) => {
+            state.secondary_provider = provider;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryAnthropicModel(model) => {
+            state.secondary_anthropic_model = model;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigToggleReverie => {
+            state.reverie_enabled = !state.reverie_enabled;
+            state.dirty = true;
+            ActionResult::Save
+        }
         Action::None => ActionResult::Nothing,
     }
 }

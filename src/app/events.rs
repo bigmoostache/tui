@@ -128,6 +128,12 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('T') => Some(Action::ConfigPrevTheme),
         // Toggle auto-continuation
         KeyCode::Char('s') => Some(Action::ConfigToggleAutoContinue),
+        // Toggle reverie (context optimizer)
+        KeyCode::Char('r') => Some(Action::ConfigToggleReverie),
+        // Secondary model selection (for reverie)
+        KeyCode::Char('e') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeOpus45)),
+        KeyCode::Char('f') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+        KeyCode::Char('g') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeHaiku45)),
         // Up/Down select which bar to edit
         KeyCode::Up => Some(Action::ConfigSelectPrevBar),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),
