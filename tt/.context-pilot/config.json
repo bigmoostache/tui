@@ -2,11 +2,20 @@
   "schema_version": 1,
   "reload_requested": false,
   "active_theme": "dnd",
-  "owner_pid": 2931781,
-  "selected_context": 7,
+  "owner_pid": 3306738,
+  "selected_context": 0,
   "draft_input": "",
   "draft_cursor": 0,
   "modules": {
+    "system": {
+      "active_agent_id": "default",
+      "loaded_skill_ids": []
+    },
+    "memory": {
+      "memories": [],
+      "next_memory_id": 1,
+      "open_memory_ids": []
+    },
     "callback": {
       "definitions": [
         {
@@ -15,7 +24,7 @@
           "built_in_command": "bash -c '/usr/local/bin/cpilot typst-recompile-watched $CP_CHANGED_FILES'",
           "cwd": null,
           "description": "Recompile watched .typ documents when their dependencies change",
-          "id": "CB5",
+          "id": "CB8",
           "name": "typst-watchlist",
           "one_at_a_time": false,
           "pattern": "*",
@@ -23,34 +32,34 @@
           "timeout_secs": 60
         }
       ],
-      "next_id": 6
+      "next_id": 9
     },
     "core": {
       "active_modules": [
         "files",
+        "typst",
         "tree",
-        "core",
-        "questions",
-        "conversation_history_panel",
         "console",
-        "todo",
-        "preset",
-        "brave",
-        "system",
+        "spine",
         "conversation_panel",
         "scratchpad",
-        "logs",
+        "questions",
         "github",
+        "todo",
+        "logs",
+        "conversation_history_panel",
+        "system",
         "callback",
-        "spine",
-        "typst",
-        "git",
+        "firecrawl",
         "memory",
-        "firecrawl"
+        "brave",
+        "git",
+        "core",
+        "preset"
       ],
       "anthropic_model": "claude-opus45",
-      "cache_hit_tokens": 28452,
-      "cache_miss_tokens": 74410,
+      "cache_hit_tokens": 167395,
+      "cache_miss_tokens": 144854,
       "cleaning_target_proportion": 0.699999988079071,
       "cleaning_threshold": 0.699999988079071,
       "context_budget": null,
@@ -59,20 +68,11 @@
       "disabled_tools": [
         "panel_goto_page"
       ],
-      "global_next_uid": 68,
+      "global_next_uid": 130,
       "grok_model": "grok41-fast",
       "groq_model": "gpt-oss120b",
       "llm_provider": "claudecode",
-      "total_output_tokens": 580
-    },
-    "memory": {
-      "memories": [],
-      "next_memory_id": 1,
-      "open_memory_ids": []
-    },
-    "system": {
-      "active_agent_id": "default",
-      "loaded_skill_ids": []
+      "total_output_tokens": 1372
     },
     "tree": {
       "tree_descriptions": [],

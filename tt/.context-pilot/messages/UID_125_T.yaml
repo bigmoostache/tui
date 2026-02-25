@@ -1,0 +1,16 @@
+id: T14
+uid: UID_125_T
+role: assistant
+message_type: tool_call
+content: ''
+content_token_count: 0
+status: full
+tool_uses:
+- id: toolu_01Cx2fRHTCCngE82ijnsM2Hf
+  name: todo_update
+  input:
+    updates:
+    - id: X4
+      status: done
+input_tokens: 0
+timestamp_ms: 1772044653187

@@ -1,0 +1,18 @@
+id: R4
+uid: UID_99_R
+role: user
+message_type: tool_result
+content: ''
+content_token_count: 0
+status: full
+tool_results:
+- tool_use_id: toolu_01TgNg3kqJjwDMDTCfCTLPmr
+  content: |-
+    Spine configured:
+      • continue_until_todos_done = true
+      • max_cost = $1.00
+      • reset runtime counters
+  is_error: false
+  tool_name: spine_configure
+input_tokens: 0
+timestamp_ms: 1772044545531

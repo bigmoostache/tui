@@ -33,6 +33,7 @@ impl App {
         let _guard = crate::profile!("app::tool_exec");
 
         self.state.dirty = true;
+        self.state.is_tooling = true;
         let tools = std::mem::take(&mut self.pending_tools);
         let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
 

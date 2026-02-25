@@ -1,0 +1,16 @@
+id: R8
+uid: UID_121_R
+role: user
+message_type: tool_result
+content: ''
+content_token_count: 0
+status: full
+tool_results:
+- tool_use_id: toolu_012RhTNAeUURkAdcG2VM6GYe
+  content: |-
+    Created 1 todo(s):
+    X4: Placeholder task
+  is_error: false
+  tool_name: todo_create
+input_tokens: 0
+timestamp_ms: 1772044647681

@@ -77,6 +77,10 @@ pub struct State {
     pub paste_buffer_labels: Vec<Option<String>>,
     pub selected_context: usize,
     pub is_streaming: bool,
+    /// Whether the system is currently executing tool calls (between stream ticks).
+    /// True when tools are being dispatched, panels loading, console waits, or sleep timers.
+    /// The LLM is not receiving tokens during this phase.
+    pub is_tooling: bool,
     /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
     pub last_stop_reason: Option<String>,
     pub scroll_offset: f32,
@@ -203,6 +207,7 @@ impl Default for State {
             paste_buffer_labels: vec![],
             selected_context: 0,
             is_streaming: false,
+            is_tooling: false,
             last_stop_reason: None,
             scroll_offset: 0.0,
             user_scrolled: false,

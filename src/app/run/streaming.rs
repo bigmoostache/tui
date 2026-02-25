@@ -124,6 +124,7 @@ impl App {
 
     /// Continue streaming after tool execution (called when panels are ready).
     pub(super) fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
+        self.state.is_tooling = false;
         let ctx = prepare_stream_context(&mut self.state, true);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();

@@ -1,0 +1,15 @@
+id: T9
+uid: UID_104_T
+role: assistant
+message_type: tool_call
+content: ''
+content_token_count: 0
+status: full
+tool_uses:
+- id: toolu_01KRJgdJJmsT4bKUuy6SZAYx
+  name: notification_mark_processed
+  input:
+    ids:
+    - N78
+input_tokens: 0
+timestamp_ms: 1772044554334

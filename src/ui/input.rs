@@ -15,16 +15,49 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
     let mut spans = vec![Span::styled(" ", base_style)];
 
-    // Show all active states as separate badges with spinners
-    if state.is_streaming {
+    // === Primary status badge (mutually exclusive, priority order) ===
+    let has_question_form = state.get_ext::<cp_base::ui::PendingQuestionForm>().is_some();
+    let has_timed_watcher = {
+        use cp_base::state::watchers::WatcherRegistry;
+        state
+            .get_ext::<WatcherRegistry>()
+            .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
+    };
+
+    if let Some(ref reason) = state.guard_rail_blocked {
+        // BLOCKED — guard rail is preventing auto-continuation
+        spans.push(Span::styled(
+            format!(" BLOCKED: {} ", reason),
+            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
+        ));
+    } else if state.is_streaming && !state.is_tooling {
+        // STREAMING — actively receiving tokens from API
         spans.push(Span::styled(
             format!(" {} STREAMING ", spin),
             Style::default().fg(theme::bg_base()).bg(theme::success()).bold(),
         ));
-        spans.push(Span::styled(" ", base_style));
+    } else if state.is_streaming && state.is_tooling {
+        // TOOLING — stream active but executing tool calls
+        spans.push(Span::styled(
+            format!(" {} TOOLING ", spin),
+            Style::default().fg(theme::bg_base()).bg(theme::accent()).bold(),
+        ));
+    } else if has_question_form {
+        // QUESTIONING — waiting for user to answer a question form
+        spans.push(Span::styled(" QUESTIONING ", Style::default().fg(theme::bg_base()).bg(theme::warning()).bold()));
+    } else if has_timed_watcher {
+        // WAITING — idle but a coucou/watcher will fire
+        spans.push(Span::styled(
+            format!(" {} WAITING ", spin),
+            Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
+        ));
+    } else {
+        // READY — default idle state
+        spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
     }
+    spans.push(Span::styled(" ", base_style));
 
-    // Show retry count when retrying after API errors
+    // Show retry count when retrying after API errors (secondary badge)
     if state.api_retry_count > 0 {
         spans.push(Span::styled(
             format!(" RETRY {}/{} ", state.api_retry_count, crate::infra::constants::MAX_API_RETRIES),
@@ -33,7 +66,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    // Count loading context elements (those without cached content)
+    // Count loading context elements (secondary badge)
     let loading_count =
         state.context.iter().filter(|c| c.cached_content.is_none() && c.context_type.needs_cache()).count();
 
@@ -42,19 +75,6 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             format!(" {} LOADING {} ", spin, loading_count),
             Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold(),
         ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // Show guard rail block reason if present
-    if let Some(ref reason) = state.guard_rail_blocked {
-        spans.push(Span::styled(
-            format!(" BLOCKED: {} ", reason),
-            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    } else if !state.is_streaming && loading_count == 0 {
-        // If nothing active, show READY
-        spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 

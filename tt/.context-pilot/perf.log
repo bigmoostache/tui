@@ -3,3 +3,11 @@
     10ms  app::tool_exec
      6ms  ui::render_panel
      6ms  ui::render
+     5ms  ui::render_panel
+     6ms  ui::render
+    13ms  app::tool_exec
+    11ms  app::tool_exec
+    12ms  app::tool_exec
+    10ms  app::tool_exec
+    12ms  app::tool_exec
+     8ms  app::tool_exec
