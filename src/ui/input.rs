@@ -49,7 +49,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         // WAITING — idle but a coucou/watcher will fire
         spans.push(Span::styled(
             format!(" {} WAITING ", spin),
-            Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
+            Style::default().fg(Color::White).bg(Color::Magenta).bold(),
         ));
     } else {
         // READY — default idle state
