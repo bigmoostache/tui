@@ -405,7 +405,8 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: 
     // We place the popup bottom at that position.
     let border_chrome = 2u16; // top + bottom border of the conversation panel
     let input_lines = ac.input_visual_lines;
-    let popup_bottom = area.y + area.height.saturating_sub(border_chrome + input_lines);
+    let scroll_padding = 2u16; // padding lines below input in the conversation panel
+    let popup_bottom = area.y + area.height.saturating_sub(border_chrome + input_lines + scroll_padding);
     let popup_top = popup_bottom.saturating_sub(popup_height);
     // Clamp: don't go above the top of the content area (+1 for border)
     let y = popup_top.max(area.y + 1);
