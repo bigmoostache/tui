@@ -436,12 +436,12 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::StartApiCheck
         }
         Action::ConfigSelectNextBar => {
-            state.config_selected_bar = (state.config_selected_bar + 1) % 3;
+            state.config_selected_bar = (state.config_selected_bar + 1) % 4;
             state.dirty = true;
             ActionResult::Nothing
         }
         Action::ConfigSelectPrevBar => {
-            state.config_selected_bar = if state.config_selected_bar == 0 { 2 } else { state.config_selected_bar - 1 };
+            state.config_selected_bar = if state.config_selected_bar == 0 { 3 } else { state.config_selected_bar - 1 };
             state.dirty = true;
             ActionResult::Nothing
         }
@@ -464,6 +464,12 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 state.dirty = true;
             }
             ActionResult::Nothing
+        }
+        Action::ConfigToggleAutoContinue => {
+            let spine = cp_mod_spine::SpineState::get_mut(state);
+            spine.config.continue_until_todos_done = !spine.config.continue_until_todos_done;
+            state.dirty = true;
+            ActionResult::Save
         }
         Action::None => ActionResult::Nothing,
     }

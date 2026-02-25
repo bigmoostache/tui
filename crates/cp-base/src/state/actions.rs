@@ -45,6 +45,7 @@ pub enum Action {
     ConfigDecreaseSelectedBar,
     ConfigNextTheme,
     ConfigPrevTheme,
+    ConfigToggleAutoContinue,
     OpenCommandPalette,
     ResetSessionCosts,
     SelectContextById(String),

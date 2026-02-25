@@ -126,6 +126,8 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Some(Action::ConfigNextTheme),
         KeyCode::Char('T') => Some(Action::ConfigPrevTheme),
+        // Toggle auto-continuation
+        KeyCode::Char('s') => Some(Action::ConfigToggleAutoContinue),
         // Up/Down select which bar to edit
         KeyCode::Up => Some(Action::ConfigSelectPrevBar),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),

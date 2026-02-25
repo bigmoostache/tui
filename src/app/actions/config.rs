@@ -20,6 +20,12 @@ pub fn handle_config_increase_bar(state: &mut State) -> ActionResult {
             // Target proportion
             state.cleaning_target_proportion = (state.cleaning_target_proportion + 0.05).min(0.95);
         }
+        3 => {
+            // Max cost guard rail ($0.50 steps)
+            let spine = cp_mod_spine::SpineState::get_mut(state);
+            let current = spine.config.max_cost.unwrap_or(0.0);
+            spine.config.max_cost = Some(current + 0.50);
+        }
         _ => {}
     }
     state.dirty = true;
@@ -44,6 +50,13 @@ pub fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         2 => {
             // Target proportion
             state.cleaning_target_proportion = (state.cleaning_target_proportion - 0.05).max(0.30);
+        }
+        3 => {
+            // Max cost guard rail ($0.50 steps, min $0 = disabled)
+            let spine = cp_mod_spine::SpineState::get_mut(state);
+            let current = spine.config.max_cost.unwrap_or(0.0);
+            let new_val = current - 0.50;
+            spine.config.max_cost = if new_val <= 0.0 { None } else { Some(new_val) };
         }
         _ => {}
     }
