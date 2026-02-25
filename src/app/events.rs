@@ -1,8 +1,8 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::actions::{Action, find_context_by_id, parse_context_pattern};
-use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::app::panels::get_panel;
+use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 

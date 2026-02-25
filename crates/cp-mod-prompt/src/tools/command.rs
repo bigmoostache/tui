@@ -18,7 +18,11 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let id = storage::slugify(&name);
     if id.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Name must contain at least one alphanumeric character".to_string(), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            "Name must contain at least one alphanumeric character".to_string(),
+            true,
+        );
     }
 
     if PromptState::get(state).commands.iter().any(|c| c.id == id) {

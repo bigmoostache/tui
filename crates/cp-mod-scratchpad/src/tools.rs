@@ -67,9 +67,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 ToolResult::new(tool.id.clone(), format!("Updated cell {}: {}", cell_id, changes.join(", ")), false)
             }
         }
-        None => {
-            ToolResult::new(tool.id.clone(), format!("Cell not found: {}", cell_id), true)
-        }
+        None => ToolResult::new(tool.id.clone(), format!("Cell not found: {}", cell_id), true),
     }
 }
 

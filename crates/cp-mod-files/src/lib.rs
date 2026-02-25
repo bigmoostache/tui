@@ -244,10 +244,7 @@ fn style_callback_line(
 
     // "Callbacks:" header
     if trimmed == "Callbacks:" {
-        return Some(Line::from(Span::styled(
-            truncate_line(trimmed, width),
-            Style::default().fg(dim),
-        )));
+        return Some(Line::from(Span::styled(truncate_line(trimmed, width), Style::default().fg(dim))));
     }
 
     // "· name passed ..." or "· name FAILED ..." or "· name running"

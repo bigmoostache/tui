@@ -4,13 +4,13 @@ use crate::app::actions::clean_llm_id_prefix;
 use crate::app::background::{TlDrResult, generate_tldr};
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
+use crate::infra::tools::{execute_tool, perform_reload};
 use crate::state::persistence::build_message_op;
 use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
-use crate::infra::tools::{execute_tool, perform_reload};
 
-use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
-use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_callback::firing as callback_firing;
+use cp_mod_callback::trigger as callback_trigger;
+use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 
 use crate::app::App;
 
@@ -103,10 +103,8 @@ impl App {
         // === CALLBACK TRIGGER ===
         // After all tools executed, check if any file edits match active callbacks.
         // Only collect files from SUCCESSFUL Edit/Write tools (skip failed ones).
-        let successful_tools: Vec<_> = tools.iter().zip(tool_results.iter())
-            .filter(|(_, r)| !r.is_error)
-            .map(|(t, _)| t.clone())
-            .collect();
+        let successful_tools: Vec<_> =
+            tools.iter().zip(tool_results.iter()).filter(|(_, r)| !r.is_error).map(|(t, _)| t.clone()).collect();
         let changed_files = callback_trigger::collect_changed_files(&successful_tools);
         if !changed_files.is_empty() {
             let (matched, skip_warnings) = callback_trigger::match_callbacks(&self.state, &changed_files);
@@ -151,20 +149,14 @@ impl App {
                     let sentinel_id = format!("cb_block_{}", self.state.next_tool_id);
                     self.state.next_tool_id += 1;
 
-                    let _summaries = callback_firing::fire_blocking_callbacks(
-                        &mut self.state, &blocking_cbs, &sentinel_id,
-                    );
+                    let _summaries =
+                        callback_firing::fire_blocking_callbacks(&mut self.state, &blocking_cbs, &sentinel_id);
 
                     // Tag the last Edit/Write tool result with sentinel so pipeline knows to wait.
                     // Store original content so we can reconstruct: original + callback output.
                     for tr in tool_results.iter_mut().rev() {
                         if tr.tool_name == "Edit" || tr.tool_name == "Write" {
-                            tr.content = format!(
-                                "{}{}{}",
-                                CONSOLE_WAIT_BLOCKING_SENTINEL,
-                                sentinel_id,
-                                tr.content,
-                            );
+                            tr.content = format!("{}{}{}", CONSOLE_WAIT_BLOCKING_SENTINEL, sentinel_id, tr.content,);
                             break;
                         }
                     }
@@ -173,8 +165,7 @@ impl App {
         }
 
         // Check if any tool triggered a console blocking wait
-        let has_console_wait =
-            tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
+        let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
         if has_console_wait {
             self.pending_console_wait_tool_results = Some(tool_results);
             self.save_state_async();
@@ -329,8 +320,7 @@ impl App {
         }
 
         // Check if form is resolved
-        let resolved =
-            self.state.get_ext::<cp_base::ui::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
+        let resolved = self.state.get_ext::<cp_base::ui::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
 
         if !resolved {
             return;
@@ -441,5 +431,4 @@ impl App {
             self.continue_streaming(tx);
         }
     }
-
 }

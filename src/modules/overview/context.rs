@@ -58,10 +58,7 @@ pub fn generate_context_content(state: &State) -> String {
     output.push_str("Context Elements:\n");
 
     accumulated += system_prompt_tokens;
-    output.push_str(&format!(
-        "  -- system-prompt (×2): {} tokens (acc: {})\n",
-        system_prompt_tokens, accumulated
-    ));
+    output.push_str(&format!("  -- system-prompt (×2): {} tokens (acc: {})\n", system_prompt_tokens, accumulated));
 
     accumulated += tool_def_tokens;
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();

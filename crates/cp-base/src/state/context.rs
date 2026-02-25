@@ -4,8 +4,8 @@ use std::sync::OnceLock;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{active_theme, normalize_icon};
 use crate::config::CHARS_PER_TOKEN;
+use crate::config::{active_theme, normalize_icon};
 
 // =============================================================================
 // ContextType Registry — modules register metadata at startup

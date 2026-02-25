@@ -28,8 +28,14 @@ pub trait GuardRailStopLogic: Send + Sync {
 ///
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
 pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
-    static GUARD_RAILS: &[&dyn GuardRailStopLogic] =
-        &[&MaxOutputTokensGuard, &MaxCostGuard, &MaxStreamCostGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
+    static GUARD_RAILS: &[&dyn GuardRailStopLogic] = &[
+        &MaxOutputTokensGuard,
+        &MaxCostGuard,
+        &MaxStreamCostGuard,
+        &MaxDurationGuard,
+        &MaxMessagesGuard,
+        &MaxAutoRetriesGuard,
+    ];
     GUARD_RAILS
 }
 

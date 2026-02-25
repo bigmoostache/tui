@@ -12,12 +12,12 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use secrecy::{ExposeSecret, SecretBox};
 use crate::parse::{extract_poll_interval, parse_api_response, poll_branch_pr, redact_token, sha256_hex};
+use secrecy::{ExposeSecret, SecretBox};
 
-use cp_base::panels::CacheUpdate;
 use cp_base::config::MAX_RESULT_CONTENT_BYTES;
 use cp_base::modules::{run_with_timeout, truncate_output};
+use cp_base::panels::CacheUpdate;
 use cp_base::panels::now_ms;
 use cp_base::state::estimate_tokens;
 
@@ -360,4 +360,3 @@ fn poll_cli_command(args: &[String], github_token: &str, last_hash: Option<&str>
 
     Some((new_hash, content))
 }
-

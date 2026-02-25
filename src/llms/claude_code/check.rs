@@ -2,7 +2,7 @@ use reqwest::blocking::Client;
 use secrecy::ExposeSecret;
 
 use super::{
-    ClaudeCodeClient, BILLING_HEADER, CLAUDE_CODE_ENDPOINT, OAUTH_BETA_HEADER, SYSTEM_REMINDER, map_model_name,
+    BILLING_HEADER, CLAUDE_CODE_ENDPOINT, ClaudeCodeClient, OAUTH_BETA_HEADER, SYSTEM_REMINDER, map_model_name,
 };
 use crate::infra::constants::API_VERSION;
 use crate::llms::ApiCheckResult;

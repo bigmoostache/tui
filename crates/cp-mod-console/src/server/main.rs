@@ -287,11 +287,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
             "send" => {
                 let key = req.key.as_deref().unwrap_or("");
                 let input = req.input.as_deref().unwrap_or("");
-                if key.is_empty() {
-                    Response::err("Missing key")
-                } else {
-                    handle_send(&sessions, key, input)
-                }
+                if key.is_empty() { Response::err("Missing key") } else { handle_send(&sessions, key, input) }
             }
             "kill" => {
                 let key = req.key.as_deref().unwrap_or("");

@@ -1,11 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::state::Action;
-use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::config::theme;
 use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
+use cp_base::state::Action;
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 

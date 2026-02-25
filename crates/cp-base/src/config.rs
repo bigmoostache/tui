@@ -359,23 +359,55 @@ pub mod theme {
     use crate::config::active_theme;
     use ratatui::style::Color;
 
-    fn rgb(c: [u8; 3]) -> Color { Color::Rgb(c[0], c[1], c[2]) }
+    fn rgb(c: [u8; 3]) -> Color {
+        Color::Rgb(c[0], c[1], c[2])
+    }
 
-    pub fn accent() -> Color { rgb(active_theme().colors.accent) }
-    pub fn accent_dim() -> Color { rgb(active_theme().colors.accent_dim) }
-    pub fn success() -> Color { rgb(active_theme().colors.success) }
-    pub fn warning() -> Color { rgb(active_theme().colors.warning) }
-    pub fn error() -> Color { rgb(active_theme().colors.error) }
-    pub fn text() -> Color { rgb(active_theme().colors.text) }
-    pub fn text_secondary() -> Color { rgb(active_theme().colors.text_secondary) }
-    pub fn text_muted() -> Color { rgb(active_theme().colors.text_muted) }
-    pub fn bg_base() -> Color { rgb(active_theme().colors.bg_base) }
-    pub fn bg_surface() -> Color { rgb(active_theme().colors.bg_surface) }
-    pub fn bg_elevated() -> Color { rgb(active_theme().colors.bg_elevated) }
-    pub fn border() -> Color { rgb(active_theme().colors.border) }
-    pub fn border_muted() -> Color { rgb(active_theme().colors.border_muted) }
-    pub fn user() -> Color { rgb(active_theme().colors.user) }
-    pub fn assistant() -> Color { rgb(active_theme().colors.assistant) }
+    pub fn accent() -> Color {
+        rgb(active_theme().colors.accent)
+    }
+    pub fn accent_dim() -> Color {
+        rgb(active_theme().colors.accent_dim)
+    }
+    pub fn success() -> Color {
+        rgb(active_theme().colors.success)
+    }
+    pub fn warning() -> Color {
+        rgb(active_theme().colors.warning)
+    }
+    pub fn error() -> Color {
+        rgb(active_theme().colors.error)
+    }
+    pub fn text() -> Color {
+        rgb(active_theme().colors.text)
+    }
+    pub fn text_secondary() -> Color {
+        rgb(active_theme().colors.text_secondary)
+    }
+    pub fn text_muted() -> Color {
+        rgb(active_theme().colors.text_muted)
+    }
+    pub fn bg_base() -> Color {
+        rgb(active_theme().colors.bg_base)
+    }
+    pub fn bg_surface() -> Color {
+        rgb(active_theme().colors.bg_surface)
+    }
+    pub fn bg_elevated() -> Color {
+        rgb(active_theme().colors.bg_elevated)
+    }
+    pub fn border() -> Color {
+        rgb(active_theme().colors.border)
+    }
+    pub fn border_muted() -> Color {
+        rgb(active_theme().colors.border_muted)
+    }
+    pub fn user() -> Color {
+        rgb(active_theme().colors.user)
+    }
+    pub fn assistant() -> Color {
+        rgb(active_theme().colors.assistant)
+    }
 }
 
 // =============================================================================
@@ -401,17 +433,39 @@ pub mod chars {
 pub mod icons {
     use crate::config::{active_theme, normalize_icon};
 
-    pub fn msg_user() -> String { normalize_icon(&active_theme().messages.user) }
-    pub fn msg_assistant() -> String { normalize_icon(&active_theme().messages.assistant) }
-    pub fn msg_tool_call() -> String { normalize_icon(&active_theme().messages.tool_call) }
-    pub fn msg_tool_result() -> String { normalize_icon(&active_theme().messages.tool_result) }
-    pub fn msg_error() -> String { normalize_icon(&active_theme().messages.error) }
-    pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }
-    pub fn status_summarized() -> String { normalize_icon(&active_theme().status.summarized) }
-    pub fn status_deleted() -> String { normalize_icon(&active_theme().status.deleted) }
-    pub fn todo_pending() -> String { normalize_icon(&active_theme().todo.pending) }
-    pub fn todo_in_progress() -> String { normalize_icon(&active_theme().todo.in_progress) }
-    pub fn todo_done() -> String { normalize_icon(&active_theme().todo.done) }
+    pub fn msg_user() -> String {
+        normalize_icon(&active_theme().messages.user)
+    }
+    pub fn msg_assistant() -> String {
+        normalize_icon(&active_theme().messages.assistant)
+    }
+    pub fn msg_tool_call() -> String {
+        normalize_icon(&active_theme().messages.tool_call)
+    }
+    pub fn msg_tool_result() -> String {
+        normalize_icon(&active_theme().messages.tool_result)
+    }
+    pub fn msg_error() -> String {
+        normalize_icon(&active_theme().messages.error)
+    }
+    pub fn status_full() -> String {
+        normalize_icon(&active_theme().status.full)
+    }
+    pub fn status_summarized() -> String {
+        normalize_icon(&active_theme().status.summarized)
+    }
+    pub fn status_deleted() -> String {
+        normalize_icon(&active_theme().status.deleted)
+    }
+    pub fn todo_pending() -> String {
+        normalize_icon(&active_theme().todo.pending)
+    }
+    pub fn todo_in_progress() -> String {
+        normalize_icon(&active_theme().todo.in_progress)
+    }
+    pub fn todo_done() -> String {
+        normalize_icon(&active_theme().todo.done)
+    }
 }
 
 // =============================================================================

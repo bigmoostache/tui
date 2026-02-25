@@ -125,7 +125,9 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                     };
                     let is_error = !output.status.success();
                     let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
-                    ToolResult::new(tool.id.clone(), if combined.is_empty() {
+                    ToolResult::new(
+                        tool.id.clone(),
+                        if combined.is_empty() {
                             if is_error {
                                 "Command failed with no output".to_string()
                             } else {

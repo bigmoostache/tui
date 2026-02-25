@@ -27,18 +27,16 @@ impl Module for ConversationHistoryModule {
     }
 
     fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
-        vec![
-            ContextTypeMeta {
-                context_type: "conversation_history",
-                icon_id: "conversation",
-                is_fixed: false,
-                needs_cache: false,
-                fixed_order: None,
-                display_name: "chat-history",
-                short_name: "history",
-                needs_async_wait: false,
-            },
-        ]
+        vec![ContextTypeMeta {
+            context_type: "conversation_history",
+            icon_id: "conversation",
+            is_fixed: false,
+            needs_cache: false,
+            fixed_order: None,
+            display_name: "chat-history",
+            short_name: "history",
+            needs_async_wait: false,
+        }]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {

@@ -146,7 +146,11 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
         invalidate_tree_cache(state);
     }
 
-    ToolResult::new(tool.id.clone(), if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, false)
+    ToolResult::new(
+        tool.id.clone(),
+        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
+        false,
+    )
 }
 
 /// Execute tree_describe_files tool - add/update/remove file descriptions
@@ -234,7 +238,11 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
         invalidate_tree_cache(state);
     }
 
-    ToolResult::new(tool.id.clone(), if result.is_empty() { "No changes".to_string() } else { result.join("\n") }, !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty())
+    ToolResult::new(
+        tool.id.clone(),
+        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
+        !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty(),
+    )
 }
 
 /// Execute edit_tree_filter tool (keep existing functionality)

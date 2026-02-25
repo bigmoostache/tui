@@ -1,5 +1,5 @@
-use crate::state::State;
 use crate::infra::tools::{ToolResult, ToolUse};
+use crate::state::State;
 use cp_base::ui::{PendingQuestionForm, Question, QuestionOption};
 
 /// Execute the ask_user_question tool.
@@ -10,7 +10,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let questions_val = match tool.input.get("questions").and_then(|v| v.as_array()) {
         Some(arr) => arr,
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(),
+                true,
+            );
         }
     };
 
@@ -52,7 +56,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         if options_val.len() < 2 || options_val.len() > 4 {
-            return ToolResult::new(tool.id.clone(), format!("Question {}: expected 2-4 options, got {}", i + 1, options_val.len()), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                format!("Question {}: expected 2-4 options, got {}", i + 1, options_val.len()),
+                true,
+            );
         }
 
         let mut options = Vec::new();
@@ -60,13 +68,21 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             let label = match o_val.get("label").and_then(|v| v.as_str()) {
                 Some(s) => s.to_string(),
                 None => {
-                    return ToolResult::new(tool.id.clone(), format!("Question {} option {}: missing 'label'", i + 1, j + 1), true);
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!("Question {} option {}: missing 'label'", i + 1, j + 1),
+                        true,
+                    );
                 }
             };
             let description = match o_val.get("description").and_then(|v| v.as_str()) {
                 Some(s) => s.to_string(),
                 None => {
-                    return ToolResult::new(tool.id.clone(), format!("Question {} option {}: missing 'description'", i + 1, j + 1), true);
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!("Question {} option {}: missing 'description'", i + 1, j + 1),
+                        true,
+                    );
                 }
             };
             options.push(QuestionOption { label, description });

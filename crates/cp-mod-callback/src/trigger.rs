@@ -34,10 +34,7 @@ pub struct ChangedFile {
 /// Also collects `skip_callbacks` names per tool for selective skipping.
 pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFile> {
     let mut hull: Vec<ChangedFile> = Vec::new();
-    let project_root = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
+    let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
     for tool in tools {
         match tool.name.as_str() {
             "Edit" | "Write" => {
@@ -60,10 +57,7 @@ pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFi
                             }
                         }
                     } else {
-                        hull.push(ChangedFile {
-                            path: anchor_str,
-                            skip_callbacks: skip_names,
-                        });
+                        hull.push(ChangedFile { path: anchor_str, skip_callbacks: skip_names });
                     }
                 }
             }
@@ -79,11 +73,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
     input
         .get("skip_callbacks")
         .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                .collect()
-        })
+        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default()
 }
 
@@ -100,10 +90,8 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
     let mut warnings: Vec<String> = Vec::new();
 
     // Validate skip_callbacks names across all files
-    let all_skip_names: Vec<&str> = changed_files
-        .iter()
-        .flat_map(|f| f.skip_callbacks.iter().map(|s| s.as_str()))
-        .collect();
+    let all_skip_names: Vec<&str> =
+        changed_files.iter().flat_map(|f| f.skip_callbacks.iter().map(|s| s.as_str())).collect();
     validate_skip_names(&cs, &all_skip_names, &mut warnings);
 
     for def in &cs.definitions {
@@ -136,8 +124,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
         for changed_file in changed_files {
             if changed_file.skip_callbacks.iter().any(|name| name == &def.name) {
                 let path = Path::new(&changed_file.path);
-                let would_match = compass.is_match(path)
-                    || compass.is_match(path.file_name().unwrap_or_default());
+                let would_match = compass.is_match(path) || compass.is_match(path.file_name().unwrap_or_default());
                 if !would_match {
                     warnings.push(format!(
                         "skip_callbacks: '{}' would not have triggered for '{}' (pattern '{}' doesn't match)",
@@ -148,10 +135,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
         }
 
         if !crew.is_empty() {
-            treasure_map.push(MatchedCallback {
-                definition: def.clone(),
-                matched_files: crew,
-            });
+            treasure_map.push(MatchedCallback { definition: def.clone(), matched_files: crew });
         }
     }
 
@@ -168,10 +152,7 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
         }
         seen.insert(*name);
         if !cs.definitions.iter().any(|d| d.name == *name) {
-            warnings.push(format!(
-                "skip_callbacks: '{}' does not match any defined callback",
-                name,
-            ));
+            warnings.push(format!("skip_callbacks: '{}' does not match any defined callback", name,));
         }
     }
 }
@@ -225,11 +206,8 @@ mod tests {
 
     #[test]
     fn test_collect_changed_files_deduplicates() {
-        let tools = vec![
-            make_tool("Edit", "src/main.rs"),
-            make_tool("Write", "src/main.rs"),
-            make_tool("Edit", "src/lib.rs"),
-        ];
+        let tools =
+            vec![make_tool("Edit", "src/main.rs"), make_tool("Write", "src/main.rs"), make_tool("Edit", "src/lib.rs")];
         let files = collect_changed_files(&tools);
         assert_eq!(paths(&files), vec!["src/main.rs", "src/lib.rs"]);
     }

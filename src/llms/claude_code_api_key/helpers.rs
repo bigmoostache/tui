@@ -172,7 +172,11 @@ pub fn dump_last_request(worker_id: &str, api_request: &Value) {
 }
 
 /// Apply standard Claude Code request headers to a reqwest builder.
-pub fn apply_claude_code_headers(builder: reqwest::blocking::RequestBuilder, api_key: &str, accept: &str) -> reqwest::blocking::RequestBuilder {
+pub fn apply_claude_code_headers(
+    builder: reqwest::blocking::RequestBuilder,
+    api_key: &str,
+    accept: &str,
+) -> reqwest::blocking::RequestBuilder {
     builder
         .header("accept", accept)
         .header("x-api-key", api_key)

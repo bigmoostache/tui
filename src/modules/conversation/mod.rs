@@ -1,6 +1,6 @@
-pub mod refresh;
 mod list;
 mod panel;
+pub mod refresh;
 pub(crate) mod render;
 mod render_input;
 

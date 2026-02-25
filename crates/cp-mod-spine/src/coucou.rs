@@ -130,11 +130,7 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     let day: i64 = date_parts[2].parse().map_err(|_| "Invalid day")?;
     let hour: i64 = time_parts[0].parse().map_err(|_| "Invalid hour")?;
     let min: i64 = time_parts[1].parse().map_err(|_| "Invalid minute")?;
-    let sec: i64 = if time_parts.len() > 2 {
-        time_parts[2].parse().map_err(|_| "Invalid second")?
-    } else {
-        0
-    };
+    let sec: i64 = if time_parts.len() > 2 { time_parts[2].parse().map_err(|_| "Invalid second")? } else { 0 };
 
     // Simple days-since-epoch calculation (good enough for scheduling)
     // Using a basic algorithm for dates after 2000
@@ -268,7 +264,11 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mode = match tool.input.get("mode").and_then(|v| v.as_str()) {
         Some(m) => m,
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(),
+                true,
+            );
         }
     };
 
@@ -288,7 +288,11 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             let delay_str = match tool.input.get("delay").and_then(|v| v.as_str()) {
                 Some(d) => d,
                 None => {
-                    return ToolResult::new(tool.id.clone(), "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(), true);
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(),
+                        true,
+                    );
                 }
             };
 
@@ -306,14 +310,22 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             let dt_str = match tool.input.get("datetime").and_then(|v| v.as_str()) {
                 Some(d) => d,
                 None => {
-                    return ToolResult::new(tool.id.clone(), "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(), true);
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(),
+                        true,
+                    );
                 }
             };
 
             match parse_datetime_ms(dt_str) {
                 Ok(target_ms) => {
                     if target_ms <= now {
-                        return ToolResult::new(tool.id.clone(), format!("DateTime '{}' is in the past!", dt_str), true);
+                        return ToolResult::new(
+                            tool.id.clone(),
+                            format!("DateTime '{}' is in the past!", dt_str),
+                            true,
+                        );
                     }
                     fire_at_ms = target_ms;
                     let remaining = format_duration(target_ms - now);
@@ -325,7 +337,11 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
         _ => {
-            return ToolResult::new(tool.id.clone(), format!("Unknown mode '{}'. Use 'timer' or 'datetime'.", mode), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                format!("Unknown mode '{}'. Use 'timer' or 'datetime'.", mode),
+                true,
+            );
         }
     }
 
@@ -333,13 +349,8 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let watcher_id = format!("coucou_{}", counter);
     let desc = format!("🔔 Coucou {}: \"{}\"", delay_desc, message);
 
-    let watcher = CoucouWatcher {
-        watcher_id,
-        message: message.clone(),
-        registered_at_ms: now,
-        fire_at_ms,
-        desc: desc.clone(),
-    };
+    let watcher =
+        CoucouWatcher { watcher_id, message: message.clone(), registered_at_ms: now, fire_at_ms, desc: desc.clone() };
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 

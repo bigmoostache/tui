@@ -67,12 +67,20 @@ pub(crate) fn execute_snapshot(
                 && let Ok(existing) = serde_json::from_str::<Preset>(&contents)
                 && existing.built_in
             {
-                return ToolResult::new(tool.id.clone(), format!("Cannot replace built-in preset '{}'", replace_name), true);
+                return ToolResult::new(
+                    tool.id.clone(),
+                    format!("Cannot replace built-in preset '{}'", replace_name),
+                    true,
+                );
             }
             let _ = fs::remove_file(&replace_path);
         }
     } else if file_path.exists() {
-        return ToolResult::new(tool.id.clone(), format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name),
+            true,
+        );
     }
 
     // Capture worker state
@@ -150,7 +158,11 @@ pub(crate) fn execute_snapshot(
 
     let panel_count = preset.worker_state.dynamic_panels.len();
     let module_count = preset.worker_state.active_modules.len();
-    ToolResult::new(tool.id.clone(), format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count),
+        false,
+    )
 }
 
 pub(crate) fn execute_load(
@@ -317,10 +329,14 @@ pub(crate) fn execute_load(
 
     let module_count = state.active_modules.len();
     let panel_count = ws.dynamic_panels.len();
-    ToolResult::new(tool.id.clone(), format!(
+    ToolResult::new(
+        tool.id.clone(),
+        format!(
             "Loaded preset '{}': {} — {} modules, {} dynamic panels restored",
             name, preset.description, module_count, panel_count
-        ), false)
+        ),
+        false,
+    )
 }
 
 /// List all available preset names

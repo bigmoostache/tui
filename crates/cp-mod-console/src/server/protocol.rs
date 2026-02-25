@@ -60,12 +60,30 @@ pub fn interpret_escapes(input: &str) -> Vec<u8> {
     while i < bytes.len() {
         if bytes[i] == b'\\' && i + 1 < bytes.len() {
             match bytes[i + 1] {
-                b'n' => { out.push(0x0A); i += 2; }
-                b'r' => { out.push(0x0D); i += 2; }
-                b't' => { out.push(0x09); i += 2; }
-                b'\\' => { out.push(b'\\'); i += 2; }
-                b'e' => { out.push(0x1B); i += 2; }
-                b'0' => { out.push(0x00); i += 2; }
+                b'n' => {
+                    out.push(0x0A);
+                    i += 2;
+                }
+                b'r' => {
+                    out.push(0x0D);
+                    i += 2;
+                }
+                b't' => {
+                    out.push(0x09);
+                    i += 2;
+                }
+                b'\\' => {
+                    out.push(b'\\');
+                    i += 2;
+                }
+                b'e' => {
+                    out.push(0x1B);
+                    i += 2;
+                }
+                b'0' => {
+                    out.push(0x00);
+                    i += 2;
+                }
                 b'x' if i + 3 < bytes.len() => {
                     let hi = bytes[i + 2];
                     let lo = bytes[i + 3];
@@ -77,7 +95,10 @@ pub fn interpret_escapes(input: &str) -> Vec<u8> {
                         i += 1;
                     }
                 }
-                _ => { out.push(b'\\'); i += 1; }
+                _ => {
+                    out.push(b'\\');
+                    i += 1;
+                }
             }
         } else {
             out.push(bytes[i]);

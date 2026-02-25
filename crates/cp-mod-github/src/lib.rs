@@ -1,7 +1,7 @@
 pub(crate) mod cache_invalidation;
 pub mod classify;
-pub mod parse;
 mod panel;
+pub mod parse;
 mod tools;
 pub mod types;
 pub mod watcher;

@@ -1,7 +1,7 @@
 use crate::storage;
 use crate::types::{PromptState, PromptType};
 use cp_base::panels::now_ms;
-use cp_base::state::{estimate_tokens, ContextType, State};
+use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Unified diff-based edit tool for agents, skills, and commands.
@@ -34,11 +34,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     } else if ps.commands.iter().any(|c| c.id == id) {
         EntityType::Command
     } else {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("ID '{}' not found in agents, skills, or commands", id),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("ID '{}' not found in agents, skills, or commands", id), true);
     };
 
     // Check that the prompt is open in the Library editor
@@ -150,13 +146,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     if replace_all && replaced > 1 {
         result_msg.push_str(&format!(
             "Edited {} '{}': {} replacements (~{} lines changed each)\n",
-            entity_type.label(), id, replaced, lines_changed
+            entity_type.label(),
+            id,
+            replaced,
+            lines_changed
         ));
     } else {
-        result_msg.push_str(&format!(
-            "Edited {} '{}': ~{} lines changed\n",
-            entity_type.label(), id, lines_changed
-        ));
+        result_msg.push_str(&format!("Edited {} '{}': ~{} lines changed\n", entity_type.label(), id, lines_changed));
     }
 
     result_msg.push_str("```diff\n");

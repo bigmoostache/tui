@@ -18,7 +18,11 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let id = storage::slugify(&name);
     if id.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Name must contain at least one alphanumeric character".to_string(), true);
+        return ToolResult::new(
+            tool.id.clone(),
+            "Name must contain at least one alphanumeric character".to_string(),
+            true,
+        );
     }
 
     if PromptState::get(state).skills.iter().any(|s| s.id == id) {
@@ -124,7 +128,11 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens),
+        false,
+    )
 }
 
 pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -154,9 +162,9 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
         .map(|s| s.name.clone())
         .unwrap_or_else(|| id.to_string());
 
-    ToolResult::new(tool.id.clone(), format!(
-            "Unloaded skill '{}'{}",
-            name,
-            panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()
-        ), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Unloaded skill '{}'{}", name, panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()),
+        false,
+    )
 }

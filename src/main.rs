@@ -15,10 +15,10 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-use infra::api::StreamEvent;
 use app::background::TlDrResult;
-use state::cache::CacheUpdate;
 use app::{App, ensure_default_agent, ensure_default_contexts};
+use infra::api::StreamEvent;
+use state::cache::CacheUpdate;
 use state::persistence::load_state;
 
 fn main() -> io::Result<()> {
@@ -38,10 +38,7 @@ fn main() -> io::Result<()> {
         // Write panic info to .context-pilot/errors/panic.log
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
         let _ = std::fs::create_dir_all(&error_dir);
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{}] {}\n\n{}\n\n---\n", ts, info, backtrace);
         let log_path = error_dir.join("panic.log");
@@ -75,7 +72,8 @@ fn main() -> io::Result<()> {
         let known_types: std::collections::HashSet<String> = modules::all_modules()
             .iter()
             .flat_map(|m| {
-                let mut types: Vec<String> = m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
+                let mut types: Vec<String> =
+                    m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
                 types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_string()));
                 types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_string()));
                 types

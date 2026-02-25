@@ -125,8 +125,7 @@ impl ConversationPanel {
 
                     // Render each frozen message with full formatting
                     for msg in msgs {
-                        let lines =
-                            render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                        let lines = render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
                         text.extend(lines);
                     }
 
@@ -177,13 +176,7 @@ impl ConversationPanel {
                 }
 
                 // Cache miss - render message
-                let lines = render::render_message(
-                    msg,
-                    viewport_width,
-                    base_style,
-                    is_streaming_this,
-                    state.dev_mode,
-                );
+                let lines = render::render_message(msg, viewport_width, base_style, is_streaming_this, state.dev_mode);
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {

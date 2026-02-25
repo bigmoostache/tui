@@ -151,11 +151,7 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
 /// Strategy: compute fixed column widths → for each row, wrap cell text to fit
 /// → render each display line as a sequence of fixed-width cells separated by │.
 /// Vertical separators are always at the same character positions.
-pub fn render_markdown_table(
-    lines: &[&str],
-    _base_style: Style,
-    max_width: usize,
-) -> Vec<Vec<Span<'static>>> {
+pub fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
@@ -260,11 +256,8 @@ pub fn render_markdown_table(
                         spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
                     }
 
-                    let cell_text = wrapped_cells
-                        .get(col)
-                        .and_then(|lines| lines.get(line_idx))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                    let cell_text =
+                        wrapped_cells.get(col).and_then(|lines| lines.get(line_idx)).map(|s| s.as_str()).unwrap_or("");
 
                     // Build a single fixed-width span for this cell.
                     // Content + padding always equals exactly `width` display chars.
@@ -300,10 +293,7 @@ pub fn render_markdown_table(
                     if col > 0 {
                         sep_spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
                     }
-                    sep_spans.push(Span::styled(
-                        "─".repeat(*width),
-                        Style::default().fg(theme::border()),
-                    ));
+                    sep_spans.push(Span::styled("─".repeat(*width), Style::default().fg(theme::border())));
                 }
                 result.push(sep_spans);
             }

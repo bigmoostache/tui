@@ -13,9 +13,9 @@ use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
-pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 #[cfg(test)]
 pub use cp_base::panels::mark_panels_dirty;
+pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).
 /// This is NOT part of the Panel trait — it uses binary-specific deps (theme, profile!, UI helpers).
@@ -129,8 +129,8 @@ pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::cache::CacheUpdate;
     use crate::state::ContextElement;
+    use crate::state::cache::CacheUpdate;
 
     /// Helper: create a minimal ContextElement for testing
     fn test_ctx(id: &str, ct: ContextType) -> ContextElement {

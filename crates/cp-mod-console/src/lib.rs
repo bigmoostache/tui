@@ -362,10 +362,7 @@ impl Module for ConsoleModule {
         // Grab file path before removing
         let log_path = {
             let cs = ConsoleState::get(state);
-            cs.sessions
-                .get(&name)
-                .map(|h| h.log_path.clone())
-                .unwrap_or_default()
+            cs.sessions.get(&name).map(|h| h.log_path.clone()).unwrap_or_default()
         };
         ConsoleState::kill_session(state, &name);
         {
@@ -381,10 +378,8 @@ impl Module for ConsoleModule {
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
         if ctx.context_type.as_str() == ContextType::CONSOLE {
-            let desc = ctx
-                .get_meta_str("console_description")
-                .or_else(|| ctx.get_meta_str("console_command"))
-                .unwrap_or("?");
+            let desc =
+                ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
             Some(format!("{} ({})", desc, status))
         } else {

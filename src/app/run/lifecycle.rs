@@ -11,9 +11,9 @@ use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
 use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
 use crate::infra::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, RENDER_THROTTLE_MS};
+use crate::state::ContextType;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{check_ownership, save_state};
-use crate::state::ContextType;
 use crate::ui;
 
 use crate::app::App;

@@ -101,9 +101,9 @@ impl App {
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
                 // Console wait sentinel: replace entirely with watcher result
-                if let Some(result) = blocking_results.iter().find(|r| {
-                    r.tool_use_id.as_deref() == Some(&tr.tool_use_id)
-                }) {
+                if let Some(result) =
+                    blocking_results.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id))
+                {
                     tr.content = result.description.clone();
                 }
             } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
@@ -112,26 +112,16 @@ impl App {
                 let after_sentinel = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
                 // Find matching watcher result by sentinel_id prefix
                 let matched_result = blocking_results.iter().find(|r| {
-                    if let Some(ref tid) = r.tool_use_id {
-                        after_sentinel.starts_with(tid.as_str())
-                    } else {
-                        false
-                    }
+                    if let Some(ref tid) = r.tool_use_id { after_sentinel.starts_with(tid.as_str()) } else { false }
                 });
                 if let Some(result) = matched_result {
                     let sentinel_id = result.tool_use_id.as_ref().unwrap();
                     let original_content = &after_sentinel[sentinel_id.len()..];
                     // Append to existing Callbacks block if present, else create new one
                     if original_content.contains("\nCallbacks:\n") {
-                        tr.content = format!(
-                            "{}\n{}",
-                            original_content, result.description,
-                        );
+                        tr.content = format!("{}\n{}", original_content, result.description,);
                     } else {
-                        tr.content = format!(
-                            "{}\nCallbacks:\n{}",
-                            original_content, result.description,
-                        );
+                        tr.content = format!("{}\nCallbacks:\n{}", original_content, result.description,);
                     }
                 }
             }
@@ -276,9 +266,7 @@ impl App {
         }
 
         // Also clean up the question form state if it was pending
-        self.state
-            .module_data
-            .remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>());
+        self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>());
 
         if all_pending.is_empty() {
             return;

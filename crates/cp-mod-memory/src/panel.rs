@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use cp_base::state::Action;
 use cp_base::config::theme;
 use cp_base::config::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::panels::{ContextItem, Panel};
+use cp_base::state::Action;
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, render_table};
 

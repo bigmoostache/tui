@@ -20,10 +20,10 @@ use super::{
     ApiCheckResult, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text,
     prepare_panel_messages,
 };
-use crate::infra::constants::{MAX_RESPONSE_TOKENS, library};
 use crate::app::panels::now_ms;
-use crate::state::{MessageStatus, MessageType};
+use crate::infra::constants::{MAX_RESPONSE_TOKENS, library};
 use crate::infra::tools::build_api_tools;
+use crate::state::{MessageStatus, MessageType};
 
 use helpers::*;
 
@@ -52,10 +52,8 @@ impl Default for ClaudeCodeApiKeyClient {
 
 impl LlmClient for ClaudeCodeApiKeyClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not found in environment".into()))?;
+        let api_key =
+            self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not found in environment".into()))?;
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
@@ -314,13 +312,10 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         dump_last_request(&request.worker_id, &api_request);
 
-        let response = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            api_key.expose_secret(),
-            "text/event-stream",
-        )
-        .json(&api_request)
-        .send()?;
+        let response =
+            apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key.expose_secret(), "text/event-stream")
+                .json(&api_request)
+                .send()?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

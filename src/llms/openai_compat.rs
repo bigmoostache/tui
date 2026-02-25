@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages};
-use crate::infra::constants::{library, prompts};
 use crate::app::panels::now_ms;
-use crate::state::{Message, MessageStatus, MessageType};
+use crate::infra::constants::{library, prompts};
 use crate::infra::tools::ToolDefinition;
+use crate::state::{Message, MessageStatus, MessageType};
 
 // ───────────────────────────────────────────────────────────────────
 // Shared message type

@@ -47,12 +47,7 @@ impl Default for CallbackState {
 
 impl CallbackState {
     pub fn new() -> Self {
-        Self {
-            definitions: Vec::new(),
-            next_id: 1,
-            active_set: HashSet::new(),
-            editor_open: None,
-        }
+        Self { definitions: Vec::new(), next_id: 1, active_set: HashSet::new(), editor_open: None }
     }
 
     pub fn get(state: &State) -> &Self {

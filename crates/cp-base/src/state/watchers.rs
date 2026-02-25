@@ -119,9 +119,7 @@ impl Default for WatcherRegistry {
 
 impl WatcherRegistry {
     pub fn new() -> Self {
-        Self {
-            watchers: Vec::new(),
-        }
+        Self { watchers: Vec::new() }
     }
 
     /// Register a new watcher.

@@ -6,8 +6,8 @@ mod tests {
     use serde_json::Value;
     use std::io::BufRead;
 
-    use super::super::helpers::*;
     use super::super::ClaudeCodeApiKeyClient;
+    use super::super::helpers::*;
     use crate::infra::constants::API_VERSION;
 
     /// Minimal request matching working Python exactly.
@@ -15,8 +15,7 @@ mod tests {
     #[test]
     #[ignore] // Requires API key — run with `cargo test -- --ignored`
     fn test_general_kenobi() {
-        let token =
-            ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
+        let token = ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
         let client = Client::new();
 
@@ -38,14 +37,11 @@ mod tests {
         });
 
         // Exact same headers as working Python get_claude_code_headers()
-        let response = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            token.expose_secret(),
-            "application/json",
-        )
-        .json(&body)
-        .send()
-        .expect("HTTP request failed");
+        let response =
+            apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), token.expose_secret(), "application/json")
+                .json(&body)
+                .send()
+                .expect("HTTP request failed");
 
         let status = response.status();
         let resp_body: serde_json::Value = response.json().expect("Failed to parse JSON response");
@@ -61,8 +57,7 @@ mod tests {
     #[test]
     #[ignore] // Requires API key — run with `cargo test -- --ignored`
     fn test_general_kenobi_with_tools_streaming() {
-        let token =
-            ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
+        let token = ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
         let client = Client::new();
 
@@ -93,14 +88,11 @@ mod tests {
             "stream": true
         });
 
-        let response = apply_claude_code_headers(
-            client.post(CLAUDE_CODE_ENDPOINT),
-            token.expose_secret(),
-            "text/event-stream",
-        )
-        .json(&body)
-        .send()
-        .expect("HTTP request failed");
+        let response =
+            apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), token.expose_secret(), "text/event-stream")
+                .json(&body)
+                .send()
+                .expect("HTTP request failed");
 
         let status = response.status();
 
