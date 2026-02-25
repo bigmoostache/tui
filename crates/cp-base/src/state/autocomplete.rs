@@ -23,6 +23,9 @@ pub struct AutocompleteState {
     pub selected: usize,
     /// Scroll offset for the visible window into matches.
     pub scroll_offset: usize,
+    /// Number of visual lines the input area occupies (set by conversation panel render).
+    /// Used to position the popup just above the input field.
+    pub input_visual_lines: u16,
 }
 
 impl Default for AutocompleteState {
@@ -41,6 +44,7 @@ impl AutocompleteState {
             matches: Vec::new(),
             selected: 0,
             scroll_offset: 0,
+            input_visual_lines: 2,
         }
     }
 

@@ -380,8 +380,8 @@ pub(super) fn render_question_form(frame: &mut Frame, state: &State, area: Rect)
 /// Calculate the height needed for the autocomplete popup
 pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::AutocompleteState) -> u16 {
     let visible = ac.visible_matches().len() as u16;
-    // Header (query) + matches + border chrome (2)
-    (1 + visible + 2).clamp(4, 14)
+    // matches + border chrome (2)
+    (visible + 2).clamp(4, 12)
 }
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward)
@@ -394,10 +394,28 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: 
     let popup_width = 60u16.min(area.width.saturating_sub(2));
     let popup_height = calculate_autocomplete_height(ac);
 
-    // Position: bottom of content area, growing upward (so it sits above the status bar)
-    let x = area.x + 1;
-    let y = area.y + area.height.saturating_sub(popup_height);
-    let popup_area = Rect::new(x, y, popup_width, popup_height);
+    // The input field (🦊 ...) occupies `input_visual_lines` at the bottom of the
+    // conversation panel viewport. We want the popup's bottom edge to sit just above
+    // the first line of the input field.
+    //
+    // area = the content region (right of sidebar, above status bar).
+    // The conversation panel fills this area with a 1-cell border on each side,
+    // so usable inner height = area.height - 2 (top/bottom border).
+    // The input starts at: area.bottom() - 1 (bottom border) - input_visual_lines
+    // We place the popup bottom at that position.
+    let border_chrome = 2u16; // top + bottom border of the conversation panel
+    let input_lines = ac.input_visual_lines;
+    let popup_bottom = area.y + area.height.saturating_sub(border_chrome + input_lines);
+    let popup_top = popup_bottom.saturating_sub(popup_height);
+    // Clamp: don't go above the top of the content area (+1 for border)
+    let y = popup_top.max(area.y + 1);
+    let clamped_height = popup_bottom.saturating_sub(y);
+    if clamped_height < 3 {
+        return; // Not enough space to render
+    }
+
+    let x = area.x + 1; // +1 to clear the panel's left border
+    let popup_area = Rect::new(x, y, popup_width, clamped_height);
 
     let mut lines: Vec<Line> = Vec::new();
 

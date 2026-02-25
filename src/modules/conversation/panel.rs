@@ -192,7 +192,12 @@ impl ConversationPanel {
         if let Some(ref cached) = state.input_cache {
             if cached.input_hash == input_hash && cached.viewport_width == viewport_width {
                 // Cache hit
+                let line_count = cached.lines.len();
                 text.extend(cached.lines.iter().cloned());
+                // Update autocomplete with input visual line count
+                if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                    ac.input_visual_lines = line_count as u16;
+                }
             } else {
                 // Cache miss
                 let input_lines = render::render_input(
@@ -204,9 +209,14 @@ impl ConversationPanel {
                     &state.paste_buffers,
                     &state.paste_buffer_labels,
                 );
+                let line_count = input_lines.len();
                 state.input_cache =
                     Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
                 text.extend(input_lines);
+                // Update autocomplete with input visual line count
+                if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                    ac.input_visual_lines = line_count as u16;
+                }
             }
         } else {
             // No cache
@@ -219,9 +229,14 @@ impl ConversationPanel {
                 &state.paste_buffers,
                 &state.paste_buffer_labels,
             );
+            let line_count = input_lines.len();
             state.input_cache =
                 Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
             text.extend(input_lines);
+            // Update autocomplete with input visual line count
+            if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                ac.input_visual_lines = line_count as u16;
+            }
         }
 
         // Padding at end for scroll
