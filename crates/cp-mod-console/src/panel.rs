@@ -30,6 +30,15 @@ impl Panel for ConsolePanel {
         Some(200)
     }
 
+    fn suicide(&self, ctx: &ContextElement, state: &State) -> bool {
+        // If the console session no longer exists (e.g. server reloaded), close the panel
+        if let Some(session_name) = ctx.get_meta_str("console_name") {
+            let cs = ConsoleState::get(state);
+            return !cs.sessions.contains_key(session_name);
+        }
+        false
+    }
+
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
         let session_name = ctx.get_meta_str("console_name")?;
         let cs = ConsoleState::get(state);

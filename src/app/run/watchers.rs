@@ -201,8 +201,21 @@ impl App {
         self.sync_file_watchers();
 
         let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
+        let mut suicide_indices: Vec<usize> = Vec::new();
 
         for (i, ctx) in self.state.context.iter().enumerate() {
+            // Suicide check: panels loading for >1s without content
+            if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {
+                let age_ms = current_ms.saturating_sub(ctx.last_refresh_ms);
+                if age_ms >= 1_000 {
+                    let panel = crate::app::panels::get_panel(&ctx.context_type);
+                    if panel.suicide(ctx, &self.state) {
+                        suicide_indices.push(i);
+                        continue;
+                    }
+                }
+            }
+
             if ctx.cache_in_flight {
                 continue;
             }
@@ -242,6 +255,20 @@ impl App {
             process_cache_request(request, self.cache_tx.clone());
             self.state.context[i].cache_in_flight = true;
             self.last_poll_ms.insert(self.state.context[i].id.clone(), current_ms);
+        }
+
+        // Mutable pass: remove suicided panels (reverse order to preserve indices)
+        if !suicide_indices.is_empty() {
+            for &i in suicide_indices.iter().rev() {
+                // Fix selected_context if it pointed at or past the removed panel
+                if self.state.selected_context >= self.state.context.len().saturating_sub(1) {
+                    self.state.selected_context = self.state.context.len().saturating_sub(2);
+                } else if self.state.selected_context > i {
+                    self.state.selected_context -= 1;
+                }
+                self.state.context.remove(i);
+            }
+            self.state.dirty = true;
         }
     }
 

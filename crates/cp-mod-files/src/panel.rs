@@ -24,6 +24,14 @@ impl Panel for FilePanel {
         true
     }
 
+    fn suicide(&self, ctx: &ContextElement, _state: &State) -> bool {
+        // If the file has been deleted from disk, close the panel
+        if let Some(path) = ctx.get_meta_str("file_path") {
+            return !PathBuf::from(path).exists();
+        }
+        false
+    }
+
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
