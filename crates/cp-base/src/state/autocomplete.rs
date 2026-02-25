@@ -1,10 +1,24 @@
 //! File path autocomplete triggered by `@` in the input field.
 //!
+//! Works like shell tab-completion:
+//! - Shows entries (files + folders) in the current directory
+//! - Prefix-matches the partial name typed after the last `/`
+//! - Tab on a folder → completes to `folder/` and shows its contents
+//! - Tab on a file → inserts the full path and closes
+//!
 //! Stored in `State.module_data` via the TypeMap pattern (get_ext/set_ext).
-//! The tree module populates `all_paths` on startup and fs changes.
 
 /// Maximum number of matches to display in the autocomplete popup.
-const AUTOCOMPLETE_MAX_VISIBLE: usize = 10;
+const MAX_VISIBLE: usize = 10;
+
+/// A single entry in the autocomplete list.
+#[derive(Debug, Clone)]
+pub struct AutocompleteEntry {
+    /// Display name (just the file/folder name, not the full path).
+    pub name: String,
+    /// Whether this entry is a directory.
+    pub is_dir: bool,
+}
 
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
@@ -13,12 +27,14 @@ pub struct AutocompleteState {
     pub active: bool,
     /// Byte position of the '@' character in state.input.
     pub anchor_pos: usize,
-    /// The query text typed after '@' (e.g., "src/ui/m").
+    /// The full query text typed after '@' (e.g., "src/ui/m").
     pub query: String,
-    /// All file paths available for matching (cached, refreshed on fs changes).
-    pub all_paths: Vec<String>,
-    /// Filtered matches for the current query.
-    pub matches: Vec<String>,
+    /// The directory portion of the query (e.g., "src/ui" for query "src/ui/m").
+    pub dir_prefix: String,
+    /// The partial name being matched (e.g., "m" for query "src/ui/m").
+    pub name_prefix: String,
+    /// Entries in the current directory that match the prefix.
+    pub matches: Vec<AutocompleteEntry>,
     /// Index of the currently highlighted match (0-based).
     pub selected: usize,
     /// Scroll offset for the visible window into matches.
@@ -40,7 +56,8 @@ impl AutocompleteState {
             active: false,
             anchor_pos: 0,
             query: String::new(),
-            all_paths: Vec::new(),
+            dir_prefix: String::new(),
+            name_prefix: String::new(),
             matches: Vec::new(),
             selected: 0,
             scroll_offset: 0,
@@ -49,43 +66,65 @@ impl AutocompleteState {
     }
 
     /// Activate autocomplete at the given anchor position.
+    /// Caller must call `set_matches()` afterward to populate entries.
     pub fn activate(&mut self, anchor_pos: usize) {
         self.active = true;
         self.anchor_pos = anchor_pos;
         self.query.clear();
+        self.dir_prefix.clear();
+        self.name_prefix.clear();
+        self.matches.clear();
         self.selected = 0;
         self.scroll_offset = 0;
-        self.refilter();
     }
 
     /// Deactivate and reset the autocomplete popup.
     pub fn deactivate(&mut self) {
         self.active = false;
         self.query.clear();
+        self.dir_prefix.clear();
+        self.name_prefix.clear();
         self.matches.clear();
         self.selected = 0;
         self.scroll_offset = 0;
     }
 
-    /// Append a character to the query and refilter.
+    /// Append a character to the query. Caller must call `set_matches()` afterward.
     pub fn push_char(&mut self, c: char) {
         self.query.push(c);
+        self.split_query();
         self.selected = 0;
         self.scroll_offset = 0;
-        self.refilter();
     }
 
     /// Remove the last character from the query.
     /// Returns false if query was already empty (caller should deactivate).
+    /// Caller must call `set_matches()` afterward if true is returned.
     pub fn pop_char(&mut self) -> bool {
         if self.query.pop().is_some() {
+            self.split_query();
             self.selected = 0;
             self.scroll_offset = 0;
-            self.refilter();
             true
         } else {
             false
         }
+    }
+
+    /// Set the query to a new value (used when completing into a folder).
+    /// Caller must call `set_matches()` afterward.
+    pub fn set_query(&mut self, query: String) {
+        self.query = query;
+        self.split_query();
+        self.selected = 0;
+        self.scroll_offset = 0;
+    }
+
+    /// Replace the current match list with new entries.
+    pub fn set_matches(&mut self, entries: Vec<AutocompleteEntry>) {
+        self.matches = entries;
+        self.selected = 0;
+        self.scroll_offset = 0;
     }
 
     /// Move selection up.
@@ -102,53 +141,48 @@ impl AutocompleteState {
     pub fn select_next(&mut self) {
         if !self.matches.is_empty() && self.selected < self.matches.len() - 1 {
             self.selected += 1;
-            if self.selected >= self.scroll_offset + AUTOCOMPLETE_MAX_VISIBLE {
-                self.scroll_offset = self.selected + 1 - AUTOCOMPLETE_MAX_VISIBLE;
+            if self.selected >= self.scroll_offset + MAX_VISIBLE {
+                self.scroll_offset = self.selected + 1 - MAX_VISIBLE;
             }
         }
     }
 
     /// Get the currently selected match, if any.
-    pub fn selected_match(&self) -> Option<&str> {
-        self.matches.get(self.selected).map(|s| s.as_str())
+    pub fn selected_match(&self) -> Option<&AutocompleteEntry> {
+        self.matches.get(self.selected)
+    }
+
+    /// Build the full path for the selected entry.
+    pub fn selected_full_path(&self) -> Option<String> {
+        self.selected_match().map(|entry| {
+            if self.dir_prefix.is_empty() { entry.name.clone() } else { format!("{}/{}", self.dir_prefix, entry.name) }
+        })
     }
 
     /// The visible window of matches for rendering.
-    pub fn visible_matches(&self) -> &[String] {
-        let end = (self.scroll_offset + AUTOCOMPLETE_MAX_VISIBLE).min(self.matches.len());
+    pub fn visible_matches(&self) -> &[AutocompleteEntry] {
+        let end = (self.scroll_offset + MAX_VISIBLE).min(self.matches.len());
         &self.matches[self.scroll_offset..end]
     }
 
-    /// Refilter matches based on current query using fuzzy substring matching.
-    fn refilter(&mut self) {
-        let query_lower = self.query.to_lowercase();
-        if query_lower.is_empty() {
-            // Show all paths (capped for performance)
-            self.matches = self.all_paths.iter().take(200).cloned().collect();
-        } else {
-            // Fuzzy: match if all query chars appear in order in the path
-            self.matches = self
-                .all_paths
-                .iter()
-                .filter(|path| fuzzy_match(&query_lower, &path.to_lowercase()))
-                .take(200)
-                .cloned()
-                .collect();
-        }
+    /// Get the directory prefix for the current query.
+    pub fn current_dir(&self) -> &str {
+        &self.dir_prefix
     }
-}
 
-/// Simple fuzzy matching: all characters of `query` appear in `haystack` in order.
-fn fuzzy_match(query: &str, haystack: &str) -> bool {
-    let mut hay_chars = haystack.chars();
-    for q_char in query.chars() {
-        loop {
-            match hay_chars.next() {
-                Some(h) if h == q_char => break,
-                Some(_) => continue,
-                None => return false,
-            }
+    /// Get the partial name being matched.
+    pub fn current_prefix(&self) -> &str {
+        &self.name_prefix
+    }
+
+    /// Split query into dir_prefix and name_prefix at the last '/'.
+    fn split_query(&mut self) {
+        if let Some(last_slash) = self.query.rfind('/') {
+            self.dir_prefix = self.query[..last_slash].to_string();
+            self.name_prefix = self.query[last_slash + 1..].to_string();
+        } else {
+            self.dir_prefix.clear();
+            self.name_prefix = self.query.clone();
         }
     }
-    true
 }

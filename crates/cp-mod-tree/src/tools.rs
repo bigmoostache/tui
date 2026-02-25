@@ -270,9 +270,14 @@ fn normalize_path(path: &Path) -> String {
     if normalized.is_empty() || normalized == "." { ".".to_string() } else { normalized.to_string() }
 }
 
-/// Collect all file paths under the project root, respecting the gitignore-style filter.
-/// Returns sorted list of relative paths (e.g., "src/main.rs", "Cargo.toml").
-pub fn collect_file_paths(tree_filter: &str) -> Vec<String> {
+/// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
+/// Returns entries sorted: directories first, then alphabetically (case-insensitive).
+/// Used by the `@` autocomplete popup.
+pub fn list_dir_entries(
+    tree_filter: &str,
+    dir_prefix: &str,
+    name_prefix: &str,
+) -> Vec<cp_base::autocomplete::AutocompleteEntry> {
     let root = PathBuf::from(".");
 
     // Build gitignore matcher from filter
@@ -285,43 +290,46 @@ pub fn collect_file_paths(tree_filter: &str) -> Vec<String> {
     }
     let gitignore = builder.build().ok();
 
-    let mut paths = Vec::new();
-    collect_files_recursive(&root, ".", &gitignore, &mut paths);
-    paths.sort();
-    paths
-}
+    let dir_path = if dir_prefix.is_empty() { PathBuf::from(".") } else { PathBuf::from(dir_prefix) };
 
-/// Recursively collect file paths.
-fn collect_files_recursive(
-    dir: &Path,
-    dir_path_str: &str,
-    gitignore: &Option<ignore::gitignore::Gitignore>,
-    paths: &mut Vec<String>,
-) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let is_dir = path.is_dir();
-
-        // Apply gitignore filter
-        if let Some(gi) = gitignore
-            && gi.matched(&path, is_dir).is_ignore()
-        {
-            continue;
-        }
-
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        let entry_path =
-            if dir_path_str == "." { name_str.to_string() } else { format!("{}/{}", dir_path_str, name_str) };
-
-        if is_dir {
-            collect_files_recursive(&path, &entry_path, gitignore, paths);
-        } else {
-            paths.push(entry_path);
-        }
+    if !dir_path.is_dir() {
+        return Vec::new();
     }
+
+    let Ok(read) = fs::read_dir(&dir_path) else { return Vec::new() };
+    let prefix_lower = name_prefix.to_lowercase();
+
+    let mut entries: Vec<cp_base::autocomplete::AutocompleteEntry> = read
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let is_dir = path.is_dir();
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            // Apply gitignore filter
+            if let Some(ref gi) = gitignore
+                && gi.matched(&path, is_dir).is_ignore()
+            {
+                return None;
+            }
+
+            // Prefix match (case-insensitive)
+            if !prefix_lower.is_empty() && !name.to_lowercase().starts_with(&prefix_lower) {
+                return None;
+            }
+
+            Some(cp_base::autocomplete::AutocompleteEntry { name, is_dir })
+        })
+        .collect();
+
+    // Sort: directories first, then alphabetically (case-insensitive)
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    entries
 }
 
 fn build_tree_new(

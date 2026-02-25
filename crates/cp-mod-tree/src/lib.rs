@@ -15,8 +15,8 @@ use cp_base::modules::Module;
 
 pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
 
-// Re-export file path collection for autocomplete
-pub use self::tools::collect_file_paths;
+// Re-export directory listing for autocomplete
+pub use self::tools::list_dir_entries;
 
 pub struct TreeModule;
 

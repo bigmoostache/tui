@@ -69,19 +69,12 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     prev_byte == b' ' || prev_byte == b'\n' || prev_byte == b'\t'
                 };
                 if should_trigger {
-                    // Populate paths lazily on first activation (before mutable borrow)
-                    let needs_paths = state
-                        .get_ext::<cp_base::autocomplete::AutocompleteState>()
-                        .is_some_and(|ac| ac.all_paths.is_empty());
-                    if needs_paths {
-                        let filter = cp_mod_tree::TreeState::get(state).tree_filter.clone();
-                        let paths = cp_mod_tree::collect_file_paths(&filter);
-                        if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
-                            ac.all_paths = paths;
-                            ac.activate(anchor_pos);
-                        }
-                    } else if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                    // Populate entries for root directory
+                    let filter = cp_mod_tree::TreeState::get(state).tree_filter.clone();
+                    let entries = cp_mod_tree::list_dir_entries(&filter, "", "");
+                    if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
                         ac.activate(anchor_pos);
+                        ac.set_matches(entries);
                     }
                 }
             }

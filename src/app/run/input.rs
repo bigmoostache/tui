@@ -29,33 +29,82 @@ impl App {
                 ac.select_next();
             }
             KeyCode::Enter | KeyCode::Tab => {
-                // Accept: replace @query with the selected file path
-                if let Some(selected_path) = ac.selected_match().map(|s| s.to_string()) {
+                // Get the selected entry info
+                let entry_info = ac.selected_match().map(|e| (e.name.clone(), e.is_dir));
+                let Some((name, is_dir)) = entry_info else {
+                    ac.deactivate();
+                    return;
+                };
+
+                if is_dir {
+                    // Folder: complete to "dir/" and show contents — don't close
+                    let full_path = ac.selected_full_path().unwrap_or(name);
+                    let new_query = format!("{}/", full_path);
+
+                    // Update the input text: replace @<old_query> with @<new_query>
+                    let anchor = ac.anchor_pos;
+                    let old_cursor = self.state.input_cursor;
+                    self.state.input =
+                        format!("{}@{}{}", &self.state.input[..anchor], new_query, &self.state.input[old_cursor..]);
+                    self.state.input_cursor = anchor + 1 + new_query.len(); // +1 for '@'
+
+                    // Refresh entries for the new directory
+                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    ac.set_query(new_query);
+                    let dir = ac.current_dir().to_string();
+                    let prefix = ac.current_prefix().to_string();
+                    let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    ac.set_matches(entries);
+                } else {
+                    // File: insert the full path and close
+                    let full_path = ac.selected_full_path().unwrap_or(name);
                     let anchor = ac.anchor_pos;
                     ac.deactivate();
-                    // Replace from anchor_pos to current cursor
                     let cursor = self.state.input_cursor;
+                    // Replace @<query> with the full file path (remove the @)
                     self.state.input =
-                        format!("{}{}{}", &self.state.input[..anchor], selected_path, &self.state.input[cursor..]);
-                    self.state.input_cursor = anchor + selected_path.len();
-                } else {
-                    ac.deactivate();
+                        format!("{}{} {}", &self.state.input[..anchor], full_path, &self.state.input[cursor..]);
+                    self.state.input_cursor = anchor + full_path.len() + 1; // +1 for space
                 }
             }
             KeyCode::Backspace => {
-                if !ac.pop_char() {
+                // Extract query info before re-borrowing
+                let pop_result = ac.pop_char();
+                let anchor = ac.anchor_pos;
+
+                if !pop_result {
                     // Query was empty — remove the '@' and deactivate
-                    let anchor = ac.anchor_pos;
                     ac.deactivate();
                     if anchor < self.state.input.len() {
                         self.state.input.remove(anchor);
                         self.state.input_cursor = anchor;
                     }
                 } else {
-                    // Update cursor position to match shortened query
-                    let anchor = ac.anchor_pos;
                     let query_len = ac.query.len();
+                    let query = ac.query.clone();
+                    // Update cursor position to match shortened query
                     self.state.input_cursor = anchor + 1 + query_len; // +1 for '@'
+
+                    // Also update the input text
+                    let old_len = self.state.input.len();
+                    let after_at = anchor + 1; // skip '@'
+                    // Rebuild: everything before @, then @query, then everything after old cursor
+                    let rest_start = after_at + query.len() + 1; // +1 for the removed char
+                    if rest_start <= old_len {
+                        self.state.input =
+                            format!("{}@{}{}", &self.state.input[..anchor], query, &self.state.input[rest_start..]);
+                    }
+
+                    // Refresh matches
+                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let dir = ac.current_dir().to_string();
+                    let prefix = ac.current_prefix().to_string();
+                    let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    ac.set_matches(entries);
                 }
             }
             KeyCode::Char(c) => {
@@ -63,10 +112,9 @@ impl App {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     return;
                 }
-                // Space or path separator cancels autocomplete on non-path chars
+                // Space or newline cancels autocomplete
                 if c == ' ' || c == '\n' {
                     ac.deactivate();
-                    // Let the char through to normal input handling
                     self.state.input.insert(self.state.input_cursor, c);
                     self.state.input_cursor += c.len_utf8();
                 } else {
@@ -74,6 +122,15 @@ impl App {
                     ac.push_char(c);
                     self.state.input.insert(self.state.input_cursor, c);
                     self.state.input_cursor += c.len_utf8();
+
+                    // Refresh matches with new query
+                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let dir = ac.current_dir().to_string();
+                    let prefix = ac.current_prefix().to_string();
+                    let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
+                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    ac.set_matches(entries);
                 }
             }
             _ => {}

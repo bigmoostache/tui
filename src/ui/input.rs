@@ -425,7 +425,7 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: 
     if visible.is_empty() {
         lines.push(Line::from(vec![Span::styled("  No matches", Style::default().fg(theme::text_muted()))]));
     } else {
-        for (i, path) in visible.iter().enumerate() {
+        for (i, entry) in visible.iter().enumerate() {
             let abs_idx = ac.scroll_offset + i;
             let is_selected = abs_idx == ac.selected;
 
@@ -436,15 +436,19 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: 
                 Style::default().fg(theme::text())
             };
 
+            let suffix = if entry.is_dir { "/" } else { "" };
+            let icon = if entry.is_dir { "📁 " } else { "   " };
             lines.push(Line::from(vec![
                 Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
-                Span::styled(path.clone(), path_style),
+                Span::styled(icon.to_string(), Style::default()),
+                Span::styled(format!("{}{}", entry.name, suffix), path_style),
             ]));
         }
     }
 
     // Count indicator
-    let count_text = format!(" @{} ({}/{}) ", ac.query, ac.matches.len().min(200), ac.all_paths.len());
+    let dir_label = if ac.dir_prefix.is_empty() { ".".to_string() } else { ac.dir_prefix.clone() };
+    let count_text = format!(" @{} — {}/{} in {}/ ", ac.query, ac.matches.len(), ac.matches.len(), dir_label);
 
     let block = Block::default()
         .borders(Borders::ALL)
