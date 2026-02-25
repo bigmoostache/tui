@@ -257,10 +257,14 @@ impl App {
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
             SpineDecision::Blocked(reason) => {
-                // Guard rail blocked — notification already created by engine
-                self.state.guard_rail_blocked = Some(reason);
-                self.state.dirty = true;
-                self.save_state_async();
+                // Guard rail blocked — notification already created by engine.
+                // Only mark dirty and save if this is a NEW block reason, to avoid
+                // burning CPU/disk on every tick (~125/sec) when persistently blocked.
+                if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
+                    self.state.guard_rail_blocked = Some(reason);
+                    self.state.dirty = true;
+                    self.save_state_async();
+                }
             }
             SpineDecision::Continue(action) => {
                 // Auto-continuation fired — apply it and start streaming

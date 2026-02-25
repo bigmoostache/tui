@@ -57,6 +57,10 @@ impl App {
                     } else {
                         // Max retries reached, show error
                         self.state.api_retry_count = 0;
+                        // Track consecutive failed continuations for backoff
+                        let spine = cp_mod_spine::SpineState::get_mut(&mut self.state);
+                        spine.config.consecutive_continuation_errors += 1;
+                        spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
                         apply_action(&mut self.state, Action::StreamError(e));
                     }
                 }
@@ -214,7 +218,11 @@ impl App {
             // Reset auto-continuation count on each successful tick (stream completion).
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,
             // not on total auto-continuations in an autonomous session.
-            cp_mod_spine::SpineState::get_mut(&mut self.state).config.auto_continuation_count = 0;
+            let spine_cfg = &mut cp_mod_spine::SpineState::get_mut(&mut self.state).config;
+            spine_cfg.auto_continuation_count = 0;
+            // Reset consecutive error backoff — successful completion proves API is healthy
+            spine_cfg.consecutive_continuation_errors = 0;
+            spine_cfg.last_continuation_error_ms = None;
 
             self.typewriter.reset();
             self.pending_done = None;
