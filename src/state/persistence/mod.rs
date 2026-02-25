@@ -42,6 +42,10 @@ pub fn load_state() -> State {
     } else {
         // Fresh start - create default state
         let mut state = State::default();
+        // Populate active_modules with all defaults BEFORE ensure_default_contexts
+        // runs — otherwise non-core panels get skipped on first run.
+        state.active_modules = crate::modules::default_active_modules();
+        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
         // Initialize module-owned state (TypeMap entries)
         for module in crate::modules::all_modules() {
             module.init_state(&mut state);
