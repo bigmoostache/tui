@@ -86,6 +86,62 @@ agents:
       These are for context management only - NEVER include these prefixes in your responses.
       Just respond naturally without any [Axxx] or similar prefixes.
 
-skills: []
+skills:
+  - id: brave-goggles
+    name: Brave Goggles
+    description: Curated Brave Search Goggles for domain re-ranking
+    content: |
+      # Brave Search Goggles — Curated Reference
+
+      Goggles re-rank Brave search results by boosting/downranking domains. Pass a goggle URL as the `goggles_id` parameter in `brave_search` or `goggles` in `brave_llm_context`.
+
+      ## Curated Goggles
+
+      ### Programming & Tech
+      | Goggle | URL | Use When |
+      |--------|-----|----------|
+      | Tech Blogs | `https://raw.githubusercontent.com/brave/goggles-quickstart/main/goggles/tech_blogs.goggle` | Searching for programming tutorials, tech opinions, developer blogs |
+      | Hacker News Favorites | `https://raw.githubusercontent.com/brave/goggles-quickstart/main/goggles/hacker_news.goggle` | Want HN-style quality — boosts domains frequently shared on HN |
+      | Copycats Removal | `https://raw.githubusercontent.com/brave/goggles-quickstart/main/goggles/copycats_removal.goggle` | Remove content farms, SEO spam, scraped/rewritten articles |
+      | Short Web (< 1K words) | `https://raw.githubusercontent.com/brave/goggles-quickstart/main/goggles/1k_short.goggle` | Want concise pages — boosts short articles, downranks bloat |
+
+      ### Academic & Research
+      | Goggle | URL | Use When |
+      |--------|-----|----------|
+      | Academic Sources | `https://search.brave.com/goggles?goggles_id=https://raw.githubusercontent.com/nicchk/brave-goggles/main/academic.goggle` | Boost .edu, arxiv, PubMed, Google Scholar, university domains |
+
+      ### News & Media
+      | Goggle | URL | Use When |
+      |--------|-----|----------|
+      | Left-Leaning News | `https://raw.githubusercontent.com/allsides-news/brave-goggles/main/left.goggles` | Want left-leaning media perspective (NYT, WaPo, MSNBC, etc.) |
+      | Right-Leaning News | `https://raw.githubusercontent.com/allsides-news/brave-goggles/main/right.goggles` | Want right-leaning media perspective (Fox, Daily Wire, etc.) |
+      | No Pinterest | `https://raw.githubusercontent.com/brave/goggles-quickstart/main/goggles/no_pinterest.goggle` | Remove Pinterest from image/visual searches |
+
+      ## Discovering New Goggles
+
+      Browse the Brave Goggles directory at: `https://search.brave.com/goggles/discover`
+
+      To find goggles by topic, you can also search GitHub for `.goggle` files:
+      - `brave-goggles` repositories on GitHub
+      - Files ending in `.goggle` with Brave Goggles syntax
+
+      ## Writing Custom Goggles (Inline)
+
+      For `brave_llm_context`, the `goggles` parameter accepts inline goggle definitions:
+      ```
+      ! name: My Custom Goggle
+      ! description: Boost official docs
+      $boost=3,site=docs.python.org
+      $boost=3,site=docs.rust-lang.org
+      $boost=2,site=developer.mozilla.org
+      $boost=2,site=stackoverflow.com
+      $downrank=5,site=w3schools.com
+      ```
+
+      ## Tips
+      - Goggles only **re-rank** results — they don't filter them out entirely (unless downranked heavily)
+      - Combine goggles with `site:` operator in query for precise targeting
+      - `$discard` removes matches entirely; `$boost=N` promotes; `$downrank=N` demotes
+      - Goggles are most effective for broad queries where source quality matters
 
 commands: []
