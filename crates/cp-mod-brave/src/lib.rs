@@ -64,9 +64,13 @@ impl Module for BraveModule {
                     "or firecrawl_scrape/firecrawl_search (Tier 3). Stop at the lowest tier that answers the query.\n\n",
                     "PARAMETER GUIDANCE:\n",
                     "- count: 3 for simple facts, 5 for multi-faceted, 5-10 for comparative/research\n",
-                    "- freshness: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year), or custom 'YYYY-MM-DDtoYYYY-MM-DD'\n",
-                    "- goggles_id: URL of a Brave Goggle for domain re-ranking. Load the 'brave-goggles' skill for curated recommendations."
+                    "- freshness: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year), ",
+                    "or custom 'YYYY-MM-DDtoYYYY-MM-DD'\n",
+                    "- goggles_id: URL of a Brave Goggle for domain re-ranking. ",
+                    "Load the 'brave-goggles' skill for curated recommendations."
                 ).to_string(),
+                // NOTE: Description is sent as-is to the LLM in tool definitions.
+                // Keep it decision-oriented: when to use, when NOT to use, what it returns.
                 params: vec![
                     ToolParam::new("query", ParamType::String)
                         .desc("Search query. Supports operators: \"exact\", -exclude, site:domain, filetype:pdf")
@@ -96,6 +100,10 @@ impl Module for BraveModule {
                     "Brave's LLM Context API returns pre-extracted, relevance-scored web content — ",
                     "text chunks, tables, code blocks, structured data — optimized for direct LLM consumption. ",
                     "No scraping needed. Use when brave_search snippets are insufficient (Tier 2).\n\n",
+                    "KEY DIFFERENCE from brave_search: brave_search returns 2-line snippets per result. ",
+                    "This tool returns full paragraphs, tables, and code blocks extracted from the top results — ",
+                    "much richer content without needing to scrape individual pages. Still search-based (no specific URL needed). ",
+                    "Cheaper and faster than firecrawl_scrape.\n\n",
                     "ESCALATION: Use after brave_search when you need deeper content. ",
                     "If you need the full page, escalate to firecrawl_scrape (Tier 3).\n\n",
                     "PARAMETER GUIDANCE:\n",

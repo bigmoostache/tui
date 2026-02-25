@@ -63,7 +63,10 @@ impl Module for FirecrawlModule {
                     "ESCALATION: Use after brave_search/brave_llm_context when ",
                     "snippets are insufficient and you have a specific URL to extract.\n\n",
                     "FORMATS: 'markdown' (default, clean text), 'html', 'links' (all page URLs), ",
-                    "'summary', 'images'. Default: ['markdown', 'links']."
+                    "'summary', 'images'. Default: ['markdown', 'links'].\n\n",
+                    "KEY DECISION: This tool REQUIRES a known URL — it cannot discover pages. ",
+                    "If you don't have a URL yet, use brave_search first (to find URLs) or firecrawl_search ",
+                    "(to search AND scrape in one step). One page per call."
                 )
                 .to_string(),
                 params: vec![
@@ -94,6 +97,9 @@ impl Module for FirecrawlModule {
                     "Use when you need full pages but don't have specific URLs yet (Tier 3b).\n\n",
                     "ESCALATION: Use after brave_search when snippets are insufficient ",
                     "and you need deep content from multiple pages.\n\n",
+                    "KEY DIFFERENCE from firecrawl_scrape: this tool discovers AND scrapes in one step — ",
+                    "you don't need a URL first. It replaces the brave_search→firecrawl_scrape two-step when you know ",
+                    "upfront you'll need full page content. More expensive per call but saves a round trip.\n\n",
                     "CATEGORIES: 'github' (repos/code), 'research' (arxiv/nature/ieee), 'pdf'.\n",
                     "TBS (time filter): 'qdr:h' (hour), 'qdr:d' (day), 'qdr:w' (week), ",
                     "'qdr:m' (month), 'qdr:y' (year)."
@@ -124,7 +130,10 @@ impl Module for FirecrawlModule {
                     "Use to explore a site's structure before targeted scraping (Tier 4).\n\n",
                     "ESCALATION: Use when you need to understand a site's structure ",
                     "to find the right pages to scrape. Typically followed by firecrawl_scrape.\n\n",
-                    "COST: 1 credit per call regardless of URLs returned. Very cheap for exploration."
+                    "COST: 1 credit per call regardless of URLs returned. Very cheap for exploration.\n\n",
+                    "WARNING: Returns URLs ONLY — no page content. This is a discovery/exploration tool. ",
+                    "After finding interesting URLs, use firecrawl_scrape to get the actual content. ",
+                    "If you already know what you're looking for, use firecrawl_search instead (search + scrape in one step)."
                 )
                 .to_string(),
                 params: vec![
