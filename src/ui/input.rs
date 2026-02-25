@@ -37,10 +37,10 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             Style::default().fg(theme::bg_base()).bg(theme::success()).bold(),
         ));
     } else if state.is_streaming && state.is_tooling {
-        // TOOLING — stream active but executing tool calls
+        // TOOLING — stream active but executing tool calls (same blue as branch name)
         spans.push(Span::styled(
             format!(" {} TOOLING ", spin),
-            Style::default().fg(theme::bg_base()).bg(theme::accent()).bold(),
+            Style::default().fg(Color::White).bg(Color::Blue).bold(),
         ));
     } else if has_question_form {
         // QUESTIONING — waiting for user to answer a question form
