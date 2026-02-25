@@ -28,6 +28,8 @@ impl App {
                     self.typewriter.mark_done();
                     self.pending_done =
                         Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
+                    // API call succeeded — reset retry counter immediately at tick level
+                    self.state.api_retry_count = 0;
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
@@ -213,8 +215,6 @@ impl App {
                 ActionResult::Save => self.save_state_async(),
                 _ => {}
             }
-            // Reset retry count on successful completion
-            self.state.api_retry_count = 0;
             // Reset auto-continuation count on each successful tick (stream completion).
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,
             // not on total auto-continuations in an autonomous session.
