@@ -95,6 +95,15 @@ pub struct SpineConfig {
     /// Timestamp when autonomous operation started (for duration guard)
     #[serde(default)]
     pub autonomous_start_ms: Option<u64>,
+
+    /// Count of consecutive auto-continuations that ended in a stream error
+    /// (all retries exhausted). Used for exponential backoff. Reset on successful
+    /// stream completion or user message.
+    #[serde(default)]
+    pub consecutive_continuation_errors: usize,
+    /// Timestamp (ms) of when the last continuation error occurred. Used for backoff delay.
+    #[serde(default)]
+    pub last_continuation_error_ms: Option<u64>,
 }
 
 /// Module-owned state for the Spine module

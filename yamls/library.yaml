@@ -119,29 +119,45 @@ skills:
 
       ## Discovering New Goggles
 
-      Browse the Brave Goggles directory at: `https://search.brave.com/goggles/discover`
+      When the curated list above doesn't cover the user's domain, discover new goggles with this workflow:
 
-      To find goggles by topic, you can also search GitHub for `.goggle` files:
-      - `brave-goggles` repositories on GitHub
-      - Files ending in `.goggle` with Brave Goggles syntax
-
-      ## Writing Custom Goggles (Inline)
-
-      For `brave_llm_context`, the `goggles` parameter accepts inline goggle definitions:
+      ### Step 1: Find goggle repos on GitHub
       ```
-      ! name: My Custom Goggle
-      ! description: Boost official docs
-      $boost=3,site=docs.python.org
-      $boost=3,site=docs.rust-lang.org
-      $boost=2,site=developer.mozilla.org
-      $boost=2,site=stackoverflow.com
-      $downrank=5,site=w3schools.com
+      brave_search query="site:github.com brave goggles <topic>" count=5
       ```
+      This is the best discovery path. Known repos with goggle collections:
+      - `brave/goggles-quickstart` — official examples (tech, HN, copycats, short web)
+      - `allsides-news/brave-goggles` — news bias goggles (left/right/center)
+      - `nicchk/brave-goggles` — academic sources
+      - `CSamuelAnderson/Brave-goggles` — community collection
+      - `kogakure/brave-goggles` — curated personal goggles
+
+      ### Step 2: Browse the repo for .goggle files
+      ```
+      firecrawl_scrape url="https://github.com/<owner>/<repo>/tree/main/goggles"
+      ```
+      Lists all .goggle files in the directory.
+
+      ### Step 3: Read a goggle's source
+      ```
+      firecrawl_scrape url="https://raw.githubusercontent.com/<owner>/<repo>/main/goggles/<name>.goggle"
+      ```
+      Shows the full goggle: `! name:`, `! description:`, and all rules. Use this to verify it does what you need.
+
+      ### Step 4: Use the raw URL as goggles_id
+      The raw GitHub URL **is** the goggle ID — pass it directly:
+      ```
+      brave_search query="..." goggles_id="https://raw.githubusercontent.com/<owner>/<repo>/main/goggles/<name>.goggle"
+      ```
+
+      ### What does NOT work well
+      - **Brave Discover page** (`search.brave.com/goggles/discover`): renders JS-only, scraping yields titles without URLs — not useful.
+      - **firecrawl_map on GitHub repos**: returns mostly issues/PRs, not .goggle files — low signal.
+      - **Goggle profile pages** (`search.brave.com/goggles/profile?goggles_id=...`): great for validation if you already have the URL, but not for discovery.
 
       ## Tips
       - Goggles only **re-rank** results — they don't filter them out entirely (unless downranked heavily)
       - Combine goggles with `site:` operator in query for precise targeting
-      - `$discard` removes matches entirely; `$boost=N` promotes; `$downrank=N` demotes
       - Goggles are most effective for broad queries where source quality matters
 
 commands: []

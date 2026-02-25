@@ -43,6 +43,21 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         return SpineDecision::Idle;
     }
 
+    // Backoff after consecutive failed continuations (errors with all retries exhausted).
+    // Delay: 2^errors seconds, capped at 60s. Prevents runaway loops on persistent API failures.
+    {
+        let cfg = &SpineState::get(state).config;
+        if cfg.consecutive_continuation_errors > 0
+            && let Some(last_err_ms) = cfg.last_continuation_error_ms
+        {
+            let backoff_secs = (1u64 << cfg.consecutive_continuation_errors.min(6)).min(60);
+            let elapsed_ms = now_ms().saturating_sub(last_err_ms);
+            if elapsed_ms < backoff_secs * 1000 {
+                return SpineDecision::Idle;
+            }
+        }
+    }
+
     // Nothing to do if no unprocessed notifications
     if !SpineState::has_unprocessed_notifications(state) {
         return SpineDecision::Idle;
