@@ -152,8 +152,12 @@ impl Module for FirecrawlModule {
         tools::dispatch(tool, state)
     }
 
-    fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
-        None
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        if context_type.as_str() == panel::FIRECRAWL_PANEL_TYPE {
+            Some(Box::new(panel::FirecrawlResultPanel))
+        } else {
+            None
+        }
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

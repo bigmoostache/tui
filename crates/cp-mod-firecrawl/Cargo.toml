@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 cp-base.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
 reqwest = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true

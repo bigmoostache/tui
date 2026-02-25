@@ -492,6 +492,8 @@ name = "cp-mod-firecrawl"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "crossterm",
+ "ratatui",
  "reqwest",
  "serde",
  "serde_json",
