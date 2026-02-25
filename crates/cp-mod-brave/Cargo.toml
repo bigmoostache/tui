@@ -1,0 +1,14 @@
+[package]
+name = "cp-mod-brave"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cp-base.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+chrono.workspace = true
+reqwest = { workspace = true }

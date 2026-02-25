@@ -438,6 +438,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-brave"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
 name = "cp-mod-callback"
 version = "0.1.0"
 dependencies = [
@@ -471,6 +485,17 @@ dependencies = [
  "crossterm",
  "ratatui",
  "serde_json",
+]
+
+[[package]]
+name = "cp-mod-firecrawl"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -3971,9 +3996,11 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cp-base",
+ "cp-mod-brave",
  "cp-mod-callback",
  "cp-mod-console",
  "cp-mod-files",
+ "cp-mod-firecrawl",
  "cp-mod-git",
  "cp-mod-github",
  "cp-mod-logs",

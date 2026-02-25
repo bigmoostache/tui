@@ -10,9 +10,11 @@ use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
 
+pub use cp_mod_brave::BraveModule;
 pub use cp_mod_callback::CallbackModule;
 pub use cp_mod_console::ConsoleModule;
 pub use cp_mod_files::FilesModule;
+pub use cp_mod_firecrawl::FirecrawlModule;
 pub use cp_mod_git::GitModule;
 pub use cp_mod_github::GithubModule;
 pub use cp_mod_logs::LogsModule;
@@ -89,6 +91,8 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(SpineModule),
         Box::new(LogsModule),
         Box::new(TypstModule),
+        Box::new(BraveModule),
+        Box::new(FirecrawlModule),
     ]
 }
 
