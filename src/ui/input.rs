@@ -384,18 +384,18 @@ pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::Autocomp
     (1 + visible + 2).clamp(4, 14)
 }
 
-/// Render the @ autocomplete popup above the status bar
+/// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward)
 pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: Rect) {
     let ac = match state.get_ext::<cp_base::autocomplete::AutocompleteState>() {
         Some(ac) if ac.active => ac,
         _ => return,
     };
 
-    let popup_width = 60u16.min(area.width.saturating_sub(4));
+    let popup_width = 60u16.min(area.width.saturating_sub(2));
     let popup_height = calculate_autocomplete_height(ac);
 
-    // Position: bottom-left, above status bar
-    let x = area.x + 2;
+    // Position: bottom of content area, growing upward (so it sits above the status bar)
+    let x = area.x + 1;
     let y = area.y + area.height.saturating_sub(popup_height);
     let popup_area = Rect::new(x, y, popup_width, popup_height);
 

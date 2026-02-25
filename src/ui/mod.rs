@@ -47,7 +47,12 @@ pub fn render(frame: &mut Frame, state: &mut State) {
     if let Some(ac) = state.get_ext::<cp_base::autocomplete::AutocompleteState>()
         && ac.active
     {
-        input::render_autocomplete_popup(frame, state, area);
+        // Position in main content area (right of sidebar, above status bar)
+        let content_x = area.x + SIDEBAR_WIDTH;
+        let content_width = area.width.saturating_sub(SIDEBAR_WIDTH);
+        let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
+        let content_area = Rect::new(content_x, area.y, content_width, content_height);
+        input::render_autocomplete_popup(frame, state, content_area);
     }
 
     // Render config overlay if open
