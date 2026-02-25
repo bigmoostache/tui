@@ -57,6 +57,9 @@ impl Module for OverviewModule {
             "grok_model": state.grok_model,
             "groq_model": state.groq_model,
             "deepseek_model": state.deepseek_model,
+            "secondary_provider": state.secondary_provider,
+            "secondary_anthropic_model": state.secondary_anthropic_model,
+            "reverie_enabled": state.reverie_enabled,
             "cleaning_threshold": state.cleaning_threshold,
             "cleaning_target_proportion": state.cleaning_target_proportion,
             "context_budget": state.context_budget,
@@ -108,6 +111,19 @@ impl Module for OverviewModule {
             && let Ok(m) = serde_json::from_value(v.clone())
         {
             state.deepseek_model = m;
+        }
+        if let Some(v) = data.get("secondary_provider")
+            && let Ok(p) = serde_json::from_value(v.clone())
+        {
+            state.secondary_provider = p;
+        }
+        if let Some(v) = data.get("secondary_anthropic_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_anthropic_model = m;
+        }
+        if let Some(v) = data.get("reverie_enabled").and_then(|v| v.as_bool()) {
+            state.reverie_enabled = v;
         }
         if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {
             state.cleaning_threshold = v as f32;

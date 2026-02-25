@@ -129,6 +129,12 @@ pub struct State {
     pub groq_model: crate::llm_types::GroqModel,
     /// Selected DeepSeek model
     pub deepseek_model: crate::llm_types::DeepSeekModel,
+    /// Secondary LLM provider (for reveries / sub-agents)
+    pub secondary_provider: crate::llm_types::LlmProvider,
+    /// Secondary Anthropic model (for reveries / sub-agents)
+    pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
+    /// Whether the reverie system is enabled (auto-trigger on threshold breach)
+    pub reverie_enabled: bool,
     /// Accumulated prompt_cache_hit_tokens across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated prompt_cache_miss_tokens across all API calls (persisted)
@@ -233,6 +239,9 @@ impl Default for State {
             grok_model: crate::llm_types::GrokModel::default(),
             groq_model: crate::llm_types::GroqModel::default(),
             deepseek_model: crate::llm_types::DeepSeekModel::default(),
+            secondary_provider: crate::llm_types::LlmProvider::Anthropic,
+            secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
+            reverie_enabled: true,
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
             total_output_tokens: 0,

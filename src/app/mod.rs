@@ -3,6 +3,7 @@ pub mod background;
 mod context;
 pub mod events;
 pub mod panels;
+pub mod reverie;
 mod run;
 
 pub use context::{ensure_default_agent, ensure_default_contexts};
