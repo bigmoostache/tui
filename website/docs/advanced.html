@@ -3,198 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Mode — Context Pilot Docs</title>
-    <meta name="description" content="Spine module, auto-continuation, guard rails, and autonomous operation in Context Pilot.">
-    <link rel="stylesheet" href="docs.css">
+    <title>Advanced Usage — Context Pilot</title>
+    <meta name="description" content="Autonomous workflows, callbacks, presets, web search, PDF generation, and power-user tips.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="docs.css">
 </head>
 <body>
-    <header class="docs-header">
-        <div class="docs-header-inner">
-            <div style="display:flex;align-items:center;gap:1rem;">
-                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
-                <a href="../index.html" class="docs-logo">
-                    <span class="docs-logo-icon">⎈</span>
-                    <span>Context Pilot</span>
-                    <span class="docs-logo-sep">/</span>
-                    <span class="docs-logo-docs">Docs</span>
-                </a>
-            </div>
-            <div class="docs-header-links">
-                <a href="../index.html">Home</a>
-                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
-            </div>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="../" class="nav-logo">
+            <span class="nav-logo-icon">⚙</span>
+            <span>Context Pilot</span>
+        </a>
+        <div class="nav-links">
+            <a href="./">Docs</a>
+            <a href="getting-started.html">Get Started</a>
+            <a href="tools.html">Tools</a>
+            <a href="modules.html">Modules</a>
+            <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
         </div>
-    </header>
-
-    <div class="docs-overlay" onclick="toggleSidebar()"></div>
-
-    <div class="docs-layout">
-        <nav class="docs-sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Getting Started</div>
-                <a href="index.html" class="sidebar-link">Overview</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Core</div>
-                <a href="context.html" class="sidebar-link">Context System</a>
-                <a href="modules.html" class="sidebar-link">Modules</a>
-                <a href="tools.html" class="sidebar-link">Tool Reference</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Customization</div>
-                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
-                <a href="configuration.html" class="sidebar-link">Configuration</a>
-                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Advanced</div>
-                <a href="advanced.html" class="sidebar-link active">Autonomous Mode</a>
-                <a href="advanced.html#spine" class="sidebar-link sub">The Spine</a>
-                <a href="advanced.html#notifications" class="sidebar-link sub">Notifications</a>
-                <a href="advanced.html#continuations" class="sidebar-link sub">Auto-Continuation</a>
-                <a href="advanced.html#guardrails" class="sidebar-link sub">Guard Rails</a>
-            </div>
-        </nav>
-
-        <main class="docs-content">
-            <h1><span class="gradient-text">Autonomous</span> Mode</h1>
-            <p class="page-subtitle">The Spine module enables the AI to work through complex tasks independently — with guard rails to keep it safe.</p>
-
-            <h2 id="spine">The Spine</h2>
-            <p>The <strong>Spine</strong> is Context Pilot's central nervous system. It manages notifications, auto-continuation logic, and guard rails. It's the module that makes autonomous multi-step operation possible.</p>
-            <p>The Spine panel (P9) shows:</p>
-            <ul>
-                <li>Unprocessed notifications (things that need the AI's attention)</li>
-                <li>Recently processed notifications (for context)</li>
-                <li>Current spine configuration (auto-continuation settings + guard rail limits)</li>
-            </ul>
-
-            <h2 id="notifications">Notifications</h2>
-            <p>Notifications are events that may require the AI's attention. They appear in the Spine panel and can trigger auto-continuation.</p>
-
-            <h3>Notification types</h3>
-            <table>
-                <thead><tr><th>Type</th><th>Trigger</th><th>Description</th></tr></thead>
-                <tbody>
-                    <tr><td><strong>UserMessage</strong></td><td>You send a message</td><td>A new human message arrived</td></tr>
-                    <tr><td><strong>ReloadResume</strong></td><td>TUI restart</td><td>The application restarted and may need to resume work</td></tr>
-                    <tr><td><strong>TodoIncomplete</strong></td><td>Todos remaining</td><td>There are still incomplete todo items</td></tr>
-                    <tr><td><strong>MaxTokensTruncated</strong></td><td>Output hit max_tokens</td><td>The AI's response was cut off by the token limit</td></tr>
-                    <tr><td><strong>Custom</strong></td><td>Various</td><td>Module-specific notifications</td></tr>
-                </tbody>
-            </table>
-
-            <p>Mark notifications as processed with <code>notification_mark_processed</code>.</p>
-
-            <h2 id="continuations">Auto-Continuation</h2>
-            <p>Auto-continuation automatically sends follow-up messages to the AI when certain conditions are met. This enables the AI to work through multi-step tasks without human intervention.</p>
-
-            <h3>Continuation triggers</h3>
-            <p>Three built-in continuation strategies, evaluated in priority order:</p>
-
-            <h4>1. Notifications continuation</h4>
-            <p>If there are unprocessed notifications after the AI finishes responding, a synthetic message is injected prompting the AI to address them. This handles user messages that arrive during streaming, reload resumptions, etc.</p>
-
-            <h4>2. Max tokens continuation</h4>
-            <p>If the AI's response was truncated (hit max_tokens), the stream is automatically relaunched so the AI can finish its thought. Enabled by default via <code>max_tokens_auto_continue</code>.</p>
-
-            <h4>3. Todos continuation</h4>
-            <p>If <code>continue_until_todos_done</code> is enabled and there are incomplete todos, a synthetic message is injected listing the remaining tasks and asking the AI to continue. This is the primary mechanism for autonomous operation.</p>
-
-            <div class="info-box warn">
-                <div class="info-label">Important</div>
-                <p>Always set guard rails before enabling <code>continue_until_todos_done</code>. Without limits, the AI will keep going until all todos are done — which could mean many API calls and significant cost.</p>
-            </div>
-
-            <h3>Configuration</h3>
-            <pre><code># Enable todo-based auto-continuation with guard rails
-spine_configure(
-    continue_until_todos_done: true,
-    max_auto_retries: 40,
-    max_cost: 5.0
-)</code></pre>
-
-            <table>
-                <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
-                <tbody>
-                    <tr><td><code>max_tokens_auto_continue</code></td><td><code>true</code></td><td>Auto-continue when output truncated</td></tr>
-                    <tr><td><code>continue_until_todos_done</code></td><td><code>false</code></td><td>Keep going until all todos are done</td></tr>
-                    <tr><td><code>reset_counters</code></td><td>—</td><td>Reset runtime counters (continuation count, duration timer)</td></tr>
-                </tbody>
-            </table>
-
-            <h2 id="guardrails">Guard Rails</h2>
-            <p>Guard rails are safety limits that <strong>block</strong> auto-continuation when exceeded. They prevent runaway autonomous operation. All guard rails are optional — set to <code>null</code> to disable.</p>
-
-            <table>
-                <thead><tr><th>Guard Rail</th><th>Default</th><th>Description</th></tr></thead>
-                <tbody>
-                    <tr><td><code>max_auto_retries</code></td><td>40</td><td>Max consecutive auto-continuations without human input</td></tr>
-                    <tr><td><code>max_cost</code></td><td><code>null</code></td><td>Max cost in USD before blocking</td></tr>
-                    <tr><td><code>max_duration_secs</code></td><td><code>null</code></td><td>Max autonomous duration in seconds</td></tr>
-                    <tr><td><code>max_messages</code></td><td><code>null</code></td><td>Max conversation messages before blocking</td></tr>
-                    <tr><td><code>max_output_tokens</code></td><td><code>null</code></td><td>Max total output tokens before blocking</td></tr>
-                </tbody>
-            </table>
-
-            <p>When a guard rail triggers, the Spine blocks auto-continuation and a notification appears. The AI will stop and wait for human input. Send any message (or reset counters) to resume.</p>
-
-            <h3>Recommended configurations</h3>
-
-            <h4>Quick autonomous task</h4>
-            <pre><code>spine_configure(
-    continue_until_todos_done: true,
-    max_auto_retries: 20,
-    max_cost: 2.0
-)</code></pre>
-
-            <h4>Long autonomous session</h4>
-            <pre><code>spine_configure(
-    continue_until_todos_done: true,
-    max_auto_retries: 100,
-    max_cost: 10.0,
-    max_duration_secs: 3600
-)</code></pre>
-
-            <h4>Disable all auto-continuation</h4>
-            <pre><code>spine_configure(
-    continue_until_todos_done: false,
-    max_tokens_auto_continue: false
-)</code></pre>
-
-            <h2>Autonomous Workflow</h2>
-            <p>The typical pattern for autonomous operation:</p>
-            <ol>
-                <li><strong>Create todos</strong> — break your task into clear, actionable items</li>
-                <li><strong>Set guard rails</strong> — configure cost/retry limits</li>
-                <li><strong>Enable continuation</strong> — <code>continue_until_todos_done: true</code></li>
-                <li><strong>Watch</strong> — the AI works through todos, checking them off as it goes</li>
-                <li><strong>Intervene</strong> — press <kbd>Escape</kbd> to stop streaming, or send a message to redirect</li>
-            </ol>
-
-            <div class="info-box tip">
-                <div class="info-label">Tip</div>
-                <p>The Spine panel (P9) shows the current <code>auto_continuation_count</code> — how many times the AI has auto-continued. This resets when you send a message.</p>
-            </div>
-
-            <div class="page-nav">
-                <a href="keyboard.html">
-                    <span class="nav-label">Previous</span>
-                    <span class="nav-title">← Keyboard Shortcuts</span>
-                </a>
-                <div></div>
-            </div>
-        </main>
     </div>
+</nav>
 
-    <script>
-    function toggleSidebar() {
-        document.querySelector('.docs-sidebar').classList.toggle('open');
-        document.querySelector('.docs-overlay').classList.toggle('open');
-    }
-    </script>
+<div class="docs-layout">
+    <aside class="docs-sidebar">
+        <h3>On this page</h3>
+        <a href="#autonomous">Autonomous Workflows</a>
+        <a href="#callbacks">File Edit Callbacks</a>
+        <a href="#web-search">Web Search & Scraping</a>
+        <a href="#pdf">PDF Generation</a>
+        <a href="#presets">Presets</a>
+        <a href="#tips">Power-User Tips</a>
+
+        <h3>Reference</h3>
+        <a href="tools.html">All 58 Tools</a>
+        <a href="modules.html">Modules</a>
+        <a href="agents.html">Agents & Skills</a>
+    </aside>
+
+    <main class="docs-content">
+        <h1>Advanced Usage</h1>
+        <p class="subtitle">
+            Autonomous workflows, self-correcting callbacks, web research,
+            PDF generation, and tips for getting the most out of Context Pilot.
+        </p>
+
+        <h2 id="autonomous">Autonomous Workflows</h2>
+        <p>
+            Context Pilot can work autonomously — the AI continues working through a todo list
+            without waiting for your input after each step. This is powered by the Spine module.
+        </p>
+
+        <h3>Setting up autonomous mode</h3>
+        <ol>
+            <li>Create a todo list with <code>todo_create</code> — break your task into subtasks</li>
+            <li>Enable auto-continuation: <code>spine_configure(continue_until_todos_done: true)</code></li>
+            <li>Set guard rails to prevent runaway AI:
+                <pre><code>spine_configure(
+    max_cost: 2.00,           // Stop after $2 spent
+    max_messages: 100,        // Stop after 100 messages
+    max_duration_secs: 1800,  // Stop after 30 minutes
+    max_auto_retries: 20      // Stop after 20 auto-continuations
+)</code></pre>
+            </li>
+            <li>The AI works through todos, marking them done, until all are complete or a guard rail triggers</li>
+        </ol>
+
+        <div class="callout callout-warning">
+            <strong>⚠️ Always set guard rails</strong>
+            Without limits, the AI could loop indefinitely. Start with conservative limits and increase as you build confidence.
+        </div>
+
+        <h3>Monitoring autonomous work</h3>
+        <p>
+            The Spine panel (P7) shows notifications, auto-continuation count, and guard rail status.
+            Press <code>Esc</code> at any time to stop the AI mid-generation. The Todo panel shows
+            progress in real-time.
+        </p>
+
+        <h2 id="callbacks">File Edit Callbacks</h2>
+        <p>
+            Callbacks are the secret weapon: bash scripts that automatically fire when the AI
+            edits files matching a glob pattern. They create a self-correcting feedback loop.
+        </p>
+
+        <h3>Creating a callback</h3>
+        <pre><code>Callback_upsert(
+    action: "create",
+    name: "rust-check",
+    pattern: "*.rs",
+    script_content: "cargo check 2>&1",
+    blocking: true,
+    timeout: 30,
+    success_message: "Build passed ✓"
+)</code></pre>
+
+        <h3>How it works</h3>
+        <ol>
+            <li>AI edits a <code>.rs</code> file via <code>Edit</code> or <code>Write</code></li>
+            <li>The <code>rust-check</code> callback fires automatically</li>
+            <li>In <strong>blocking mode</strong>, the AI waits for the result</li>
+            <li>If the check fails, the AI sees the error output and self-corrects</li>
+            <li>If it passes, the AI sees the success message and continues</li>
+        </ol>
+
+        <h3>Advanced callback features</h3>
+        <ul>
+            <li><strong>Blocking mode</strong> — AI pauses until the callback completes</li>
+            <li><strong>One-at-a-time</strong> — prevents simultaneous runs of the same callback</li>
+            <li><strong>Timeout</strong> — kills callbacks that run too long</li>
+            <li><strong>Exit code 7</strong> — silently suppresses output (for "not applicable" cases)</li>
+            <li><strong>skip_callbacks</strong> — bypass specific callbacks on individual edits</li>
+            <li><strong>$CP_CHANGED_FILES</strong> — environment variable with the list of changed files</li>
+        </ul>
+
+        <h2 id="web-search">Web Search & Scraping</h2>
+        <p>
+            With API keys configured, the AI can search the web and scrape pages.
+            Tools follow an escalation tier system — start cheap, go deeper only if needed.
+        </p>
+
+        <h3>Escalation tiers</h3>
+        <table>
+            <thead><tr><th>Tier</th><th>Tool</th><th>When to use</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td><code>brave_search</code></td><td>Quick facts, snippets — always try first</td></tr>
+                <tr><td>2</td><td><code>brave_llm_context</code></td><td>Need more depth from search results</td></tr>
+                <tr><td>3a</td><td><code>firecrawl_scrape</code></td><td>Full page from a known URL</td></tr>
+                <tr><td>3b</td><td><code>firecrawl_search</code></td><td>Search + scrape in one call</td></tr>
+                <tr><td>4</td><td><code>firecrawl_map</code></td><td>Discover URLs on a domain</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Brave Goggles</h3>
+        <p>
+            Load the built-in "Brave Goggles" skill (<code>skill_load("brave-goggles")</code>)
+            for curated domain re-ranking goggles — tech blogs, HN, academic sources, and more.
+        </p>
+
+        <h2 id="pdf">PDF Generation</h2>
+        <p>
+            Context Pilot embeds the Typst compiler — create professional PDFs from code without
+            any external tools.
+        </p>
+
+        <h3>Quick start</h3>
+        <pre><code># Create a document
+Write("report.typ", "#set page(paper: \"a4\")\n= My Report\nHello world")
+
+# Compile to PDF
+typst_execute("typst compile report.typ")
+
+# Watch for auto-recompile on edits
+typst_execute("typst watch report.typ")</code></pre>
+
+        <h3>Templates</h3>
+        <p>
+            Reusable templates live in <code>.context-pilot/shared/typst-templates/</code>.
+            Import them in your documents. You can also scaffold from Typst Universe:
+        </p>
+        <pre><code>typst_execute("typst init @preview/brilliant-cv:2.0.3")</code></pre>
+
+        <h2 id="presets">Presets</h2>
+        <p>
+            Presets save and restore your entire working configuration — switch between
+            different project contexts instantly.
+        </p>
+
+        <h3>Saving a preset</h3>
+        <pre><code>preset_snapshot_myself(
+    name: "my-rust-project",
+    description: "Rust project with clippy callbacks and web search"
+)</code></pre>
+
+        <h3>Loading a preset</h3>
+        <pre><code>preset_load(name: "my-rust-project")</code></pre>
+
+        <p>Presets capture: active agent, modules, disabled tools, todos, scratchpad, callbacks, and panel configurations. Messages are preserved.</p>
+
+        <h2 id="tips">Power-User Tips</h2>
+        <ul>
+            <li><strong>Use <code>@</code> autocomplete</strong> — type <code>@</code> in the input to get shell-style file path completion with Tab navigation</li>
+            <li><strong>Create slash commands</strong> — <code>/review</code>, <code>/deploy</code>, <code>/test</code> for common prompts</li>
+            <li><strong>Stack callbacks</strong> — combine <code>cargo check</code> (blocking) + <code>cargo clippy</code> (blocking) + <code>cargo test</code> (async) for a full CI pipeline on every edit</li>
+            <li><strong>Use memories for conventions</strong> — "Always use explicit error handling", "Run tests before committing" — the AI follows them every session</li>
+            <li><strong>Close stale panels</strong> — the AI can close panels to free context space. Ask it to clean up if things feel cluttered</li>
+            <li><strong>Use <code>coucou</code> for reminders</strong> — schedule a notification to check on a long-running process</li>
+            <li><strong>Conversation history</strong> — when context gets large, ask the AI to close old history panels (it preserves important info as logs/memories first)</li>
+        </ul>
+    </main>
+</div>
+
+<footer class="footer">
+    <div class="footer-inner">
+        <p>Built with 🦀 Rust and ❤️ by the Context Pilot contributors. <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a></p>
+    </div>
+</footer>
+
 </body>
 </html>

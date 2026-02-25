@@ -3,166 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agents & Skills — Context Pilot Docs</title>
+    <title>Agents & Skills — Context Pilot</title>
     <meta name="description" content="Create and manage agents, skills, commands, and presets in Context Pilot.">
-    <link rel="stylesheet" href="docs.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="docs.css">
 </head>
 <body>
-    <header class="docs-header">
-        <div class="docs-header-inner">
-            <div style="display:flex;align-items:center;gap:1rem;">
-                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
-                <a href="../index.html" class="docs-logo">
-                    <span class="docs-logo-icon">⎈</span>
-                    <span>Context Pilot</span>
-                    <span class="docs-logo-sep">/</span>
-                    <span class="docs-logo-docs">Docs</span>
-                </a>
-            </div>
-            <div class="docs-header-links">
-                <a href="../index.html">Home</a>
-                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
-            </div>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="../" class="nav-logo">
+            <span class="nav-logo-icon">⚙</span>
+            <span>Context Pilot</span>
+        </a>
+        <div class="nav-links">
+            <a href="./">Docs</a>
+            <a href="getting-started.html">Get Started</a>
+            <a href="tools.html">Tools</a>
+            <a href="modules.html">Modules</a>
+            <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
         </div>
-    </header>
+    </div>
+</nav>
 
-    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+<div class="docs-layout">
+    <aside class="docs-sidebar">
+        <h3>On this page</h3>
+        <a href="#agents">Agents</a>
+        <a href="#skills">Skills</a>
+        <a href="#commands">Commands</a>
+        <a href="#presets">Presets</a>
+        <a href="#storage">Storage Format</a>
 
-    <div class="docs-layout">
-        <nav class="docs-sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Getting Started</div>
-                <a href="index.html" class="sidebar-link">Overview</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Core</div>
-                <a href="context.html" class="sidebar-link">Context System</a>
-                <a href="modules.html" class="sidebar-link">Modules</a>
-                <a href="tools.html" class="sidebar-link">Tool Reference</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Customization</div>
-                <a href="agents.html" class="sidebar-link active">Agents & Skills</a>
-                <a href="agents.html#agents" class="sidebar-link sub">Agents</a>
-                <a href="agents.html#skills" class="sidebar-link sub">Skills</a>
-                <a href="agents.html#commands" class="sidebar-link sub">Commands</a>
-                <a href="agents.html#presets" class="sidebar-link sub">Presets</a>
-                <a href="configuration.html" class="sidebar-link">Configuration</a>
-                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Advanced</div>
-                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
-            </div>
-        </nav>
+        <h3>Reference</h3>
+        <a href="tools.html">All 58 Tools</a>
+        <a href="modules.html">Modules</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="advanced.html">Advanced Usage</a>
+    </aside>
 
-        <main class="docs-content">
-            <h1>Agents & <span class="gradient-text">Skills</span></h1>
-            <p class="page-subtitle">Customize the AI's identity, knowledge, shortcuts, and configurations.</p>
+    <main class="docs-content">
+        <h1>Agents & Skills</h1>
+        <p class="subtitle">
+            Customize the AI's identity, knowledge, shortcuts, and configurations.
+        </p>
 
-            <h2 id="agents">Agents</h2>
-            <p>An <strong>agent</strong> is a system prompt that defines the AI's behavior, personality, and instructions. Only one agent is active at a time — it appears in panel <code>P0</code>.</p>
+        <h2 id="agents">Agents</h2>
+        <p>An <strong>agent</strong> is a system prompt that defines the AI's behavior, personality, and instructions. Only one agent is active at a time — it appears as the first context element.</p>
 
-            <h3>Built-in agents</h3>
-            <table>
-                <thead><tr><th>Agent</th><th>Purpose</th></tr></thead>
-                <tbody>
-                    <tr><td><strong>Default</strong></td><td>General-purpose coding assistant</td></tr>
-                    <tr><td><strong>Context Builder</strong></td><td>Codebase exploration and understanding</td></tr>
-                    <tr><td><strong>Context Cleaner</strong></td><td>Context management and hygiene</td></tr>
-                    <tr><td><strong>Planner</strong></td><td>Task planning and breakdown</td></tr>
-                    <tr><td><strong>Worker</strong></td><td>Focused implementation and testing</td></tr>
-                </tbody>
-            </table>
+        <h3>Built-in agents</h3>
+        <table>
+            <thead><tr><th>Agent</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Default</strong></td><td>General-purpose coding assistant</td></tr>
+                <tr><td><strong>Context Builder</strong></td><td>Codebase exploration and understanding</td></tr>
+                <tr><td><strong>Context Cleaner</strong></td><td>Context management and hygiene</td></tr>
+                <tr><td><strong>Planner</strong></td><td>Task planning and breakdown</td></tr>
+                <tr><td><strong>Worker</strong></td><td>Focused implementation and testing</td></tr>
+            </tbody>
+        </table>
 
-            <h3>Creating custom agents</h3>
-            <p>Use the <code>agent_create</code> tool with a name and content (the system prompt text). The agent is saved as a <code>.md</code> file in <code>.context-pilot/agents/</code>.</p>
-            <pre><code># The AI creates agents via tool calls:
+        <h3>Creating custom agents</h3>
+        <p>Use the <code>agent_create</code> tool with a name and content (the system prompt text). The agent is saved as a <code>.md</code> file in <code>.context-pilot/agents/</code>.</p>
+        <pre><code># The AI creates agents via tool calls:
 agent_create(name: "Reviewer", content: "You are a code reviewer...")</code></pre>
-            <p>You can also create agents manually by adding <code>.md</code> files to <code>.context-pilot/agents/</code> with YAML frontmatter:</p>
-            <pre><code>---
+        <p>You can also create agents manually by adding <code>.md</code> files to <code>.context-pilot/agents/</code> with YAML frontmatter:</p>
+        <pre><code>---
 name: Reviewer
 description: Code review specialist
 ---
 You are a code reviewer focused on security, performance, and readability...</code></pre>
 
-            <h3>Managing agents</h3>
-            <ul>
-                <li><code>agent_create</code> — Create a new agent</li>
-                <li><code>agent_edit</code> — Modify name, description, or content</li>
-                <li><code>agent_delete</code> — Remove a custom agent (built-ins can't be deleted)</li>
-                <li><code>agent_load</code> — Activate an agent as the current system prompt</li>
-            </ul>
+        <h3>Managing agents</h3>
+        <ul>
+            <li><code>agent_create</code> — Create a new agent</li>
+            <li><code>Edit_prompt</code> — Modify name, description, or content</li>
+            <li><code>agent_delete</code> — Remove a custom agent (built-ins can't be deleted)</li>
+            <li><code>agent_load</code> — Activate an agent as the current system prompt</li>
+        </ul>
 
-            <h2 id="skills">Skills</h2>
-            <p>A <strong>skill</strong> is a knowledge document that gets loaded as a context panel. Skills provide additional instructions, coding standards, API references, or domain knowledge.</p>
+        <h2 id="skills">Skills</h2>
+        <p>A <strong>skill</strong> is a knowledge document that gets loaded as a context panel. Skills provide additional instructions, coding standards, API references, or domain knowledge.</p>
 
-            <h3>How skills work</h3>
-            <ol>
-                <li>Create a skill with <code>skill_create</code> (or add a <code>.md</code> file to <code>.context-pilot/skills/</code>)</li>
-                <li>Load it with <code>skill_load</code> — it appears as a dynamic panel the AI can see</li>
-                <li>Unload with <code>skill_unload</code> when no longer needed</li>
-            </ol>
-            <p>Skills are ideal for project-specific conventions, framework documentation, or coding standards that should persist across conversations.</p>
+        <h3>How skills work</h3>
+        <ol>
+            <li>Create a skill with <code>skill_create</code> (or add a <code>.md</code> file to <code>.context-pilot/skills/</code>)</li>
+            <li>Load it with <code>skill_load</code> — it appears as a dynamic panel the AI can see</li>
+            <li>Unload with <code>skill_unload</code> when no longer needed</li>
+        </ol>
+        <p>Skills are ideal for project-specific conventions, framework documentation, or coding standards that should persist across conversations.</p>
 
-            <div class="info-box tip">
-                <div class="info-label">Example</div>
-                <p>A "Rust Best Practices" skill loaded with coding conventions means the AI follows your standards without you repeating them every conversation.</p>
-            </div>
+        <div class="callout callout-tip">
+            <strong>💡 Example</strong>
+            A "Rust Best Practices" skill loaded with coding conventions means the AI follows your standards without you repeating them every conversation.
+        </div>
 
-            <h3>Managing skills</h3>
-            <ul>
-                <li><code>skill_create</code> — Create a new skill</li>
-                <li><code>skill_edit</code> — Modify content (updates live if loaded)</li>
-                <li><code>skill_delete</code> — Remove a skill (unloads first if loaded)</li>
-                <li><code>skill_load</code> — Add skill to context as a panel</li>
-                <li><code>skill_unload</code> — Remove skill from context</li>
-            </ul>
+        <h3>Managing skills</h3>
+        <ul>
+            <li><code>skill_create</code> — Create a new skill</li>
+            <li><code>Edit_prompt</code> — Modify content (updates live if loaded)</li>
+            <li><code>skill_delete</code> — Remove a skill (unloads first if loaded)</li>
+            <li><code>skill_load</code> — Add skill to context as a panel</li>
+            <li><code>skill_unload</code> — Remove skill from context</li>
+        </ul>
 
-            <h2 id="commands">Commands</h2>
-            <p>A <strong>command</strong> is a text shortcut expanded inline when you type <code>/command-name</code> in the input field. Commands are replaced with their content before the message is sent.</p>
+        <h2 id="commands">Commands</h2>
+        <p>A <strong>command</strong> is a text shortcut expanded inline when you type <code>/command-name</code> in the input field. Commands are replaced with their content before the message is sent.</p>
 
-            <h3>Creating commands</h3>
-            <pre><code># Create a command:
-command_create(name: "review", content: "Please review the code changes in the current git diff. Focus on bugs, performance issues, and style violations.")</code></pre>
-            <p>Then typing <code>/review</code> in the input field expands to the full review prompt.</p>
+        <h3>Creating commands</h3>
+        <pre><code># Create a command:
+command_create(name: "review", content: "Please review the code changes...")</code></pre>
+        <p>Then typing <code>/review</code> in the input field expands to the full review prompt.</p>
 
-            <h3>Managing commands</h3>
-            <ul>
-                <li><code>command_create</code> — Create a new command</li>
-                <li><code>command_edit</code> — Modify content</li>
-                <li><code>command_delete</code> — Remove a command (built-ins can't be deleted)</li>
-            </ul>
+        <h3>Managing commands</h3>
+        <ul>
+            <li><code>command_create</code> — Create a new command</li>
+            <li><code>Edit_prompt</code> — Modify content</li>
+            <li><code>command_delete</code> — Remove a command (built-ins can't be deleted)</li>
+        </ul>
 
-            <h2 id="presets">Presets</h2>
-            <p>A <strong>preset</strong> is a snapshot of your entire worker configuration — active agent, active modules, disabled tools, panel state, and module data. Load a preset to instantly switch contexts.</p>
+        <h2 id="presets">Presets</h2>
+        <p>A <strong>preset</strong> is a snapshot of your entire worker configuration — active agent, active modules, disabled tools, panel state, and module data. Load a preset to instantly switch contexts.</p>
 
-            <h3>Built-in presets</h3>
-            <table>
-                <thead><tr><th>Preset</th><th>Agent</th><th>Modules</th><th>Focus</th></tr></thead>
-                <tbody>
-                    <tr><td><strong>Admin</strong></td><td>Default</td><td>All</td><td>Unrestricted access</td></tr>
-                    <tr><td><strong>Worker</strong></td><td>Worker</td><td>Files, Git, Console</td><td>Implementation</td></tr>
-                    <tr><td><strong>Planner</strong></td><td>Planner</td><td>Todo, Scratchpad</td><td>Task planning</td></tr>
-                    <tr><td><strong>Context Builder</strong></td><td>Context Builder</td><td>All</td><td>Exploration</td></tr>
-                    <tr><td><strong>Context Cleaner</strong></td><td>Context Cleaner</td><td>Minimal</td><td>Cleanup</td></tr>
-                </tbody>
-            </table>
+        <h3>Built-in presets</h3>
+        <table>
+            <thead><tr><th>Preset</th><th>Agent</th><th>Focus</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Admin</strong></td><td>Default</td><td>Unrestricted access to all modules and tools</td></tr>
+                <tr><td><strong>Worker</strong></td><td>Worker</td><td>Implementation — file editing, git, console</td></tr>
+                <tr><td><strong>Planner</strong></td><td>Planner</td><td>Task planning with todo and scratchpad</td></tr>
+                <tr><td><strong>Context Builder</strong></td><td>Context Builder</td><td>Full exploration mode</td></tr>
+                <tr><td><strong>Context Cleaner</strong></td><td>Context Cleaner</td><td>Minimal read-only cleanup mode</td></tr>
+            </tbody>
+        </table>
 
-            <h3>Custom presets</h3>
-            <p>Configure your environment how you want it, then save with <code>preset_snapshot_myself</code>. Load later with <code>preset_load</code>.</p>
+        <h3>Custom presets</h3>
+        <p>Configure your environment how you want it, then save with <code>preset_snapshot_myself</code>. Load later with <code>preset_load</code>.</p>
 
-            <div class="info-box note">
-                <div class="info-label">What presets capture</div>
-                <p>Active agent, active modules, disabled tools, per-worker module data (todos, scratchpad, git settings), loaded skills, and dynamic panel configurations. <strong>Not captured:</strong> conversation messages or global config (provider, model).</p>
-            </div>
+        <div class="callout callout-info">
+            <strong>ℹ️ What presets capture</strong>
+            Active agent, active modules, disabled tools, per-worker module data (todos, scratchpad, git settings), loaded skills, and dynamic panel configurations. <strong>Not captured:</strong> conversation messages or global config (provider, model).
+        </div>
 
-            <h2 id="storage">Storage Format</h2>
-            <p>All prompts (agents, skills, commands) are stored as Markdown files with YAML frontmatter in <code>.context-pilot/</code>:</p>
-            <pre><code>.context-pilot/
+        <h2 id="storage">Storage Format</h2>
+        <p>All prompts (agents, skills, commands) are stored as Markdown files with YAML frontmatter in <code>.context-pilot/</code>:</p>
+        <pre><code>.context-pilot/
 ├── agents/
 │   ├── default.md          # Built-in
 │   └── my-reviewer.md      # Custom
@@ -175,26 +162,15 @@ command_create(name: "review", content: "Please review the code changes in the c
     ├── admin.json          # Built-in
     └── my-setup.json       # Custom</code></pre>
 
-            <p>Built-in prompts are regenerated from embedded defaults on startup if missing. Custom ones are yours to edit, share, or version control.</p>
+        <p>Built-in prompts are regenerated from embedded defaults on startup if missing. Custom ones are yours to edit, share, or version control.</p>
+    </main>
+</div>
 
-            <div class="page-nav">
-                <a href="tools.html">
-                    <span class="nav-label">Previous</span>
-                    <span class="nav-title">← Tool Reference</span>
-                </a>
-                <a href="configuration.html" class="next">
-                    <span class="nav-label">Next</span>
-                    <span class="nav-title">Configuration →</span>
-                </a>
-            </div>
-        </main>
+<footer class="footer">
+    <div class="footer-inner">
+        <p>Built with 🦀 Rust and ❤️ by the Context Pilot contributors. <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a></p>
     </div>
+</footer>
 
-    <script>
-    function toggleSidebar() {
-        document.querySelector('.docs-sidebar').classList.toggle('open');
-        document.querySelector('.docs-overlay').classList.toggle('open');
-    }
-    </script>
 </body>
 </html>
