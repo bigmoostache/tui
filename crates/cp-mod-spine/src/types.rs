@@ -1,6 +1,10 @@
 use cp_base::state::{ContextType, State};
 use serde::{Deserialize, Serialize};
 
+fn default_true() -> bool {
+    true
+}
+
 /// Notification type -- what triggered this notification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -87,6 +91,13 @@ pub struct SpineConfig {
     /// without disabling it. Cleared when user sends a new message.
     #[serde(default)]
     pub user_stopped: bool,
+
+    /// Throttle gate for notification-driven auto-continuation.
+    /// Set to `false` when a notification fires a continuation (or when blocked).
+    /// Set back to `true` after a successful LLM tick or human message.
+    /// Prevents rapid-fire notification spam when guard rails block.
+    #[serde(default = "default_true")]
+    pub can_awake_using_notification: bool,
 
     // === Runtime tracking (persisted for guard rails) ===
     /// Count of consecutive auto-continuations without human input
@@ -190,6 +201,27 @@ impl SpineState {
     /// Check if there are any unprocessed notifications
     pub fn has_unprocessed_notifications(state: &State) -> bool {
         Self::get(state).notifications.iter().any(|n| !n.processed)
+    }
+
+    /// Mark ALL unprocessed notifications as processed.
+    /// Used when a guard rail blocks — the notifications were evaluated but the
+    /// decision was "blocked." Persistent watchers will recreate new ones on the
+    /// next poll cycle.
+    pub fn mark_all_unprocessed_as_processed(state: &mut State) {
+        let changed = {
+            let ss = Self::get_mut(state);
+            let mut changed = false;
+            for n in &mut ss.notifications {
+                if !n.processed {
+                    n.processed = true;
+                    changed = true;
+                }
+            }
+            changed
+        };
+        if changed {
+            state.touch_panel(ContextType::new(ContextType::SPINE));
+        }
     }
 
     /// Mark all "transparent" notifications (UserMessage, ReloadResume) as processed.

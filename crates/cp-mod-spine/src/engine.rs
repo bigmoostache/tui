@@ -63,6 +63,36 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         return SpineDecision::Idle;
     }
 
+    // === Guardrail 1: Throttle gate ===
+    // If the gate is closed, a previous notification-driven continuation hasn't
+    // completed yet (or was blocked). Don't fire again until a successful LLM tick
+    // or human message reopens the gate.
+    if !SpineState::get(state).config.can_awake_using_notification {
+        return SpineDecision::Idle;
+    }
+
+    // === Guardrail 2: No two synthetic messages in a row ===
+    // If the last non-error user message was a synthetic auto-continuation,
+    // don't fire another one. Wait for the LLM to process it first.
+    // IMPORTANT: skip error messages when scanning — otherwise error→notification
+    // alternation creates an infinite loop.
+    {
+        let last_non_error_user = state
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == "user" && m.message_type != cp_base::state::MessageType::ToolResult);
+        if let Some(msg) = last_non_error_user {
+            let content = msg.content.trim();
+            if content.starts_with("/* Auto-continuation:")
+                || content.starts_with("/* Continue */")
+                || content.starts_with("/* Reload complete */")
+            {
+                return SpineDecision::Idle;
+            }
+        }
+    }
+
     // Build the continuation action from unprocessed notifications
     let action = build_continuation_from_notifications(state);
 
@@ -85,6 +115,16 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                     format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
                 );
             }
+            // Mark all unprocessed notifications as processed — they were evaluated
+            // and the decision was "blocked." Persistent watchers will recreate new
+            // notifications on the next poll, and we'll re-evaluate then.
+            // Without this, notifications accumulate infinitely while blocked.
+            SpineState::mark_all_unprocessed_as_processed(state);
+
+            // Close the throttle gate — prevents rapid-fire re-evaluation.
+            // Reopened by a successful LLM tick or human message.
+            SpineState::get_mut(state).config.can_awake_using_notification = false;
+
             return SpineDecision::Blocked(reason);
         }
     }
