@@ -36,10 +36,12 @@ impl Module for TreeModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
+        state.set_ext(cp_base::autocomplete::AutocompleteState::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
+        state.set_ext(cp_base::autocomplete::AutocompleteState::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
