@@ -334,6 +334,39 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let extra = format!(" ({}%)", target_abs_pct);
     render_bar(&mut lines, 2, "Clean Target", target_pct, target_filled, target_tokens, theme::accent(), Some(&extra));
 
+    // 4. Max Cost Guard Rail
+    {
+        let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
+        let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
+        let max_display = 20.0f64; // bar maxes out at $20
+        let cost_filled = ((max_cost / max_display) * bar_width as f64).min(bar_width as f64) as usize;
+        let cost_label = if max_cost <= 0.0 { "disabled".to_string() } else { format!("${:.2}", max_cost) };
+        let is_selected = selected == 3;
+        let indicator = if is_selected { ">" } else { " " };
+        let label_style = if is_selected {
+            Style::default().fg(theme::accent()).bold()
+        } else {
+            Style::default().fg(theme::text_secondary()).bold()
+        };
+        let arrow_color = if is_selected { theme::accent() } else { theme::text_muted() };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {} ", indicator), Style::default().fg(theme::accent())),
+            Span::styled("Max Cost".to_string(), label_style),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("   ◀ ", Style::default().fg(arrow_color)),
+            Span::styled(chars::BLOCK_FULL.repeat(cost_filled.min(bar_width)), Style::default().fg(theme::error())),
+            Span::styled(
+                chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(cost_filled)),
+                Style::default().fg(theme::bg_elevated()),
+            ),
+            Span::styled(" ▶ ", Style::default().fg(arrow_color)),
+            Span::styled(cost_label, Style::default().fg(theme::text()).bold()),
+            Span::styled("  (guard rail)", Style::default().fg(theme::text_muted())),
+        ]));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
         format!("  {}", chars::HORIZONTAL.repeat(50)),
@@ -385,6 +418,23 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         format!("  {}", chars::HORIZONTAL.repeat(50)),
         Style::default().fg(theme::border()),
     )]));
+    lines.push(Line::from(""));
+
+    // Auto-continuation toggle
+    {
+        let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
+        let auto_on = spine_cfg.continue_until_todos_done;
+        let (check, status, color) =
+            if auto_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
+        lines.push(Line::from(vec![
+            Span::styled("  Auto-continue: ", Style::default().fg(theme::text_secondary()).bold()),
+            Span::styled(format!("{} ", check), Style::default().fg(color).bold()),
+            Span::styled(status, Style::default().fg(color).bold()),
+            Span::styled("  (press ", Style::default().fg(theme::text_muted())),
+            Span::styled("s", Style::default().fg(theme::warning())),
+            Span::styled(" to toggle)", Style::default().fg(theme::text_muted())),
+        ]));
+    }
 
     // Help text
     lines.push(Line::from(vec![
