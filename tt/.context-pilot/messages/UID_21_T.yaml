@@ -1,0 +1,16 @@
+id: T3
+uid: UID_21_T
+role: assistant
+message_type: tool_call
+content: ''
+content_token_count: 0
+status: full
+tool_uses:
+- id: toolu_016Me3UvVNkCv8jSa7WBuyrK
+  name: todo_update
+  input:
+    updates:
+    - id: X1
+      status: done
+input_tokens: 0
+timestamp_ms: 1772040871823

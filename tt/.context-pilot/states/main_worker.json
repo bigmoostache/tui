@@ -1,0 +1,677 @@
+{
+  "schema_version": 1,
+  "worker_id": "main_worker",
+  "important_panel_uids": {
+    "overview": "UID_60_P",
+    "scratchpad": "UID_67_P",
+    "conversation": "UID_1_P",
+    "todo": "UID_59_P",
+    "tools": "UID_61_P",
+    "callback": "UID_66_P",
+    "memory": "UID_63_P",
+    "logs": "UID_65_P",
+    "spine": "UID_64_P",
+    "tree": "UID_62_P"
+  },
+  "panel_uid_to_local_id": {},
+  "next_tool_id": 7,
+  "next_result_id": 4,
+  "modules": {
+    "core_worker": {
+      "previous_panel_hash_list": [
+        "P6:47327ae6a4c8d50c9ebcc83159c865fefcb9dbf79d52b07023cc8066e07ccc13",
+        "P8:ad4d5b4517b9b69681357ad610c8d7b53a596acc8d5cc9dbe7012586a637fcbd",
+        "P9:82b5c86f4806674c7d2bad9af704f35866bcdd9886094b8222e2713e0da850ca",
+        "P10:44b9d2e0795cacdcd37cc73f378753e3f795a44872784280a0e7d61336af3f19",
+        "P2:df40c2fd2d9ecbad5cbf48fcc7a9ab397b034f30f617e1a5d7e64343ba96158e",
+        "P5:cf258ce8a1e05da05a7ba0cd4427ca52f92aa7d2309132ef82fcd02d0e3306a1",
+        "P4:7f6b9533f6068c0915e0146d8e964550ea939f1558da3e716b22283c3a8bcde3",
+        "P1:aa94626ad5a281664d8f87c91e8d774b8932990dc4a2f57c68b8afa0e2309006",
+        "P7:04544c1fdfd332eeae7b867145b1bdcb011e8292d478fbac7eb92c57ee9a9412",
+        "P3:946e79cbf3e2932574b2ad57f62022ff1a0f96374aaa83432ceae938a8d47b8f"
+      ]
+    },
+    "spine": {
+      "next_notification_id": 74,
+      "notifications": [
+        {
+          "content": "activate auto continuation and create a todo please. \n",
+          "id": "N1",
+          "notification_type": "user_message",
+          "processed": true,
+          "source": "U1",
+          "timestamp_ms": 1772040851189
+        },
+        {
+          "content": ".\n",
+          "id": "N2",
+          "notification_type": "user_message",
+          "processed": true,
+          "source": "U2",
+          "timestamp_ms": 1772040860254
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X1] ○  — Sample todo item",
+          "id": "N3",
+          "notification_type": "custom",
+          "processed": true,
+          "source": "watcher",
+          "timestamp_ms": 1772040867909
+        },
+        {
+          "content": "create a new one. then go idle without marking it as done\n",
+          "id": "N4",
+          "notification_type": "user_message",
+          "processed": true,
+          "source": "U3",
+          "timestamp_ms": 1772040940829
+        },
+        {
+          "content": "Auto-continuation blocked by MaxCost: Cost limit reached: $0.2719 / $0.0000",
+          "id": "N5",
+          "notification_type": "custom",
+          "processed": true,
+          "source": "guard_rail:MaxCost",
+          "timestamp_ms": 1772040940830
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N6",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040973851
+        },
+        {
+          "content": "Auto-continuation blocked by MaxCost: Cost limit reached: $0.4938 / $0.4000",
+          "id": "N7",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "guard_rail:MaxCost",
+          "timestamp_ms": 1772040973851
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N8",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040973901
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N9",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040973952
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N10",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974004
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N11",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974054
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N12",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974105
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N13",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974156
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N14",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974207
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N15",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974258
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N16",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974309
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N17",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974360
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N18",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974411
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N19",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974461
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N20",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974512
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N21",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974563
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N22",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974614
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N23",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974665
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N24",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974716
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N25",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974767
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N26",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974817
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N27",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974869
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N28",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974920
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N29",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040974970
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N30",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975021
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N31",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975072
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N32",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975123
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N33",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975174
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N34",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975225
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N35",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975275
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N36",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975326
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N37",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975377
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N38",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975428
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N39",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975479
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N40",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975530
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N41",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975582
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N42",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975632
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N43",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975683
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N44",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975733
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N45",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975785
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N46",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975836
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N47",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975887
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N48",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975938
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N49",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040975989
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N50",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976040
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N51",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976091
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N52",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976142
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N53",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976193
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N54",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976244
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N55",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976294
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N56",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976345
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N57",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976396
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N58",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976447
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N59",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976498
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N60",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976549
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N61",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976600
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N62",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976651
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N63",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976702
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N64",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976753
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N65",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976804
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N66",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976854
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N67",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976905
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N68",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040976956
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N69",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040977007
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N70",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040977058
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N71",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040977109
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N72",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040977160
+        },
+        {
+          "content": "Todo auto-continuation: 1 todo(s) remaining:\n[X2] ○  — New task placeholder",
+          "id": "N73",
+          "notification_type": "custom",
+          "processed": false,
+          "source": "watcher",
+          "timestamp_ms": 1772040977211
+        }
+      ],
+      "pending_coucous": [],
+      "spine_config": {
+        "auto_continuation_count": 0,
+        "autonomous_start_ms": 1772040968226,
+        "consecutive_continuation_errors": 0,
+        "continue_until_todos_done": false,
+        "last_continuation_error_ms": null,
+        "max_auto_retries": null,
+        "max_cost": 0.4,
+        "max_duration_secs": null,
+        "max_messages": null,
+        "max_output_tokens": null,
+        "max_stream_cost": null,
+        "user_stopped": false
+      }
+    },
+    "logs_worker": {
+      "open_log_ids": []
+    },
+    "todo": {
+      "next_todo_id": 3,
+      "todos": [
+        {
+          "description": "This is a placeholder todo. Let me know what you'd like it to be!",
+          "id": "X1",
+          "name": "Sample todo item",
+          "status": "done"
+        },
+        {
+          "description": "Placeholder task - tell me what you'd like this to be!",
+          "id": "X2",
+          "name": "New task placeholder",
+          "status": "pending"
+        }
+      ]
+    },
+    "scratchpad": {
+      "next_scratchpad_id": 1,
+      "scratchpad_cells": []
+    },
+    "git": {
+      "git_diff_base": null
+    },
+    "callback_worker": {
+      "active_set": [
+        "CB5"
+      ],
+      "editor_open": null
+    },
+    "tree_worker": {
+      "tree_open_folders": [
+        "."
+      ]
+    }
+  }
+}

@@ -1,0 +1,9 @@
+id: U1
+uid: UID_11_U
+role: user
+message_type: text_message
+content: "activate auto continuation and create a todo please. \n"
+content_token_count: 17
+status: full
+input_tokens: 0
+timestamp_ms: 1772040851188

@@ -43,6 +43,13 @@ pub fn render(frame: &mut Frame, state: &mut State) {
         perf::render_perf_overlay(frame, area);
     }
 
+    // Render autocomplete popup if active
+    if let Some(ac) = state.get_ext::<cp_base::autocomplete::AutocompleteState>()
+        && ac.active
+    {
+        input::render_autocomplete_popup(frame, state, area);
+    }
+
     // Render config overlay if open
     if state.config_view {
         render_config_overlay(frame, state, area);

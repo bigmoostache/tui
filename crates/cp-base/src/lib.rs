@@ -9,3 +9,8 @@ pub mod watchers {
     //! Re-export from state::watchers for convenience.
     pub use crate::state::watchers::*;
 }
+
+// Re-export autocomplete from state for convenience
+pub mod autocomplete {
+    pub use crate::state::autocomplete::*;
+}

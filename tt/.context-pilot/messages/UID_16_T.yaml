@@ -1,0 +1,16 @@
+id: T2
+uid: UID_16_T
+role: assistant
+message_type: tool_call
+content: ''
+content_token_count: 0
+status: full
+tool_uses:
+- id: toolu_01KTToa34oXaFezF9ZozEm58
+  name: todo_create
+  input:
+    todos:
+    - description: This is a placeholder todo. Let me know what you'd like it to be!
+      name: Sample todo item
+input_tokens: 0
+timestamp_ms: 1772040864472

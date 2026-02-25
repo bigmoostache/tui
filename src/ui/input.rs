@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
 use super::{helpers::spinner, theme};
@@ -375,4 +375,66 @@ pub(super) fn render_question_form(frame: &mut Frame, state: &State, area: Rect)
 
     let paragraph = Paragraph::new(lines).block(block).wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, area);
+}
+
+/// Calculate the height needed for the autocomplete popup
+pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::AutocompleteState) -> u16 {
+    let visible = ac.visible_matches().len() as u16;
+    // Header (query) + matches + border chrome (2)
+    (1 + visible + 2).clamp(4, 14)
+}
+
+/// Render the @ autocomplete popup above the status bar
+pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: Rect) {
+    let ac = match state.get_ext::<cp_base::autocomplete::AutocompleteState>() {
+        Some(ac) if ac.active => ac,
+        _ => return,
+    };
+
+    let popup_width = 60u16.min(area.width.saturating_sub(4));
+    let popup_height = calculate_autocomplete_height(ac);
+
+    // Position: bottom-left, above status bar
+    let x = area.x + 2;
+    let y = area.y + area.height.saturating_sub(popup_height);
+    let popup_area = Rect::new(x, y, popup_width, popup_height);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Show matches
+    let visible = ac.visible_matches();
+    if visible.is_empty() {
+        lines.push(Line::from(vec![Span::styled("  No matches", Style::default().fg(theme::text_muted()))]));
+    } else {
+        for (i, path) in visible.iter().enumerate() {
+            let abs_idx = ac.scroll_offset + i;
+            let is_selected = abs_idx == ac.selected;
+
+            let cursor_marker = if is_selected { ">" } else { " " };
+            let path_style = if is_selected {
+                Style::default().fg(theme::accent()).bold()
+            } else {
+                Style::default().fg(theme::text())
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
+                Span::styled(path.clone(), path_style),
+            ]));
+        }
+    }
+
+    // Count indicator
+    let count_text = format!(" @{} ({}/{}) ", ac.query, ac.matches.len().min(200), ac.all_paths.len());
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme::accent()))
+        .style(Style::default().bg(theme::bg_surface()))
+        .title(Span::styled(count_text, Style::default().fg(theme::accent()).bold()));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(paragraph, popup_area);
 }

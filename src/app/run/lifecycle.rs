@@ -74,6 +74,25 @@ impl App {
                     continue;
                 }
 
+                // Handle autocomplete events if popup is active
+                if let Some(ac) = self.state.get_ext::<cp_base::autocomplete::AutocompleteState>()
+                    && ac.active
+                {
+                    self.handle_autocomplete_event(&evt);
+                    self.state.dirty = true;
+
+                    // Render immediately
+                    if self.state.dirty {
+                        terminal.draw(|frame| {
+                            ui::render(frame, &mut self.state);
+                            self.command_palette.render(frame, &self.state);
+                        })?;
+                        self.state.dirty = false;
+                        self.last_render_ms = current_ms;
+                    }
+                    continue;
+                }
+
                 // Handle question form events if form is active (mutates state directly)
                 if let Some(form) = self.state.get_ext::<cp_base::ui::PendingQuestionForm>()
                     && !form.resolved

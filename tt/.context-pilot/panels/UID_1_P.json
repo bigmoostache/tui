@@ -1,0 +1,27 @@
+{
+  "uid": "UID_1_P",
+  "panel_type": "conversation",
+  "name": "Chat",
+  "token_count": 547,
+  "last_refresh_ms": 1772040973843,
+  "message_uids": [
+    "UID_11_U",
+    "UID_13_U",
+    "UID_14_A",
+    "UID_15_T",
+    "UID_16_T",
+    "UID_17_R",
+    "UID_18_A",
+    "UID_20_A",
+    "UID_21_T",
+    "UID_22_T",
+    "UID_23_R",
+    "UID_24_A",
+    "UID_34_U",
+    "UID_54_A",
+    "UID_55_T",
+    "UID_56_T",
+    "UID_57_R",
+    "UID_58_A"
+  ]
+}

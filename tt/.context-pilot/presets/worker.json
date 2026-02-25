@@ -1,0 +1,34 @@
+{
+  "preset_name": "worker",
+  "description": "Implementation and testing mode. File editing, git, and console. No exploration or planning tools.",
+  "built_in": true,
+  "worker_state": {
+    "active_agent_id": "S_worker",
+    "active_modules": [
+      "core",
+      "system",
+      "preset",
+      "files",
+      "tree",
+      "git",
+      "tmux",
+      "memory"
+    ],
+    "disabled_tools": [
+      "tree_filter",
+      "tree_describe",
+      "git_branch_create",
+      "git_branch_switch",
+      "git_merge",
+      "git_toggle_details",
+      "git_toggle_logs",
+      "system_create",
+      "system_edit",
+      "system_delete",
+      "system_load"
+    ],
+    "modules": {},
+    "loaded_skill_ids": [],
+    "dynamic_panels": []
+  }
+}

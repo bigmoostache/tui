@@ -1,0 +1,10 @@
+id: U3
+uid: UID_34_U
+role: user
+message_type: text_message
+content: |
+  create a new one. then go idle without marking it as done
+content_token_count: 18
+status: full
+input_tokens: 0
+timestamp_ms: 1772040940829

@@ -60,6 +60,32 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input.insert(state.input_cursor, c);
             state.input_cursor += c.len_utf8();
 
+            // Check if '@' was typed and should trigger autocomplete
+            if c == '@' {
+                let anchor_pos = state.input_cursor - 1; // position of '@'
+                // Trigger if at start of input OR preceded by whitespace
+                let should_trigger = anchor_pos == 0 || {
+                    let prev_byte = state.input.as_bytes()[anchor_pos - 1];
+                    prev_byte == b' ' || prev_byte == b'\n' || prev_byte == b'\t'
+                };
+                if should_trigger {
+                    // Populate paths lazily on first activation (before mutable borrow)
+                    let needs_paths = state
+                        .get_ext::<cp_base::autocomplete::AutocompleteState>()
+                        .is_some_and(|ac| ac.all_paths.is_empty());
+                    if needs_paths {
+                        let filter = cp_mod_tree::TreeState::get(state).tree_filter.clone();
+                        let paths = cp_mod_tree::collect_file_paths(&filter);
+                        if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                            ac.all_paths = paths;
+                            ac.activate(anchor_pos);
+                        }
+                    } else if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                        ac.activate(anchor_pos);
+                    }
+                }
+            }
+
             // After typing a space or newline, check if preceding text is a /command
             if (c == ' ' || c == '\n') && !PromptState::get(state).commands.is_empty() {
                 // Find start of current "word" — scan back past the space we just inserted

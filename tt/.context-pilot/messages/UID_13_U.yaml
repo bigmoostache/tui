@@ -1,0 +1,10 @@
+id: U2
+uid: UID_13_U
+role: user
+message_type: text_message
+content: |
+  .
+content_token_count: 1
+status: full
+input_tokens: 0
+timestamp_ms: 1772040860253

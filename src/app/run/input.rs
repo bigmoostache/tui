@@ -6,6 +6,80 @@ use crate::infra::tools::perform_reload;
 use crate::app::App;
 
 impl App {
+    /// Handle keyboard events when the @ autocomplete popup is active.
+    /// Mutates AutocompleteState and state.input directly.
+    pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
+        use crossterm::event::{KeyCode, KeyModifiers};
+        let event::Event::Key(key) = event else { return };
+
+        let ac = match self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+            Some(ac) => ac,
+            None => return,
+        };
+
+        match key.code {
+            KeyCode::Esc => {
+                // Cancel: deactivate popup, leave @query text in input as-is
+                ac.deactivate();
+            }
+            KeyCode::Up => {
+                ac.select_prev();
+            }
+            KeyCode::Down => {
+                ac.select_next();
+            }
+            KeyCode::Enter | KeyCode::Tab => {
+                // Accept: replace @query with the selected file path
+                if let Some(selected_path) = ac.selected_match().map(|s| s.to_string()) {
+                    let anchor = ac.anchor_pos;
+                    ac.deactivate();
+                    // Replace from anchor_pos to current cursor
+                    let cursor = self.state.input_cursor;
+                    self.state.input =
+                        format!("{}{}{}", &self.state.input[..anchor], selected_path, &self.state.input[cursor..]);
+                    self.state.input_cursor = anchor + selected_path.len();
+                } else {
+                    ac.deactivate();
+                }
+            }
+            KeyCode::Backspace => {
+                if !ac.pop_char() {
+                    // Query was empty — remove the '@' and deactivate
+                    let anchor = ac.anchor_pos;
+                    ac.deactivate();
+                    if anchor < self.state.input.len() {
+                        self.state.input.remove(anchor);
+                        self.state.input_cursor = anchor;
+                    }
+                } else {
+                    // Update cursor position to match shortened query
+                    let anchor = ac.anchor_pos;
+                    let query_len = ac.query.len();
+                    self.state.input_cursor = anchor + 1 + query_len; // +1 for '@'
+                }
+            }
+            KeyCode::Char(c) => {
+                // Don't capture ctrl+key combos
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    return;
+                }
+                // Space or path separator cancels autocomplete on non-path chars
+                if c == ' ' || c == '\n' {
+                    ac.deactivate();
+                    // Let the char through to normal input handling
+                    self.state.input.insert(self.state.input_cursor, c);
+                    self.state.input_cursor += c.len_utf8();
+                } else {
+                    // Append to query and update input
+                    ac.push_char(c);
+                    self.state.input.insert(self.state.input_cursor, c);
+                    self.state.input_cursor += c.len_utf8();
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Handle keyboard events when a question form is active.
     /// Mutates the PendingQuestionForm directly in state.
     pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
