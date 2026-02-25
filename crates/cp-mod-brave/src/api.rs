@@ -117,7 +117,6 @@ impl BraveClient {
                 .client
                 .get(url)
                 .header("Accept", "application/json")
-                .header("Accept-Encoding", "gzip")
                 .header("X-Subscription-Token", &self.api_key)
                 .send()
                 .map_err(|e| format!("Request failed: {}", e))?;

@@ -105,12 +105,12 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             // Links
-            if let Some(ref links) = data.links {
-                if !links.is_empty() {
-                    content.push_str("## Links\n\n");
-                    for link in links {
-                        content.push_str(&format!("- {}\n", link));
-                    }
+            if let Some(ref links) = data.links
+                && !links.is_empty()
+            {
+                content.push_str("## Links\n\n");
+                for link in links {
+                    content.push_str(&format!("- {}\n", link));
                 }
             }
 
@@ -169,7 +169,24 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 return err_result(tool, format!("Firecrawl search failed: {}", msg));
             }
 
-            let results = resp.data.unwrap_or_default();
+            let data = match resp.data {
+                Some(d) => d,
+                None => return ok_result(tool, format!("No results found for '{}'", query)),
+            };
+
+            // Parse data — can be array (scraped results) or object (web/news/images dict)
+            let results: Vec<crate::types::SearchResult> = if data.is_array() {
+                serde_json::from_value(data.clone()).unwrap_or_default()
+            } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
+                web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
+            } else {
+                // Fallback: dump as YAML
+                let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{:#}", data));
+                let panel_id =
+                    crate::panel::create_panel(state, &format!("firecrawl_search: {}", query), &panel_content);
+                return ok_result(tool, format!("Created panel {}: results for '{}'", panel_id, query));
+            };
+
             let count = results.len();
 
             if count == 0 {
@@ -192,14 +209,14 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                     content.push_str("\n\n");
                 }
 
-                if let Some(ref links) = result.links {
-                    if !links.is_empty() {
-                        content.push_str("**Links:**\n");
-                        for link in links.iter().take(10) {
-                            content.push_str(&format!("- {}\n", link));
-                        }
-                        content.push('\n');
+                if let Some(ref links) = result.links
+                    && !links.is_empty()
+                {
+                    content.push_str("**Links:**\n");
+                    for link in links.iter().take(10) {
+                        content.push_str(&format!("- {}\n", link));
                     }
+                    content.push('\n');
                 }
 
                 content.push_str("---\n\n");
