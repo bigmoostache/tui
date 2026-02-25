@@ -307,4 +307,9 @@ impl Watcher for CallbackWatcher {
     fn source_tag(&self) -> &str {
         &self.callback_tag
     }
+
+    fn suicide(&self, state: &State) -> bool {
+        let cs = ConsoleState::get(state);
+        !cs.sessions.contains_key(&self.session_name)
+    }
 }

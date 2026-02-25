@@ -241,6 +241,11 @@ impl Watcher for ConsoleWatcher {
         "console"
     }
 
+    fn suicide(&self, state: &State) -> bool {
+        let cs = ConsoleState::get(state);
+        !cs.sessions.contains_key(&self.session_name)
+    }
+
     fn is_easy_bash(&self) -> bool {
         self.easy_bash
     }

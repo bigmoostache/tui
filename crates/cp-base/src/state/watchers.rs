@@ -77,6 +77,13 @@ pub trait Watcher: Send + Sync {
     /// Source tag for categorizing notifications (e.g., "console").
     fn source_tag(&self) -> &str;
 
+    /// Whether this watcher should be silently removed. Called every poll
+    /// cycle. Return `true` if the watched resource no longer exists
+    /// (e.g., console session gone after reload). Default: `false`.
+    fn suicide(&self, _state: &State) -> bool {
+        false
+    }
+
     /// Whether this watcher was created by easy_bash (needs special result formatting).
     fn is_easy_bash(&self) -> bool {
         false
@@ -137,6 +144,11 @@ impl WatcherRegistry {
         let mut remaining = Vec::new();
 
         for watcher in self.watchers.drain(..) {
+            // Suicide: silently remove watchers whose resource no longer exists
+            if watcher.suicide(state) {
+                continue;
+            }
+
             // Check condition first (before timeout) to avoid race
             if let Some(result) = watcher.check(state) {
                 if watcher.is_blocking() {
