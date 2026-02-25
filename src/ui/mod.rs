@@ -113,11 +113,11 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
 fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
-    // Center the overlay
-    let overlay_width = 56u16;
-    let overlay_height = 45u16;
-    let x = area.width.saturating_sub(overlay_width) / 2;
-    let y = area.height.saturating_sub(overlay_height) / 2;
+    // Center the overlay, clamped to available area
+    let overlay_width = 56u16.min(area.width);
+    let overlay_height = 45u16.min(area.height);
+    let x = area.x + area.width.saturating_sub(overlay_width) / 2;
+    let y = area.y + area.height.saturating_sub(overlay_height) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
 
     let mut lines: Vec<Line> = Vec::new();
