@@ -105,6 +105,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("System prompt content").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             // === Edit tool (unified for agents, skills, commands) ===
@@ -120,6 +121,7 @@ impl Module for PromptModule {
                     ToolParam::new("replace_all", ParamType::Boolean).desc("Replace all occurrences (default: false)"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             ToolDefinition {
@@ -131,6 +133,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to delete").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             ToolDefinition {
@@ -142,6 +145,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent ID to activate. Empty to use default."),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             // === Skill tools ===
@@ -156,6 +160,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Skill content (instructions/knowledge)").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Skill".to_string(),
             },
             ToolDefinition {
@@ -167,6 +172,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to delete").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Skill".to_string(),
             },
             ToolDefinition {
@@ -178,6 +184,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to load").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Skill".to_string(),
             },
             ToolDefinition {
@@ -189,6 +196,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Skill ID to unload").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Skill".to_string(),
             },
             // === Library editor tools ===
@@ -204,6 +212,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID to open").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             ToolDefinition {
@@ -214,6 +223,7 @@ impl Module for PromptModule {
                     .to_string(),
                 params: vec![],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Agent".to_string(),
             },
             // === Command tools ===
@@ -228,6 +238,7 @@ impl Module for PromptModule {
                     ToolParam::new("content", ParamType::String).desc("Content to replace the /command with").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Command".to_string(),
             },
             ToolDefinition {
@@ -239,6 +250,7 @@ impl Module for PromptModule {
                     ToolParam::new("id", ParamType::String).desc("Command ID to delete").required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Command".to_string(),
             },
         ]

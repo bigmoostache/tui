@@ -87,6 +87,7 @@ impl Module for ScratchpadModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Scratchpad".to_string(),
             },
             ToolDefinition {
@@ -104,6 +105,7 @@ impl Module for ScratchpadModule {
                         .desc("New contents (omit to keep current)"),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Scratchpad".to_string(),
             },
             ToolDefinition {
@@ -117,6 +119,7 @@ impl Module for ScratchpadModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Scratchpad".to_string(),
             },
         ]

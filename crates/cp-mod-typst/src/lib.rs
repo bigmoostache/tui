@@ -105,6 +105,7 @@ impl Module for TypstModule {
                     .required(),
             ],
             enabled: true,
+            reverie_allowed: false,
             category: "PDF".to_string(),
         }]
     }

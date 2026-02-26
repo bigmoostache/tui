@@ -2,9 +2,6 @@
 // API & MODELS
 // =============================================================================
 
-/// Maximum tokens for main response
-pub const MAX_RESPONSE_TOKENS: u32 = 128000;
-
 /// Anthropic API endpoint
 pub const API_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 

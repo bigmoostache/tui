@@ -27,8 +27,11 @@ pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     ]));
     add_separator(&mut lines);
 
+    render_provider_section(&mut lines, state);
+    add_separator(&mut lines);
+
     if showing_main {
-        render_main_model_section(&mut lines, state);
+        render_model_section(&mut lines, state);
     } else {
         render_secondary_model_section(&mut lines, state);
     }
@@ -78,14 +81,16 @@ fn add_separator(lines: &mut Vec<Line>) {
     lines.push(Line::from(""));
 }
 
-/// Render the main model section (provider + model selection)
-fn render_main_model_section(lines: &mut Vec<Line>, state: &State) {
+/// Render the provider section (always visible regardless of Tab mode)
+fn render_provider_section(lines: &mut Vec<Line>, state: &State) {
     use crate::llms::LlmProvider;
 
     lines.push(Line::from(vec![Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
-    // Provider options
+    // Show selection indicator for main or secondary provider depending on Tab mode
+    let active_provider = if state.config_secondary_mode { state.secondary_provider } else { state.llm_provider };
+
     let providers = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
         (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
@@ -96,7 +101,7 @@ fn render_main_model_section(lines: &mut Vec<Line>, state: &State) {
     ];
 
     for (provider, key, name) in providers {
-        let is_selected = state.llm_provider == provider;
+        let is_selected = active_provider == provider;
         let indicator = if is_selected { ">" } else { " " };
         let check = if is_selected { "[x]" } else { "[ ]" };
         let style =
@@ -109,9 +114,6 @@ fn render_main_model_section(lines: &mut Vec<Line>, state: &State) {
             Span::styled(name.to_string(), style),
         ]));
     }
-
-    add_separator(lines);
-    render_model_section(lines, state);
 }
 
 fn render_model_section(lines: &mut Vec<Line>, state: &State) {
@@ -390,7 +392,7 @@ fn render_toggles_section(lines: &mut Vec<Line>, state: &State) {
 }
 
 fn render_secondary_model_section(lines: &mut Vec<Line>, state: &State) {
-    use crate::llms::AnthropicModel;
+    use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
     lines.push(Line::from(vec![Span::styled(
         "  Secondary Model (Reverie)",
@@ -398,14 +400,37 @@ fn render_secondary_model_section(lines: &mut Vec<Line>, state: &State) {
     )]));
     lines.push(Line::from(""));
 
-    for (model, key) in [
-        (AnthropicModel::ClaudeOpus45, "e"),
-        (AnthropicModel::ClaudeSonnet45, "f"),
-        (AnthropicModel::ClaudeHaiku45, "g"),
-    ] {
-        render_model_line_with_info(lines, state.secondary_anthropic_model == model, key, &model);
+    match state.secondary_provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+            for (model, key) in [
+                (AnthropicModel::ClaudeOpus45, "a"),
+                (AnthropicModel::ClaudeSonnet45, "b"),
+                (AnthropicModel::ClaudeHaiku45, "c"),
+            ] {
+                render_model_line_with_info(lines, state.secondary_anthropic_model == model, key, &model);
+            }
+        }
+        LlmProvider::Grok => {
+            for (model, key) in [(GrokModel::Grok41Fast, "a"), (GrokModel::Grok4Fast, "b")] {
+                render_model_line_with_info(lines, state.secondary_grok_model == model, key, &model);
+            }
+        }
+        LlmProvider::Groq => {
+            for (model, key) in [
+                (GroqModel::GptOss120b, "a"),
+                (GroqModel::GptOss20b, "b"),
+                (GroqModel::Llama33_70b, "c"),
+                (GroqModel::Llama31_8b, "d"),
+            ] {
+                render_model_line_with_info(lines, state.secondary_groq_model == model, key, &model);
+            }
+        }
+        LlmProvider::DeepSeek => {
+            for (model, key) in [(DeepSeekModel::DeepseekChat, "a"), (DeepSeekModel::DeepseekReasoner, "b")] {
+                render_model_line_with_info(lines, state.secondary_deepseek_model == model, key, &model);
+            }
+        }
     }
-    lines.push(Line::from(""));
 }
 
 fn render_model_line_with_info<M: crate::llms::ModelInfo>(

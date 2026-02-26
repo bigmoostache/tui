@@ -59,6 +59,8 @@ pub trait ModelInfo {
     fn cache_miss_price_per_mtok(&self) -> f32 {
         self.input_price_per_mtok() * 1.25
     }
+    /// Maximum output tokens the model can produce in a single response
+    fn max_output_tokens(&self) -> u32;
 }
 
 /// Available LLM providers
@@ -89,22 +91,22 @@ pub enum AnthropicModel {
 impl ModelInfo for AnthropicModel {
     fn api_name(&self) -> &'static str {
         match self {
-            AnthropicModel::ClaudeOpus45 => "claude-opus-4-5",
-            AnthropicModel::ClaudeSonnet45 => "claude-sonnet-4-5",
-            AnthropicModel::ClaudeHaiku45 => "claude-haiku-4-5",
+            AnthropicModel::ClaudeOpus45 => "claude-opus-4-6",
+            AnthropicModel::ClaudeSonnet45 => "claude-sonnet-4-5-20250929",
+            AnthropicModel::ClaudeHaiku45 => "claude-haiku-4-5-20251001",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            AnthropicModel::ClaudeOpus45 => "Opus 4.5",
+            AnthropicModel::ClaudeOpus45 => "Opus 4.6",
             AnthropicModel::ClaudeSonnet45 => "Sonnet 4.5",
             AnthropicModel::ClaudeHaiku45 => "Haiku 4.5",
         }
     }
 
     fn context_window(&self) -> usize {
-        200_000
+        200_000 // All current Anthropic models: 200K context window
     }
 
     fn input_price_per_mtok(&self) -> f32 {
@@ -136,6 +138,14 @@ impl ModelInfo for AnthropicModel {
             AnthropicModel::ClaudeOpus45 => 6.25,
             AnthropicModel::ClaudeSonnet45 => 3.75,
             AnthropicModel::ClaudeHaiku45 => 1.25,
+        }
+    }
+
+    fn max_output_tokens(&self) -> u32 {
+        match self {
+            AnthropicModel::ClaudeOpus45 => 128_000,
+            AnthropicModel::ClaudeSonnet45 => 64_000,
+            AnthropicModel::ClaudeHaiku45 => 64_000,
         }
     }
 }
@@ -184,9 +194,11 @@ impl ModelInfo for GrokModel {
             GrokModel::Grok4Fast => 0.50,
         }
     }
-}
 
-/// Available models for Groq
+    fn max_output_tokens(&self) -> u32 {
+        128_000
+    }
+}
 /// - GPT-OSS models: Support BOTH custom tools AND built-in tools (browser search, code exec)
 /// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -239,6 +251,10 @@ impl ModelInfo for GroqModel {
             GroqModel::Llama31_8b => 0.08,
         }
     }
+
+    fn max_output_tokens(&self) -> u32 {
+        128_000
+    }
 }
 
 /// Available models for DeepSeek
@@ -283,5 +299,12 @@ impl ModelInfo for DeepSeekModel {
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
         0.28
+    }
+
+    fn max_output_tokens(&self) -> u32 {
+        match self {
+            DeepSeekModel::DeepseekChat => 8_192,
+            DeepSeekModel::DeepseekReasoner => 16_384,
+        }
     }
 }

@@ -78,7 +78,7 @@ impl App {
                 {
                     msg.content.clear();
                 }
-                let ctx = prepare_stream_context(&mut self.state, true);
+                let ctx = prepare_stream_context(&mut self.state, true, None);
                 let system_prompt = get_active_agent_content(&self.state);
                 self.typewriter.reset();
                 self.pending_done = None;
@@ -86,6 +86,7 @@ impl App {
                     StreamParams {
                         provider: self.state.llm_provider,
                         model: self.state.current_model(),
+                        max_output_tokens: self.state.current_max_output_tokens(),
                         messages: ctx.messages,
                         context_items: ctx.context_items,
                         tools: ctx.tools,
@@ -125,7 +126,7 @@ impl App {
     /// Continue streaming after tool execution (called when panels are ready).
     pub(super) fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
         self.state.is_tooling = false;
-        let ctx = prepare_stream_context(&mut self.state, true);
+        let ctx = prepare_stream_context(&mut self.state, true, None);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
         self.pending_done = None;
@@ -133,6 +134,7 @@ impl App {
             StreamParams {
                 provider: self.state.llm_provider,
                 model: self.state.current_model(),
+                max_output_tokens: self.state.current_max_output_tokens(),
                 messages: ctx.messages,
                 context_items: ctx.context_items,
                 tools: ctx.tools,

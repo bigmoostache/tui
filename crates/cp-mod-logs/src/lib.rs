@@ -182,6 +182,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Context".to_string(),
             },
 
@@ -199,6 +200,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Context".to_string(),
             },
 
@@ -217,6 +219,7 @@ impl Module for LogsModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Context".to_string(),
             },
 
@@ -246,6 +249,7 @@ impl Module for LogsModule {
                         .desc("Memory items to create (persistent across conversations)"),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Context".to_string(),
             },
         ]

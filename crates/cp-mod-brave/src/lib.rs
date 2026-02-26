@@ -90,6 +90,7 @@ impl Module for BraveModule {
                         .desc("Brave Goggle URL for domain re-ranking"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Web Search".to_string(),
             },
             ToolDefinition {
@@ -129,6 +130,7 @@ impl Module for BraveModule {
                         .desc("Brave Goggle URL or inline definition"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Web Search".to_string(),
             },
         ]

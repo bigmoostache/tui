@@ -124,6 +124,7 @@ impl Module for SpineModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Spine".to_string(),
             },
             ToolDefinition {
@@ -148,6 +149,7 @@ impl Module for SpineModule {
                         .desc("Reset runtime counters (auto_continuation_count, autonomous_start_ms)"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Spine".to_string(),
             },
             ToolDefinition {
@@ -168,6 +170,7 @@ impl Module for SpineModule {
                         .desc("When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Spine".to_string(),
             },
         ]

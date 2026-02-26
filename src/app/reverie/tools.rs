@@ -3,36 +3,8 @@
 //! The reverie has access to a curated subset of tools for context management,
 //! plus a mandatory Report tool to end its run.
 
-use std::collections::HashSet;
-
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolResult, ToolUse};
 use crate::state::State;
-
-/// The complete set of tool IDs the reverie is allowed to use.
-/// These are context-management tools — no file writes, git, console, etc.
-// Used by reverie_tool_definitions() and dispatch_reverie_tool() — called
-// from the event loop once Phase 7 (main loop integration) is wired.
-#[cfg_attr(not(test), allow(dead_code))]
-const ALLOWED_VESSEL_IDS: &[&str] = &[
-    // Panel management
-    "Close_panel",
-    "Open",
-    // Tree navigation
-    "tree_toggle",
-    "tree_filter",
-    // Logs
-    "log_create",
-    "log_summarize",
-    // Memory
-    "memory_create",
-    "memory_update",
-    // Scratchpad
-    "scratchpad_create_cell",
-    "scratchpad_edit_cell",
-    "scratchpad_wipe",
-    // Conversation history
-    "Close_conversation_history",
-];
 
 /// Build the Report tool definition — the reverie's mandatory end-of-run tool.
 #[cfg_attr(not(test), allow(dead_code))]
@@ -51,19 +23,48 @@ pub fn report_tool_definition() -> ToolDefinition {
                 .required(),
         ],
         enabled: true,
+        reverie_allowed: false,
         category: "Reverie".to_string(),
     }
 }
 
-/// Build the tool definitions available to the reverie.
+/// Build a human-readable text describing which tools the reverie is allowed to use.
+/// This is injected at the top of the reverie's conversation panel (P-reverie) so the
+/// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
+pub fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition]) -> String {
+    let mut text = String::from(
+        "## Tool Restrictions\n\
+         You are a reverie (context optimizer sub-agent). You may ONLY use the following tools:\n\n",
+    );
+    for tool in tools {
+        if tool.reverie_allowed {
+            text.push_str(&format!("- {}\n", tool.id));
+        }
+    }
+    text.push_str(
+        "\nIf you call any tool NOT in this list, it will be rejected with an error. \
+         Focus on context management only.\n\n",
+    );
+
+    // Report instructions — the reverie ends by calling a special tool
+    text.push_str(
+        "## Ending Your Run (MANDATORY)\n\
+         When you are done optimizing, you MUST call the `reverie_report` tool with a brief summary.\n\
+         This is how you signal completion. Your run will be force-terminated if you don't.\n\n\
+         Call it like this:\n\
+         ```\n\
+         reverie_report({\"summary\": \"Closed 5 stale panels, summarized 12 logs.\"})\n\
+         ```\n\
+         The `summary` parameter is a short string (1-3 sentences) describing what you did.\n",
+    );
+    text
+}
 ///
 /// Filters the main tool list to the allowed subset, then appends the Report tool.
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn reverie_tool_definitions(main_tools: &[ToolDefinition]) -> Vec<ToolDefinition> {
-    let allowed: HashSet<&str> = ALLOWED_VESSEL_IDS.iter().copied().collect();
-
     let mut anchor_tools: Vec<ToolDefinition> =
-        main_tools.iter().filter(|t| t.enabled && allowed.contains(t.id.as_str())).cloned().collect();
+        main_tools.iter().filter(|t| t.enabled && t.reverie_allowed).cloned().collect();
 
     anchor_tools.push(report_tool_definition());
     anchor_tools
@@ -90,6 +91,7 @@ pub fn optimize_context_tool_definition() -> ToolDefinition {
                 .desc("Optional guidance for the optimizer (e.g., 'focus on git module files')"),
         ],
         enabled: true,
+        reverie_allowed: false,
         category: "Reverie".to_string(),
     }
 }
@@ -164,13 +166,12 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
 #[cfg_attr(not(test), allow(dead_code))]
-pub fn dispatch_reverie_tool(tool: &ToolUse, _state: &mut State) -> Option<ToolResult> {
+pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "reverie_report" => Some(execute_report(tool)),
         _ => {
-            // Verify it's in the allowed list
-            let allowed: HashSet<&str> = ALLOWED_VESSEL_IDS.iter().copied().collect();
-            if allowed.contains(tool.name.as_str()) {
+            // Verify tool is allowed for reveries via the reverie_allowed flag
+            if state.tools.iter().any(|t| t.id == tool.name && t.reverie_allowed) {
                 // Delegate to normal module dispatch
                 None
             } else {
@@ -219,35 +220,29 @@ You CANNOT: edit files, run commands, use git, create callbacks, or modify syste
 mod tests {
     use super::*;
 
+    fn make_tool(id: &str, reverie_allowed: bool) -> ToolDefinition {
+        ToolDefinition {
+            id: id.to_string(),
+            name: id.to_string(),
+            short_desc: String::new(),
+            description: String::new(),
+            params: vec![],
+            enabled: true,
+            reverie_allowed,
+            category: String::new(),
+        }
+    }
+
     #[test]
     fn reverie_tool_definitions_include_allowed_and_report() {
-        // Build a minimal main tool set that includes some allowed IDs
         let main_tools = vec![
-            ToolDefinition {
-                id: "Close_panel".to_string(),
-                name: "Close Contexts".to_string(),
-                short_desc: String::new(),
-                description: String::new(),
-                params: vec![],
-                enabled: true,
-                category: String::new(),
-            },
-            ToolDefinition {
-                id: "Edit".to_string(),
-                name: "Edit".to_string(),
-                short_desc: String::new(),
-                description: String::new(),
-                params: vec![],
-                enabled: true,
-                category: String::new(),
-            },
+            make_tool("Close_panel", true),
+            make_tool("Edit", false),
         ];
 
         let tools = reverie_tool_definitions(&main_tools);
-        // Should include Close_panel (allowed) but NOT Edit (forbidden)
         assert!(tools.iter().any(|t| t.id == "Close_panel"));
         assert!(!tools.iter().any(|t| t.id == "Edit"));
-        // Should include the Report tool
         assert!(tools.iter().any(|t| t.id == "reverie_report"));
     }
 
@@ -280,6 +275,7 @@ mod tests {
     fn dispatch_forbidden_tool_returns_error() {
         let tool = ToolUse { id: "t2".to_string(), name: "Edit".to_string(), input: serde_json::json!({}) };
         let mut state = State::default();
+        // Edit is not in state.tools at all, so dispatch treats it as forbidden
         let result = dispatch_reverie_tool(&tool, &mut state);
         assert!(result.is_some());
         assert!(result.unwrap().is_error);
@@ -289,9 +285,22 @@ mod tests {
     fn dispatch_allowed_tool_delegates() {
         let tool = ToolUse { id: "t3".to_string(), name: "Close_panel".to_string(), input: serde_json::json!({}) };
         let mut state = State::default();
+        // Add Close_panel with reverie_allowed: true to state.tools
+        state.tools.push(make_tool("Close_panel", true));
         let result = dispatch_reverie_tool(&tool, &mut state);
         // Allowed tools return None (delegate to module dispatch)
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn dispatch_non_reverie_tool_rejected() {
+        let tool = ToolUse { id: "t4".to_string(), name: "Edit".to_string(), input: serde_json::json!({}) };
+        let mut state = State::default();
+        // Add Edit with reverie_allowed: false
+        state.tools.push(make_tool("Edit", false));
+        let result = dispatch_reverie_tool(&tool, &mut state);
+        assert!(result.is_some());
+        assert!(result.unwrap().is_error);
     }
 
     #[test]

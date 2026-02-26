@@ -120,6 +120,7 @@ impl Module for TreeModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Tree".to_string(),
             },
             ToolDefinition {
@@ -137,6 +138,7 @@ impl Module for TreeModule {
                         .default_val("toggle"),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Tree".to_string(),
             },
             ToolDefinition {
@@ -158,6 +160,7 @@ impl Module for TreeModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Tree".to_string(),
             },
         ]

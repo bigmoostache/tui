@@ -109,6 +109,7 @@ impl Module for MemoryModule {
                     .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Memory".to_string(),
             },
             ToolDefinition {
@@ -138,6 +139,7 @@ impl Module for MemoryModule {
                     .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Memory".to_string(),
             },
         ]

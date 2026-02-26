@@ -135,6 +135,12 @@ pub struct State {
     pub secondary_provider: crate::llm_types::LlmProvider,
     /// Secondary Anthropic model (for reveries / sub-agents)
     pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
+    /// Secondary Grok model
+    pub secondary_grok_model: crate::llm_types::GrokModel,
+    /// Secondary Groq model
+    pub secondary_groq_model: crate::llm_types::GroqModel,
+    /// Secondary DeepSeek model
+    pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach)
     pub reverie_enabled: bool,
     /// Active reverie session (None when no reverie is running).
@@ -247,6 +253,9 @@ impl Default for State {
             config_secondary_mode: false,
             secondary_provider: crate::llm_types::LlmProvider::Anthropic,
             secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
+            secondary_grok_model: crate::llm_types::GrokModel::default(),
+            secondary_groq_model: crate::llm_types::GroqModel::default(),
+            secondary_deepseek_model: crate::llm_types::DeepSeekModel::default(),
             reverie_enabled: true,
             reverie: None,
             cache_hit_tokens: 0,
@@ -324,6 +333,32 @@ impl State {
             LlmProvider::Grok => self.grok_model.api_name().to_string(),
             LlmProvider::Groq => self.groq_model.api_name().to_string(),
             LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
+        }
+    }
+
+    /// Get the max output tokens for the current provider/model selection
+    pub fn current_max_output_tokens(&self) -> u32 {
+        use crate::llm_types::LlmProvider;
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.max_output_tokens()
+            }
+            LlmProvider::Grok => self.grok_model.max_output_tokens(),
+            LlmProvider::Groq => self.groq_model.max_output_tokens(),
+            LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
+        }
+    }
+
+    /// Get the max output tokens for the secondary provider/model selection
+    pub fn secondary_max_output_tokens(&self) -> u32 {
+        use crate::llm_types::LlmProvider;
+        match self.secondary_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.secondary_anthropic_model.max_output_tokens()
+            }
+            LlmProvider::Grok => self.secondary_grok_model.max_output_tokens(),
+            LlmProvider::Groq => self.secondary_groq_model.max_output_tokens(),
+            LlmProvider::DeepSeek => self.secondary_deepseek_model.max_output_tokens(),
         }
     }
 

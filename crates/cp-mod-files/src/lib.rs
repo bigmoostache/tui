@@ -53,6 +53,7 @@ impl Module for FilesModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "File".to_string(),
             },
             ToolDefinition {
@@ -76,6 +77,7 @@ impl Module for FilesModule {
                         .desc("List of callback names to skip for this edit. Use sparingly — only when you KNOW the callback will fail (e.g. mid-refactor) or when actively debugging. Callbacks exist to help you; prefer letting them run."),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "File".to_string(),
             },
             ToolDefinition {
@@ -94,6 +96,7 @@ impl Module for FilesModule {
                         .desc("List of callback names to skip for this write. Use sparingly — only when you KNOW the callback will fail (e.g. mid-refactor) or when actively debugging. Callbacks exist to help you; prefer letting them run."),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "File".to_string(),
             },
 

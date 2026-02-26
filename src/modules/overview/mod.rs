@@ -59,6 +59,9 @@ impl Module for OverviewModule {
             "deepseek_model": state.deepseek_model,
             "secondary_provider": state.secondary_provider,
             "secondary_anthropic_model": state.secondary_anthropic_model,
+            "secondary_grok_model": state.secondary_grok_model,
+            "secondary_groq_model": state.secondary_groq_model,
+            "secondary_deepseek_model": state.secondary_deepseek_model,
             "reverie_enabled": state.reverie_enabled,
             "cleaning_threshold": state.cleaning_threshold,
             "cleaning_target_proportion": state.cleaning_target_proportion,
@@ -121,6 +124,21 @@ impl Module for OverviewModule {
             && let Ok(m) = serde_json::from_value(v.clone())
         {
             state.secondary_anthropic_model = m;
+        }
+        if let Some(v) = data.get("secondary_grok_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_grok_model = m;
+        }
+        if let Some(v) = data.get("secondary_groq_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_groq_model = m;
+        }
+        if let Some(v) = data.get("secondary_deepseek_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_deepseek_model = m;
         }
         if let Some(v) = data.get("reverie_enabled").and_then(|v| v.as_bool()) {
             state.reverie_enabled = v;
@@ -225,6 +243,7 @@ impl Module for OverviewModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: true,
                 category: "Context".to_string(),
             },
 
@@ -236,6 +255,7 @@ impl Module for OverviewModule {
                 description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
                 params: vec![],
                 enabled: true,
+                reverie_allowed: false,
                 category: "System".to_string(),
             },
 
@@ -259,6 +279,7 @@ impl Module for OverviewModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "System".to_string(),
             },
         ];
@@ -276,6 +297,7 @@ impl Module for OverviewModule {
                 ToolParam::new("page", ParamType::Integer).desc("Page number (1-indexed)").required(),
             ],
             enabled: false,
+            reverie_allowed: false,
             category: "Context".to_string(),
         });
 

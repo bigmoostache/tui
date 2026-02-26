@@ -1,8 +1,8 @@
 pub mod actions;
-pub mod background;
 mod context;
 pub mod events;
 pub mod panels;
+pub mod prompt_builder;
 pub mod reverie;
 mod run;
 

@@ -289,12 +289,13 @@ impl App {
                 if should_stream {
                     self.typewriter.reset();
                     self.pending_tools.clear();
-                    let ctx = prepare_stream_context(&mut self.state, false);
+                    let ctx = prepare_stream_context(&mut self.state, false, None);
                     let system_prompt = get_active_agent_content(&self.state);
                     start_streaming(
                         StreamParams {
                             provider: self.state.llm_provider,
                             model: self.state.current_model(),
+                            max_output_tokens: self.state.current_max_output_tokens(),
                             messages: ctx.messages,
                             context_items: ctx.context_items,
                             tools: ctx.tools,

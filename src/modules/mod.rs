@@ -220,6 +220,7 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
             .required(),
         ],
         enabled: true,
+        reverie_allowed: false,
         category: "System".to_string(),
     }
 }

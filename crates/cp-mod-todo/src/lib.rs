@@ -94,6 +94,7 @@ impl Module for TodoModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Todo".to_string(),
             },
             ToolDefinition {
@@ -122,6 +123,7 @@ impl Module for TodoModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Todo".to_string(),
             },
             ToolDefinition {
@@ -137,6 +139,7 @@ impl Module for TodoModule {
                         .desc("Place after this todo ID. Null or omit to move to top."),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Todo".to_string(),
             },
         ]

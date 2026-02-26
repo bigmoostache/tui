@@ -85,44 +85,82 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
 /// Handle key events when config view is open
 fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
+    let secondary = _state.config_secondary_mode;
     match key.code {
         // Escape closes config
         KeyCode::Esc => Some(Action::ToggleConfigView),
-        // Number keys select provider
-        KeyCode::Char('1') => Some(Action::ConfigSelectProvider(LlmProvider::Anthropic)),
-        KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCode)),
-        KeyCode::Char('3') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
-        KeyCode::Char('4') => Some(Action::ConfigSelectProvider(LlmProvider::Groq)),
-        KeyCode::Char('5') => Some(Action::ConfigSelectProvider(LlmProvider::DeepSeek)),
-        KeyCode::Char('6') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCodeApiKey)),
-        // Letter keys select model based on current provider
-        KeyCode::Char('a') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45))
+        // Number keys select provider (main or secondary depending on Tab mode)
+        KeyCode::Char('1') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::Anthropic))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::Anthropic))
             }
-            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss120b)),
-            LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat)),
-        },
-        KeyCode::Char('b') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45))
+        }
+        KeyCode::Char('2') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCode))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCode))
             }
-            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss20b)),
-            LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
-        },
-        KeyCode::Char('c') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45))
+        }
+        KeyCode::Char('3') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::Grok))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::Grok))
             }
-            LlmProvider::Grok | LlmProvider::DeepSeek => Some(Action::None),
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
-        },
-        KeyCode::Char('d') => match _state.llm_provider {
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
-            _ => Some(Action::None),
-        },
+        }
+        KeyCode::Char('4') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::Groq))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::Groq))
+            }
+        }
+        KeyCode::Char('5') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::DeepSeek))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::DeepSeek))
+            }
+        }
+        KeyCode::Char('6') => {
+            if secondary {
+                Some(Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCodeApiKey))
+            } else {
+                Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCodeApiKey))
+            }
+        }
+        // Letter keys select model based on current provider and Tab mode
+        KeyCode::Char('a') => {
+            if secondary {
+                dispatch_secondary_model(_state, 0)
+            } else {
+                dispatch_primary_model(_state, 0)
+            }
+        }
+        KeyCode::Char('b') => {
+            if secondary {
+                dispatch_secondary_model(_state, 1)
+            } else {
+                dispatch_primary_model(_state, 1)
+            }
+        }
+        KeyCode::Char('c') => {
+            if secondary {
+                dispatch_secondary_model(_state, 2)
+            } else {
+                dispatch_primary_model(_state, 2)
+            }
+        }
+        KeyCode::Char('d') => {
+            if secondary {
+                dispatch_secondary_model(_state, 3)
+            } else {
+                dispatch_primary_model(_state, 3)
+            }
+        }
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Some(Action::ConfigNextTheme),
         KeyCode::Char('T') => Some(Action::ConfigPrevTheme),
@@ -130,10 +168,6 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('s') => Some(Action::ConfigToggleAutoContinue),
         // Toggle reverie (context optimizer)
         KeyCode::Char('r') => Some(Action::ConfigToggleReverie),
-        // Secondary model selection (for reverie)
-        KeyCode::Char('e') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeOpus45)),
-        KeyCode::Char('f') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeSonnet45)),
-        KeyCode::Char('g') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeHaiku45)),
         // Tab toggles between main/secondary model selection
         KeyCode::Tab => Some(Action::ConfigToggleSecondaryMode),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),
@@ -142,5 +176,63 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Right => Some(Action::ConfigIncreaseSelectedBar),
         // Any other key is ignored in config view
         _ => Some(Action::None),
+    }
+}
+
+/// Dispatch primary model selection based on provider and index (0=a, 1=b, 2=c, 3=d)
+fn dispatch_primary_model(state: &State, idx: usize) -> Option<Action> {
+    match state.llm_provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => match idx {
+            0 => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
+            1 => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+            2 => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::Grok => match idx {
+            0 => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
+            1 => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::Groq => match idx {
+            0 => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss120b)),
+            1 => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss20b)),
+            2 => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
+            3 => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::DeepSeek => match idx {
+            0 => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat)),
+            1 => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
+            _ => Some(Action::None),
+        },
+    }
+}
+
+/// Dispatch secondary model selection based on secondary provider and index
+fn dispatch_secondary_model(state: &State, idx: usize) -> Option<Action> {
+    match state.secondary_provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => match idx {
+            0 => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeOpus45)),
+            1 => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+            2 => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeHaiku45)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::Grok => match idx {
+            0 => Some(Action::ConfigSelectSecondaryGrokModel(GrokModel::Grok41Fast)),
+            1 => Some(Action::ConfigSelectSecondaryGrokModel(GrokModel::Grok4Fast)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::Groq => match idx {
+            0 => Some(Action::ConfigSelectSecondaryGroqModel(GroqModel::GptOss120b)),
+            1 => Some(Action::ConfigSelectSecondaryGroqModel(GroqModel::GptOss20b)),
+            2 => Some(Action::ConfigSelectSecondaryGroqModel(GroqModel::Llama33_70b)),
+            3 => Some(Action::ConfigSelectSecondaryGroqModel(GroqModel::Llama31_8b)),
+            _ => Some(Action::None),
+        },
+        LlmProvider::DeepSeek => match idx {
+            0 => Some(Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::DeepseekChat)),
+            1 => Some(Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
+            _ => Some(Action::None),
+        },
     }
 }

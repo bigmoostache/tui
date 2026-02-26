@@ -2,6 +2,27 @@ use crate::state::State;
 
 use super::ActionResult;
 
+/// Handle secondary provider selection
+pub fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
+    state.secondary_provider = provider;
+    state.dirty = true;
+    ActionResult::Save
+}
+
+/// Handle secondary model selection for all providers
+pub fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
+    use super::Action;
+    match action {
+        Action::ConfigSelectSecondaryAnthropicModel(model) => state.secondary_anthropic_model = *model,
+        Action::ConfigSelectSecondaryGrokModel(model) => state.secondary_grok_model = *model,
+        Action::ConfigSelectSecondaryGroqModel(model) => state.secondary_groq_model = *model,
+        Action::ConfigSelectSecondaryDeepSeekModel(model) => state.secondary_deepseek_model = *model,
+        _ => return ActionResult::Nothing,
+    }
+    state.dirty = true;
+    ActionResult::Save
+}
+
 /// Handle ConfigIncreaseSelectedBar action
 pub fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {

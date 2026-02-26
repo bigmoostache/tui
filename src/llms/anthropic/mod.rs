@@ -10,7 +10,7 @@ use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
-use crate::infra::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
+use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
 use crate::infra::tools::ToolUse;
 use crate::infra::tools::build_api_tools;
 
@@ -90,12 +90,18 @@ impl LlmClient for AnthropicClient {
 
         // Build API messages
         let include_tool_uses = request.tool_results.is_some();
-        let mut api_messages = messages_to_api(
-            &request.messages,
-            &request.context_items,
-            include_tool_uses,
-            request.seed_content.as_deref(),
-        );
+        // Use pre-assembled API messages from prompt_builder (centralized assembly)
+        let mut api_messages = if !request.api_messages.is_empty() {
+            request.api_messages.clone()
+        } else {
+            // Fallback: build from raw data (should only happen for api_check etc.)
+            messages_to_api(
+                &request.messages,
+                &request.context_items,
+                include_tool_uses,
+                request.seed_content.as_deref(),
+            )
+        };
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
@@ -122,23 +128,9 @@ impl LlmClient for AnthropicClient {
             library::default_agent_content().to_string()
         };
 
-        // Get model context window for max_tokens
-        let model_context_window = match request.model.as_str() {
-            "claude-3-5-haiku-20241022" => 200_000,
-            "claude-3-5-sonnet-20241022" => 200_000,
-            "claude-3-5-opus-20241022" => 200_000,
-            "claude-3-haiku-20240307" => 200_000,
-            "claude-3-sonnet-20240229" => 200_000,
-            "claude-3-opus-20240229" => 200_000,
-            "claude-3-5-haiku-20251001" => 64_000, // Haiku 4.5 has 64K output limit
-            "claude-3-5-sonnet-20251001" => 200_000,
-            "claude-3-5-opus-20251001" => 200_000,
-            _ => 200_000, // Default to 200K for unknown models
-        };
-
         let api_request = AnthropicRequest {
             model: request.model.clone(),
-            max_tokens: model_context_window.min(MAX_RESPONSE_TOKENS),
+            max_tokens: request.max_output_tokens,
             system: system_prompt,
             messages: api_messages,
             tools: build_api_tools(&request.tools),

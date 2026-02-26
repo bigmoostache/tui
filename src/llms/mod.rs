@@ -29,6 +29,7 @@ pub use cp_base::llm_types::{
 #[derive(Debug, Clone)]
 pub struct LlmRequest {
     pub model: String,
+    pub max_output_tokens: u32,
     pub messages: Vec<Message>,
     pub context_items: Vec<ContextItem>,
     pub tools: Vec<ToolDefinition>,
@@ -39,6 +40,9 @@ pub struct LlmRequest {
     pub seed_content: Option<String>,
     /// Worker/reverie ID for debug logging
     pub worker_id: String,
+    /// Pre-assembled API messages (panels + seed + conversation).
+    /// When non-empty, providers should use this instead of doing their own assembly.
+    pub api_messages: Vec<ApiMessage>,
 }
 
 /// Trait for LLM providers
@@ -75,6 +79,7 @@ pub fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheck
 pub struct StreamParams {
     pub provider: LlmProvider,
     pub model: String,
+    pub max_output_tokens: u32,
     pub messages: Vec<Message>,
     pub context_items: Vec<ContextItem>,
     pub tools: Vec<ToolDefinition>,
@@ -88,8 +93,18 @@ pub fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
     let client = get_client(params.provider);
 
     std::thread::spawn(move || {
+        // Assemble the prompt (panels + seed + conversation → api_messages)
+        let include_tool_uses = false; // No pending tool results on first stream
+        let api_messages = crate::app::prompt_builder::assemble_prompt(
+            &params.messages,
+            &params.context_items,
+            include_tool_uses,
+            params.seed_content.as_deref(),
+        );
+
         let request = LlmRequest {
             model: params.model,
+            max_output_tokens: params.max_output_tokens,
             messages: params.messages,
             context_items: params.context_items,
             tools: params.tools,
@@ -98,6 +113,7 @@ pub fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
             extra_context: None,
             seed_content: params.seed_content,
             worker_id: params.worker_id,
+            api_messages,
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
@@ -118,7 +134,7 @@ pub enum ContentBlock {
     ToolResult { tool_use_id: String, content: String },
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApiMessage {
     pub role: String,
     pub content: Vec<ContentBlock>,
@@ -277,6 +293,70 @@ pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMes
             content: format!("======= [{}] {} =======\n{}", item.id, item.header, item.content),
         })
         .collect()
+}
+
+/// Convert pre-assembled `Vec<ApiMessage>` into Claude Code's raw JSON format.
+///
+/// Claude Code requires raw `serde_json::Value` messages (not typed structs).
+/// This also injects `cache_control` breakpoints at 25/50/75/100% of panel
+/// tool_result positions for prefix-based cache optimization.
+///
+/// Shared between `claude_code` and `claude_code_api_key` providers.
+pub fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<serde_json::Value> {
+    // Find all panel tool_result indices for cache breakpoints
+    let panel_result_indices: Vec<usize> = api_messages
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| {
+            m.role == "user"
+                && m.content.iter().any(
+                    |b| matches!(b, ContentBlock::ToolResult { tool_use_id, .. } if tool_use_id.starts_with("panel_")),
+                )
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    let panel_count = panel_result_indices.len();
+    let mut cache_breakpoints = std::collections::BTreeSet::new();
+    if panel_count > 0 {
+        for quarter in 1..=4usize {
+            let pos = (panel_count * quarter).div_ceil(4);
+            cache_breakpoints.insert(pos.saturating_sub(1));
+        }
+    }
+
+    let mut json_messages: Vec<serde_json::Value> = Vec::new();
+
+    for (msg_idx, msg) in api_messages.iter().enumerate() {
+        let content_blocks: Vec<serde_json::Value> = msg
+            .content
+            .iter()
+            .map(|block| match block {
+                ContentBlock::Text { text } => serde_json::json!({"type": "text", "text": text}),
+                ContentBlock::ToolUse { id, name, input } => {
+                    serde_json::json!({"type": "tool_use", "id": id, "name": name, "input": input})
+                }
+                ContentBlock::ToolResult { tool_use_id, content } => {
+                    let mut result =
+                        serde_json::json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content});
+                    // Add cache_control at breakpoint positions
+                    if let Some(panel_pos) = panel_result_indices.iter().position(|&i| i == msg_idx)
+                        && cache_breakpoints.contains(&panel_pos)
+                    {
+                        result["cache_control"] = serde_json::json!({"type": "ephemeral"});
+                    }
+                    result
+                }
+            })
+            .collect();
+
+        json_messages.push(serde_json::json!({
+            "role": msg.role,
+            "content": content_blocks
+        }));
+    }
+
+    json_messages
 }
 
 /// Log an SSE error event to `.context-pilot/errors/sse_errors.log` for post-mortem debugging.

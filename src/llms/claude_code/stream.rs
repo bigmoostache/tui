@@ -9,14 +9,10 @@ use super::{
     BILLING_HEADER, CLAUDE_CODE_ENDPOINT, ClaudeCodeClient, OAUTH_BETA_HEADER, StreamMessage, dump_last_request,
     ensure_message_alternation, inject_system_reminder, map_model_name,
 };
-use crate::app::panels::now_ms;
-use crate::infra::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
+use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::{ToolUse, build_api_tools};
 use crate::llms::error::LlmError;
-use crate::llms::{
-    LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages,
-};
-use crate::state::{MessageStatus, MessageType};
+use crate::llms::{LlmRequest, StreamEvent, api_messages_to_cc_json};
 
 impl ClaudeCodeClient {
     pub(super) fn do_stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
@@ -34,82 +30,9 @@ impl ClaudeCodeClient {
             library::default_agent_content().to_string()
         };
 
-        // Build messages as simple JSON (matching Python example format)
-        let mut json_messages: Vec<Value> = Vec::new();
-        let current_ms = now_ms();
-
-        // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
-        let fake_panels = prepare_panel_messages(&request.context_items);
-
-        if !fake_panels.is_empty() {
-            // Calculate cache breakpoint positions at 25%, 50%, 75%, 100% of panels.
-            // Prefix-based caching means each breakpoint caches everything before it,
-            // so spreading them across panels maximizes partial cache hits when only
-            // later panels change. Uses ceiling division to distribute evenly.
-            let panel_count = fake_panels.len();
-            let mut cache_breakpoints = std::collections::BTreeSet::new();
-            for quarter in 1..=4usize {
-                let pos = (panel_count * quarter).div_ceil(4);
-                cache_breakpoints.insert(pos.saturating_sub(1));
-            }
-
-            for (idx, panel) in fake_panels.iter().enumerate() {
-                let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-                let text =
-                    if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
-
-                // Assistant message with tool_use
-                json_messages.push(serde_json::json!({
-                    "role": "assistant",
-                    "content": [
-                        {"type": "text", "text": text},
-                        {
-                            "type": "tool_use",
-                            "id": format!("panel_{}", panel.panel_id),
-                            "name": "dynamic_panel",
-                            "input": {"id": panel.panel_id}
-                        }
-                    ]
-                }));
-
-                // User message with tool_result (cache_control at breakpoint positions)
-                let mut tool_result = serde_json::json!({
-                    "type": "tool_result",
-                    "tool_use_id": format!("panel_{}", panel.panel_id),
-                    "content": panel.content
-                });
-                if cache_breakpoints.contains(&idx) {
-                    tool_result["cache_control"] = serde_json::json!({"type": "ephemeral"});
-                }
-                json_messages.push(serde_json::json!({
-                    "role": "user",
-                    "content": [tool_result]
-                }));
-            }
-
-            // Add footer after all panels
-            let footer = panel_footer_text(&request.messages, current_ms);
-            json_messages.push(serde_json::json!({
-                "role": "assistant",
-                "content": [
-                    {"type": "text", "text": footer},
-                    {
-                        "type": "tool_use",
-                        "id": "panel_footer",
-                        "name": "dynamic_panel",
-                        "input": {"action": "end_panels"}
-                    }
-                ]
-            }));
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": "panel_footer",
-                    "content": crate::infra::constants::prompts::panel_footer_ack()
-                }]
-            }));
-        }
+        // Build messages from pre-assembled API messages or raw data
+        let mut json_messages =
+            if !request.api_messages.is_empty() { api_messages_to_cc_json(&request.api_messages) } else { Vec::new() };
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
@@ -117,145 +40,6 @@ impl ClaudeCodeClient {
                 "role": "user",
                 "content": format!("Please clean up the context to reduce token usage:\n\n{}", context)
             }));
-        }
-
-        let include_tool_uses = request.tool_results.is_some();
-
-        // First pass: collect tool_use IDs that have matching results (will be included)
-        let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
-        for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted
-                || msg.status == MessageStatus::Detached
-                || msg.message_type != MessageType::ToolCall
-            {
-                continue;
-            }
-            let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
-            let has_result = request.messages[idx + 1..]
-                .iter()
-                .filter(|m| {
-                    m.status != MessageStatus::Deleted
-                        && m.status != MessageStatus::Detached
-                        && m.message_type == MessageType::ToolResult
-                })
-                .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
-            if has_result {
-                for id in tool_use_ids {
-                    included_tool_use_ids.insert(id.to_string());
-                }
-            }
-        }
-
-        for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-                continue;
-            }
-            if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-                continue;
-            }
-
-            // Handle tool results - only include if tool_use was included
-            if msg.message_type == MessageType::ToolResult {
-                let tool_results: Vec<Value> = msg
-                    .tool_results
-                    .iter()
-                    .filter(|r| included_tool_use_ids.contains(&r.tool_use_id))
-                    .map(|r| {
-                        serde_json::json!({
-                            "type": "tool_result",
-                            "tool_use_id": r.tool_use_id,
-                            "content": r.content
-                        })
-                    })
-                    .collect();
-
-                if !tool_results.is_empty() {
-                    json_messages.push(serde_json::json!({
-                        "role": "user",
-                        "content": tool_results
-                    }));
-                }
-                continue;
-            }
-
-            // Handle tool calls - only include if has matching result
-            if msg.message_type == MessageType::ToolCall {
-                let tool_uses: Vec<Value> = msg
-                    .tool_uses
-                    .iter()
-                    .filter(|tu| included_tool_use_ids.contains(&tu.id))
-                    .map(|tu| {
-                        serde_json::json!({
-                            "type": "tool_use",
-                            "id": tu.id,
-                            "name": tu.name,
-                            "input": if tu.input.is_null() { serde_json::json!({}) } else { tu.input.clone() }
-                        })
-                    })
-                    .collect();
-
-                if !tool_uses.is_empty() {
-                    // Append to last assistant message or create new one
-                    if let Some(last) = json_messages.last_mut()
-                        && last["role"] == "assistant"
-                        && let Some(content) = last.get_mut("content")
-                        && let Some(arr) = content.as_array_mut()
-                    {
-                        arr.extend(tool_uses);
-                        continue;
-                    }
-
-                    json_messages.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": tool_uses
-                    }));
-                }
-                continue;
-            }
-
-            // Regular text message
-            let message_content = msg.content.clone();
-
-            if !message_content.is_empty() {
-                // Use simple string content like Python example
-                json_messages.push(serde_json::json!({
-                    "role": msg.role,
-                    "content": message_content
-                }));
-            }
-
-            // Add tool uses to last assistant message if this is the last message
-            let is_last = idx == request.messages.len().saturating_sub(1);
-            if msg.role == "assistant" && include_tool_uses && is_last && !msg.tool_uses.is_empty() {
-                let tool_uses: Vec<Value> = msg
-                    .tool_uses
-                    .iter()
-                    .map(|tu| {
-                        serde_json::json!({
-                            "type": "tool_use",
-                            "id": tu.id,
-                            "name": tu.name,
-                            "input": if tu.input.is_null() { serde_json::json!({}) } else { tu.input.clone() }
-                        })
-                    })
-                    .collect();
-
-                if let Some(last) = json_messages.last_mut()
-                    && last["role"] == "assistant"
-                {
-                    // Convert string content to array and add tool uses
-                    let existing_content = last["content"].clone();
-                    let mut content_array = if existing_content.is_string() {
-                        vec![serde_json::json!({"type": "text", "text": existing_content.as_str().unwrap_or("")})]
-                    } else if let Some(arr) = existing_content.as_array() {
-                        arr.clone()
-                    } else {
-                        vec![]
-                    };
-                    content_array.extend(tool_uses);
-                    last["content"] = Value::Array(content_array);
-                }
-            }
         }
 
         // Add pending tool results
@@ -285,7 +69,7 @@ impl ClaudeCodeClient {
         // Build final request (cache_control breakpoints are on panel tool_results above)
         let api_request = serde_json::json!({
             "model": map_model_name(&request.model),
-            "max_tokens": MAX_RESPONSE_TOKENS,
+            "max_tokens": request.max_output_tokens,
             "system": [
                 {"type": "text", "text": BILLING_HEADER},
                 {"type": "text", "text": system_text}

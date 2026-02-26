@@ -64,6 +64,7 @@ impl Module for GithubModule {
                     .required(),
             ],
             enabled: true,
+            reverie_allowed: false,
             category: "Git".to_string(),
         }]
     }

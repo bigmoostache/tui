@@ -85,6 +85,7 @@ impl Module for FirecrawlModule {
                     .desc("Optional location for geo-targeted scraping"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Web Scrape".to_string(),
             },
             ToolDefinition {
@@ -118,6 +119,7 @@ impl Module for FirecrawlModule {
                         .desc("Location string, e.g. 'Germany', 'San Francisco,California'"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Web Scrape".to_string(),
             },
             ToolDefinition {
@@ -152,6 +154,7 @@ impl Module for FirecrawlModule {
                     .desc("Optional location for geo-targeted mapping"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Web Scrape".to_string(),
             },
         ]

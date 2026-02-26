@@ -72,6 +72,7 @@ impl Module for PresetModule {
                     ),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "System".to_string(),
             },
             ToolDefinition {
@@ -85,6 +86,7 @@ impl Module for PresetModule {
                     .to_string(),
                 params: vec![ToolParam::new("name", ParamType::String).desc("Name of the preset to load").required()],
                 enabled: true,
+                reverie_allowed: false,
                 category: "System".to_string(),
             },
         ]

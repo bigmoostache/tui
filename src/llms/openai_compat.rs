@@ -121,9 +121,127 @@ pub struct BuildOptions {
 
 /// Build the full OpenAI-compatible message list.
 ///
-/// Handles: system message, panel injection, tool pairing, message
-/// conversion with [ID]: prefixes, extra context, footer/header.
+/// When pre-assembled API messages are available, converts them to OAI format.
+/// Falls back to building from raw data (for api_check etc.).
 pub fn build_messages(
+    messages: &[Message],
+    context_items: &[crate::app::panels::ContextItem],
+    opts: &BuildOptions,
+    api_messages: &[super::ApiMessage],
+) -> Vec<OaiMessage> {
+    // If we have pre-assembled API messages, convert them directly
+    if !api_messages.is_empty() {
+        return build_from_api_messages(api_messages, opts);
+    }
+
+    // Fallback: build from raw data (legacy path, for api_check etc.)
+    build_from_raw(messages, context_items, opts)
+}
+
+/// Convert pre-assembled `Vec<ApiMessage>` to OpenAI-compatible format.
+fn build_from_api_messages(api_messages: &[super::ApiMessage], opts: &BuildOptions) -> Vec<OaiMessage> {
+    let mut out: Vec<OaiMessage> = Vec::new();
+
+    // System message
+    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_string());
+    if let Some(ref suffix) = opts.system_suffix {
+        system_content.push_str("\n\n");
+        system_content.push_str(suffix);
+    }
+    out.push(OaiMessage {
+        role: "system".to_string(),
+        content: Some(system_content),
+        tool_calls: None,
+        tool_call_id: None,
+    });
+
+    // Convert each ApiMessage
+    for msg in api_messages {
+        // Check if it contains tool_use blocks → convert to tool_calls
+        let has_tool_use = msg.content.iter().any(|b| matches!(b, super::ContentBlock::ToolUse { .. }));
+        let has_tool_result = msg.content.iter().any(|b| matches!(b, super::ContentBlock::ToolResult { .. }));
+
+        if has_tool_result {
+            // Tool results → individual tool messages
+            for block in &msg.content {
+                if let super::ContentBlock::ToolResult { tool_use_id, content } = block {
+                    out.push(OaiMessage {
+                        role: "tool".to_string(),
+                        content: Some(content.clone()),
+                        tool_calls: None,
+                        tool_call_id: Some(tool_use_id.clone()),
+                    });
+                }
+            }
+        } else if has_tool_use {
+            // Assistant message with text + tool calls
+            let text_parts: Vec<&str> = msg
+                .content
+                .iter()
+                .filter_map(|b| if let super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+                .collect();
+            let text = if text_parts.is_empty() { None } else { Some(text_parts.join("\n")) };
+
+            let calls: Vec<OaiToolCall> = msg
+                .content
+                .iter()
+                .filter_map(|b| {
+                    if let super::ContentBlock::ToolUse { id, name, input } = b {
+                        Some(OaiToolCall {
+                            id: id.clone(),
+                            call_type: "function".to_string(),
+                            function: OaiFunction {
+                                name: name.clone(),
+                                arguments: serde_json::to_string(input).unwrap_or_default(),
+                            },
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            out.push(OaiMessage {
+                role: msg.role.clone(),
+                content: text,
+                tool_calls: if calls.is_empty() { None } else { Some(calls) },
+                tool_call_id: None,
+            });
+        } else {
+            // Pure text message
+            let text: String = msg
+                .content
+                .iter()
+                .filter_map(|b| if let super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            if !text.is_empty() {
+                out.push(OaiMessage {
+                    role: msg.role.clone(),
+                    content: Some(text),
+                    tool_calls: None,
+                    tool_call_id: None,
+                });
+            }
+        }
+    }
+
+    // Extra context (cleaner mode)
+    if let Some(ref ctx) = opts.extra_context {
+        out.push(OaiMessage {
+            role: "user".to_string(),
+            content: Some(format!("Please clean up the context to reduce token usage:\n\n{}", ctx)),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+    }
+
+    out
+}
+
+/// Build from raw messages + context_items (legacy fallback path).
+fn build_from_raw(
     messages: &[Message],
     context_items: &[crate::app::panels::ContextItem],
     opts: &BuildOptions,

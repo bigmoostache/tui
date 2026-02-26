@@ -105,6 +105,7 @@ impl LlmClient for DeepSeekClient {
                 extra_context: request.extra_context.clone(),
                 pending_tool_result_ids: pending_tool_ids,
             },
+            &request.api_messages,
         );
 
         // Convert to DeepSeek format (adds reasoning_content for assistant messages)
@@ -132,7 +133,7 @@ impl LlmClient for DeepSeekClient {
             messages: ds_messages,
             tools,
             tool_choice,
-            max_tokens: if is_reasoner { 16384 } else { 8192 },
+            max_tokens: request.max_output_tokens,
             stream: true,
         };
 

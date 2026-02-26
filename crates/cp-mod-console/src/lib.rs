@@ -219,6 +219,7 @@ impl Module for ConsoleModule {
                         .desc("Short description for the panel title"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Console".to_string(),
             },
             ToolDefinition {
@@ -243,6 +244,7 @@ impl Module for ConsoleModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Console".to_string(),
             },
             ToolDefinition {
@@ -277,6 +279,7 @@ impl Module for ConsoleModule {
                         .default_val("30"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Console".to_string(),
             },
             ToolDefinition {
@@ -305,6 +308,7 @@ impl Module for ConsoleModule {
                             Falls back to literal match if invalid regex."),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Console".to_string(),
             },
             ToolDefinition {
@@ -325,6 +329,7 @@ impl Module for ConsoleModule {
                         .desc("Working directory (defaults to project root)"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Console".to_string(),
             },
         ]

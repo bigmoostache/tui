@@ -159,21 +159,35 @@ impl App {
 
             // Record tool use + result in reverie messages
             if let Some(rev) = self.state.reverie.as_mut() {
-                // Add tool_use record to last assistant message
-                if let Some(msg) = rev.messages.last_mut() {
-                    msg.tool_uses.push(crate::state::message::ToolUseRecord {
+                // Add tool_use as a ToolCall message so assemble_prompt()
+                // correctly emits ContentBlock::ToolUse for the LLM.
+                // (TextMessage + tool_uses would be silently dropped on re-stream)
+                rev.messages.push(crate::state::Message {
+                    id: format!("rev-tc-{}", rev.messages.len()),
+                    uid: None,
+                    role: "assistant".to_string(),
+                    content: String::new(),
+                    message_type: crate::state::MessageType::ToolCall,
+                    status: crate::state::MessageStatus::Full,
+                    content_token_count: 0,
+                    input_tokens: 0,
+                    timestamp_ms: crate::app::panels::now_ms(),
+                    tool_uses: vec![crate::state::message::ToolUseRecord {
                         id: tool.id.clone(),
                         name: tool.name.clone(),
                         input: tool.input.clone(),
-                    });
-                }
+                    }],
+                    tool_results: Vec::new(),
+                });
                 // Add tool result as a new message
+                // NOTE: message_type MUST be ToolResult so assemble_prompt()
+                // correctly emits ContentBlock::ToolResult for the LLM.
                 rev.messages.push(crate::state::Message {
                     id: format!("rev-tr-{}", rev.messages.len()),
                     uid: None,
                     role: "user".to_string(),
                     content: String::new(),
-                    message_type: crate::state::MessageType::TextMessage,
+                    message_type: crate::state::MessageType::ToolResult,
                     status: crate::state::MessageStatus::Full,
                     content_token_count: 0,
                     input_tokens: 0,
@@ -192,8 +206,15 @@ impl App {
 
         // If we have tool results and the reverie is still alive, re-stream
         if !tool_results.is_empty() && self.state.reverie.is_some() {
-            // Start a new reverie stream with the updated conversation
+            // Trim trailing whitespace from assistant messages to avoid API errors
+            // ("final assistant content cannot end with trailing whitespace")
             if let Some(rev) = self.state.reverie.as_mut() {
+                for msg in &mut rev.messages {
+                    if msg.role == "assistant" {
+                        let trimmed = msg.content.trim_end().to_string();
+                        msg.content = trimmed;
+                    }
+                }
                 rev.is_streaming = true;
             }
             let (tx, rx) = mpsc::channel();
@@ -204,7 +225,7 @@ impl App {
     }
 
     /// Check if the reverie ended without calling Report.
-    /// If so, auto-relaunch with a directive to call Report.
+    /// If so, inject a user message telling it to call Report, then re-stream.
     pub(super) fn check_reverie_end_turn(&mut self) {
         let rev = match self.state.reverie.as_ref() {
             Some(r) if !r.is_streaming => r,
@@ -232,15 +253,36 @@ impl App {
             return;
         }
 
-        // Auto-relaunch with Report directive
+        // Inject a user message telling the LLM to call Report, then re-stream
         if let Some(rev) = self.state.reverie.as_mut() {
             rev.report_retries += 1;
             rev.is_streaming = true;
-            rev.directive = Some(
-                "You MUST call the Report tool to summarize your work and complete your run. \
-                 Do it now."
+
+            // Trim trailing whitespace on all assistant messages before re-stream
+            for msg in &mut rev.messages {
+                if msg.role == "assistant" {
+                    msg.content = msg.content.trim_end().to_string();
+                }
+            }
+
+            // Push a user message like a notification — clear, direct instructions
+            rev.messages.push(crate::state::Message {
+                id: format!("rev-nudge-{}", rev.messages.len()),
+                uid: None,
+                role: "user".to_string(),
+                content: "You ended your turn without calling the `reverie_report` tool. \
+                    This is MANDATORY. Call it now with a summary of what you did:\n\n\
+                    reverie_report({\"summary\": \"<your summary here>\"})\n\n\
+                    You MUST call this tool to complete your run."
                     .to_string(),
-            );
+                message_type: crate::state::MessageType::TextMessage,
+                status: crate::state::MessageStatus::Full,
+                content_token_count: 0,
+                input_tokens: 0,
+                timestamp_ms: crate::app::panels::now_ms(),
+                tool_uses: Vec::new(),
+                tool_results: Vec::new(),
+            });
         }
 
         let (tx, rx) = mpsc::channel();

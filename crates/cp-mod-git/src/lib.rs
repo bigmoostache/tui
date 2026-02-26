@@ -204,6 +204,7 @@ impl Module for GitModule {
                     .required(),
             ],
             enabled: true,
+            reverie_allowed: false,
             category: "Git".to_string(),
         }]
     }

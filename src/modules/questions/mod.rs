@@ -75,6 +75,7 @@ impl Module for QuestionsModule {
                     .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Context".to_string(),
             },
         ]

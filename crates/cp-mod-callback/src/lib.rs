@@ -153,6 +153,7 @@ impl Module for CallbackModule {
                         .desc("For diff-based script update: replacement text"),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Callback".to_string(),
             },
             ToolDefinition {
@@ -165,6 +166,7 @@ impl Module for CallbackModule {
                     .to_string(),
                 params: vec![ToolParam::new("id", ParamType::String).desc("Callback ID (e.g., 'CB1')").required()],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Callback".to_string(),
             },
             ToolDefinition {
@@ -176,6 +178,7 @@ impl Module for CallbackModule {
                         .to_string(),
                 params: vec![],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Callback".to_string(),
             },
             ToolDefinition {
@@ -192,6 +195,7 @@ impl Module for CallbackModule {
                         .required(),
                 ],
                 enabled: true,
+                reverie_allowed: false,
                 category: "Callback".to_string(),
             },
         ]

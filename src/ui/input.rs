@@ -231,6 +231,18 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
+    // Active reverie card — shows when a background optimizer is running
+    if let Some(rev) = &state.reverie {
+        let rev_name = format!("{}", rev.reverie_type);
+        let tools_done = rev.tool_call_count;
+        let rev_spin = if rev.is_streaming { format!("{} ", spin) } else { String::new() };
+        spans.push(Span::styled(
+            format!(" {}🧠 {} ({} tools) ", rev_spin, rev_name, tools_done),
+            Style::default().fg(Color::White).bg(Color::Rgb(100, 60, 160)).bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     // Right side info
     let char_count = state.input.chars().count();
     let right_info = if char_count > 0 { format!("{} chars ", char_count) } else { String::new() };

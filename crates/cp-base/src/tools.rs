@@ -142,6 +142,8 @@ pub struct ToolDefinition {
     pub params: Vec<ToolParam>,
     /// Whether this tool is currently enabled
     pub enabled: bool,
+    /// Whether this tool is available to reverie sub-agents (context optimizers)
+    pub reverie_allowed: bool,
     /// Category for grouping (e.g., "File", "Git", "System")
     pub category: String,
 }

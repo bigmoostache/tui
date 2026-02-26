@@ -18,13 +18,27 @@ pub struct StreamContext {
     pub tools: Vec<ToolDefinition>,
 }
 
+/// Optional reverie context: when provided, replaces the conversation section
+/// with P-main-conv (main AI's conversation as a read-only panel) and the
+/// reverie's own messages. Panels and tools remain IDENTICAL for cache hits.
+pub struct ReverieContext {
+    /// The reverie's own conversation messages (may be empty on first run)
+    pub messages: Vec<Message>,
+    /// Tool restrictions preamble injected at the top of the reverie conversation
+    pub tool_restrictions: String,
+}
+
 /// Refresh all context elements and prepare data for streaming.
 ///
 /// Every call to this function means the LLM is about to see the full
 /// conversation history (including any user messages that arrived during
 /// streaming). We therefore mark all UserMessage notifications as processed
 /// here — the LLM has "seen" them via the rebuilt context.
-pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> StreamContext {
+pub fn prepare_stream_context(
+    state: &mut State,
+    include_last_message: bool,
+    reverie: Option<ReverieContext>,
+) -> StreamContext {
     // Mark UserMessage notifications as processed on every context rebuild.
     // This prevents the spine from firing a redundant auto-continuation for
     // messages the LLM already saw (e.g., user sent a message during a tool
@@ -102,25 +116,66 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
         }
     }
 
-    // Prepare messages
-    let messages: Vec<_> = if include_last_message {
-        state
-            .messages
-            .iter()
-            .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
-            .cloned()
-            .collect()
-    } else {
-        state
-            .messages
-            .iter()
-            .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
-            .take(state.messages.len().saturating_sub(1))
-            .cloned()
-            .collect()
-    };
+    // Prepare messages — branch based on whether this is a reverie or main worker
+    if let Some(rev) = reverie {
+        // ── Reverie path ──
+        // Add P-main-conv: the main worker's conversation as a read-only panel
+        let main_conv_content = cp_base::state::format_messages_to_chunk(
+            &state
+                .messages
+                .iter()
+                .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+        context_items.push(ContextItem {
+            id: "P-main-conv".to_string(),
+            header: "Main Agent Conversation (read-only)".to_string(),
+            content: main_conv_content,
+            last_refresh_ms: crate::app::panels::now_ms(),
+        });
 
-    StreamContext { messages, context_items, tools: state.tools.clone() }
+        // Add P-reverie: tool restrictions + reverie's own conversation context
+        // This tells the LLM which tools it's allowed to use (even though it sees ALL tools)
+        let mut reverie_panel_content = rev.tool_restrictions;
+        if !rev.messages.is_empty() {
+            reverie_panel_content
+                .push_str("\n## Reverie Conversation\n(Your messages follow in the conversation below)\n");
+        }
+        context_items.push(ContextItem {
+            id: "P-reverie".to_string(),
+            header: "Reverie Context (tool restrictions + conversation)".to_string(),
+            content: reverie_panel_content,
+            last_refresh_ms: crate::app::panels::now_ms(),
+        });
+
+        // The reverie's messages ARE the conversation (may be empty on first run).
+        // Tools are IDENTICAL to the main worker for prompt cache hits.
+        // Report is described in the P-reverie panel text, not in the API tool list.
+        let tools = state.tools.clone();
+        // api_messages assembled later in start_streaming() from context_items + messages
+        StreamContext { messages: rev.messages, context_items, tools }
+    } else {
+        // ── Main worker path ──
+        let messages: Vec<_> = if include_last_message {
+            state
+                .messages
+                .iter()
+                .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                .cloned()
+                .collect()
+        } else {
+            state
+                .messages
+                .iter()
+                .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                .take(state.messages.len().saturating_sub(1))
+                .cloned()
+                .collect()
+        };
+
+        StreamContext { messages, context_items, tools: state.tools.clone() }
+    }
 }
 
 // ─── Conversation History Detachment ────────────────────────────────────────

@@ -14,7 +14,6 @@ use serde::Serialize;
 use super::error::LlmError;
 use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
-use crate::infra::constants::MAX_RESPONSE_TOKENS;
 
 const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
 
@@ -71,6 +70,7 @@ impl LlmClient for GrokClient {
                 extra_context: request.extra_context.clone(),
                 pending_tool_result_ids: pending_tool_ids,
             },
+            &request.api_messages,
         );
 
         // Add tool results if present
@@ -93,7 +93,7 @@ impl LlmClient for GrokClient {
             messages,
             tools,
             tool_choice,
-            max_tokens: MAX_RESPONSE_TOKENS,
+            max_tokens: request.max_output_tokens,
             stream: true,
         };
 
