@@ -91,6 +91,9 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
         state.previous_panel_hash_list = new_hash_list;
     }
 
+    // Check if context has breached the threshold — may activate the reverie optimizer
+    crate::app::reverie::trigger::check_threshold_trigger(state);
+
     // Dynamically enable/disable panel_goto_page based on whether any panel is paginated
     let has_paginated = state.context.iter().any(|c| c.total_pages > 1);
     for tool in &mut state.tools {

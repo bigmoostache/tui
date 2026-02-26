@@ -126,6 +126,11 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
         return execute_module_toggle(tool, state);
     }
 
+    // Handle reverie tools — optimize_context for main AI, report + allowed tools for reverie
+    if tool.name == "optimize_context" {
+        return crate::app::reverie::tools::execute_optimize_context(tool, state);
+    }
+
     for module in all_modules() {
         if active_modules.contains(module.id())
             && let Some(mut result) = module.execute_tool(tool, state)
@@ -382,6 +387,9 @@ fn rebuild_tools(state: &mut State) {
 
     // Get fresh tool definitions from active modules
     let mut tools = active_tool_definitions(&state.active_modules);
+
+    // Add the reverie's optimize_context tool (always available for main AI)
+    tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
 
     // Re-apply disabled state
     for tool in &mut tools {

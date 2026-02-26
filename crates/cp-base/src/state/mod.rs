@@ -15,3 +15,59 @@ pub use context::{
 };
 pub use message::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk};
 pub use runtime::{FullContentCache, InputRenderCache, MessageRenderCache, State, hash_values};
+
+// ─── Reverie State ──────────────────────────────────────────────────────────
+// Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
+
+pub mod reverie {
+    use super::message::Message;
+
+    /// The type of reverie running.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum ReverieType {
+        /// Context optimizer — reshapes context for relevance and budget.
+        ContextOptimizer,
+    }
+
+    /// Ephemeral state for an active reverie session.
+    ///
+    /// Lives as `Option<ReverieState>` on the main `State` struct.
+    /// Not persisted — discarded after each run (fresh start every time).
+    #[derive(Debug, Clone)]
+    pub struct ReverieState {
+        /// What kind of reverie this is.
+        pub reverie_type: ReverieType,
+        /// Optional directive from the main AI or trigger system.
+        pub directive: Option<String>,
+        /// The reverie's own conversation (separate from main chat).
+        pub messages: Vec<Message>,
+        /// Number of tool calls executed this run (for guard rail cap).
+        pub tool_call_count: usize,
+        /// Whether the reverie LLM stream is currently active.
+        pub is_streaming: bool,
+        /// How many times we've auto-relaunched for missing Report (max 1).
+        pub report_retries: usize,
+    }
+
+    impl ReverieState {
+        /// Create a new reverie session.
+        pub fn new(reverie_type: ReverieType, directive: Option<String>) -> Self {
+            Self {
+                reverie_type,
+                directive,
+                messages: Vec::new(),
+                tool_call_count: 0,
+                is_streaming: true,
+                report_retries: 0,
+            }
+        }
+    }
+
+    impl std::fmt::Display for ReverieType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                ReverieType::ContextOptimizer => write!(f, "Context Optimizer"),
+            }
+        }
+    }
+}

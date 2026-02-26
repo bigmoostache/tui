@@ -4,8 +4,6 @@
 //! LLM stream and conversation, but sharing all panels and state.
 //! The first reverie type is the **Context Optimizer**, which reshapes
 //! context for relevance and budget.
-//!
-//! Types, streaming, tools, and trigger logic will be added in phases 3-7.
 
 pub mod streaming;
 pub mod tools;

@@ -90,6 +90,18 @@ impl App {
             return;
         }
 
+        // === REVERIE TRIGGER ===
+        // Check if any tool result contains a REVERIE_START: sentinel (from optimize_context).
+        // If so, extract the directive and start the reverie.
+        for tr in &tool_results {
+            if let Some(directive_str) = tr.content.strip_prefix("REVERIE_START:") {
+                let directive_line = directive_str.lines().next().unwrap_or("");
+                let directive = if directive_line.is_empty() { None } else { Some(directive_line.to_string()) };
+                crate::app::reverie::trigger::start_manual_reverie(&mut self.state, directive);
+                break;
+            }
+        }
+
         // === CALLBACK TRIGGER ===
         // After all tools executed, check if any file edits match active callbacks.
         // Only collect files from SUCCESSFUL Edit/Write tools (skip failed ones).

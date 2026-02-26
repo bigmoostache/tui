@@ -46,6 +46,8 @@ pub fn load_state() -> State {
         // runs — otherwise non-core panels get skipped on first run.
         state.active_modules = crate::modules::default_active_modules();
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+        // Add reverie's optimize_context tool (always available for main AI)
+        state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
         // Initialize module-owned state (TypeMap entries)
         for module in crate::modules::all_modules() {
             module.init_state(&mut state);

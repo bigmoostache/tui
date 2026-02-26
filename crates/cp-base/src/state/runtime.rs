@@ -135,6 +135,9 @@ pub struct State {
     pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach)
     pub reverie_enabled: bool,
+    /// Active reverie session (None when no reverie is running).
+    /// Ephemeral — not persisted, discarded after each run.
+    pub reverie: Option<super::reverie::ReverieState>,
     /// Accumulated prompt_cache_hit_tokens across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated prompt_cache_miss_tokens across all API calls (persisted)
@@ -242,6 +245,7 @@ impl Default for State {
             secondary_provider: crate::llm_types::LlmProvider::Anthropic,
             secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
             reverie_enabled: true,
+            reverie: None,
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
             total_output_tokens: 0,

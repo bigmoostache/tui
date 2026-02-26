@@ -150,6 +150,8 @@ impl Module for OverviewModule {
             let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
             // Build tools from active_modules (must be loaded already) and apply disabled state
             state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+            // Add reverie's optimize_context tool (always available for main AI)
+            state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
             for tool in &mut state.tools {
                 if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
                     tool.enabled = false;
