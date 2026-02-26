@@ -7,18 +7,81 @@ use crate::infra::constants::{chars, theme};
 use crate::state::State;
 
 pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
-    use crate::llms::LlmProvider;
-
     // Center the overlay, clamped to available area
     let overlay_width = 56u16.min(area.width);
-    let overlay_height = 50u16.min(area.height);
+    let overlay_height = 38u16.min(area.height); // Reduced from 50
     let x = area.x + area.width.saturating_sub(overlay_width) / 2;
     let y = area.y + area.height.saturating_sub(overlay_height) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
 
     let mut lines: Vec<Line> = Vec::new();
 
+    // Tab indicator
+    let showing_main = !state.config_secondary_mode;
+    let tab_text = if showing_main { "Main Model" } else { "Secondary Model (Reverie)" };
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("Tab", Style::default().fg(theme::warning())),
+        Span::styled(" to switch • ", Style::default().fg(theme::text_muted())),
+        Span::styled(tab_text, Style::default().fg(theme::accent()).bold()),
+    ]));
+    add_separator(&mut lines);
+
+    if showing_main {
+        render_main_model_section(&mut lines, state);
+    } else {
+        render_secondary_model_section(&mut lines, state);
+    }
+
+    add_separator(&mut lines);
+    render_api_check(&mut lines, state);
+    add_separator(&mut lines);
+    render_budget_bars(&mut lines, state);
+    add_separator(&mut lines);
+    render_theme_section(&mut lines, state);
+    add_separator(&mut lines);
+    render_toggles_section(&mut lines, state);
+
+    // Help text
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("1-6", Style::default().fg(theme::warning())),
+        Span::styled(" provider  ", Style::default().fg(theme::text_muted())),
+        Span::styled("a-d", Style::default().fg(theme::warning())),
+        Span::styled(" model  ", Style::default().fg(theme::text_muted())),
+        Span::styled("t", Style::default().fg(theme::warning())),
+        Span::styled(" theme  ", Style::default().fg(theme::text_muted())),
+        Span::styled("r", Style::default().fg(theme::warning())),
+        Span::styled(" reverie  ", Style::default().fg(theme::text_muted())),
+        Span::styled("s", Style::default().fg(theme::warning())),
+        Span::styled(" auto", Style::default().fg(theme::text_muted())),
+    ]));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme::accent()))
+        .style(Style::default().bg(theme::bg_surface()))
+        .title(Span::styled(" Configuration ", Style::default().fg(theme::accent()).bold()));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    frame.render_widget(Clear, overlay_area);
+    frame.render_widget(paragraph, overlay_area);
+}
+
+fn add_separator(lines: &mut Vec<Line>) {
     lines.push(Line::from(""));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", chars::HORIZONTAL.repeat(50)),
+        Style::default().fg(theme::border()),
+    )]));
+    lines.push(Line::from(""));
+}
+
+/// Render the main model section (provider + model selection)
+fn render_main_model_section(lines: &mut Vec<Line>, state: &State) {
+    use crate::llms::LlmProvider;
+
     lines.push(Line::from(vec![Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
@@ -47,54 +110,8 @@ pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         ]));
     }
 
-    add_separator(&mut lines);
-    render_model_section(&mut lines, state);
-    add_separator(&mut lines);
-
-    // API check status
-    render_api_check(&mut lines, state);
-
-    add_separator(&mut lines);
-    render_budget_bars(&mut lines, state);
-    add_separator(&mut lines);
-    render_theme_section(&mut lines, state);
-    add_separator(&mut lines);
-    render_toggles_section(&mut lines, state);
-    add_separator(&mut lines);
-    render_secondary_model_section(&mut lines, state);
-
-    // Help text
-    lines.push(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("1-6", Style::default().fg(theme::warning())),
-        Span::styled(" provider  ", Style::default().fg(theme::text_muted())),
-        Span::styled("a-d", Style::default().fg(theme::warning())),
-        Span::styled(" model  ", Style::default().fg(theme::text_muted())),
-        Span::styled("t", Style::default().fg(theme::warning())),
-        Span::styled(" theme  ", Style::default().fg(theme::text_muted())),
-        Span::styled("e-g", Style::default().fg(theme::warning())),
-        Span::styled(" 2nd model", Style::default().fg(theme::text_muted())),
-    ]));
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme::accent()))
-        .style(Style::default().bg(theme::bg_surface()))
-        .title(Span::styled(" Configuration ", Style::default().fg(theme::accent()).bold()));
-
-    let paragraph = Paragraph::new(lines).block(block);
-    frame.render_widget(Clear, overlay_area);
-    frame.render_widget(paragraph, overlay_area);
-}
-
-fn add_separator(lines: &mut Vec<Line>) {
-    lines.push(Line::from(""));
-    lines.push(Line::from(vec![Span::styled(
-        format!("  {}", chars::HORIZONTAL.repeat(50)),
-        Style::default().fg(theme::border()),
-    )]));
-    lines.push(Line::from(""));
+    add_separator(lines);
+    render_model_section(lines, state);
 }
 
 fn render_model_section(lines: &mut Vec<Line>, state: &State) {

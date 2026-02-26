@@ -486,6 +486,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.dirty = true;
             ActionResult::Save
         }
+        Action::ConfigToggleSecondaryMode => {
+            state.config_secondary_mode = !state.config_secondary_mode;
+            state.dirty = true;
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }

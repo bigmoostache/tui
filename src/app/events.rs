@@ -134,8 +134,8 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('e') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeOpus45)),
         KeyCode::Char('f') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeSonnet45)),
         KeyCode::Char('g') => Some(Action::ConfigSelectSecondaryAnthropicModel(AnthropicModel::ClaudeHaiku45)),
-        // Up/Down select which bar to edit
-        KeyCode::Up => Some(Action::ConfigSelectPrevBar),
+        // Tab toggles between main/secondary model selection
+        KeyCode::Tab => Some(Action::ConfigToggleSecondaryMode),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),
         // Left/Right adjust the selected bar
         KeyCode::Left => Some(Action::ConfigDecreaseSelectedBar),

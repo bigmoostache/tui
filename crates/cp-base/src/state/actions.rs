@@ -49,6 +49,7 @@ pub enum Action {
     ConfigSelectSecondaryProvider(crate::llm_types::LlmProvider),
     ConfigSelectSecondaryAnthropicModel(crate::llm_types::AnthropicModel),
     ConfigToggleReverie,
+    ConfigToggleSecondaryMode,
     OpenCommandPalette,
     ResetSessionCosts,
     SelectContextById(String),

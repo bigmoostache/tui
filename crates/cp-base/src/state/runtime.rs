@@ -129,6 +129,8 @@ pub struct State {
     pub groq_model: crate::llm_types::GroqModel,
     /// Selected DeepSeek model
     pub deepseek_model: crate::llm_types::DeepSeekModel,
+    /// Whether config overlay is showing secondary model selection (Tab toggles)
+    pub config_secondary_mode: bool,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: crate::llm_types::LlmProvider,
     /// Secondary Anthropic model (for reveries / sub-agents)
@@ -242,6 +244,7 @@ impl Default for State {
             grok_model: crate::llm_types::GrokModel::default(),
             groq_model: crate::llm_types::GroqModel::default(),
             deepseek_model: crate::llm_types::DeepSeekModel::default(),
+            config_secondary_mode: false,
             secondary_provider: crate::llm_types::LlmProvider::Anthropic,
             secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
             reverie_enabled: true,
