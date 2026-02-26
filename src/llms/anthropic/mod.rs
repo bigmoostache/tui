@@ -122,9 +122,23 @@ impl LlmClient for AnthropicClient {
             library::default_agent_content().to_string()
         };
 
+        // Get model context window for max_tokens
+        let model_context_window = match request.model.as_str() {
+            "claude-3-5-haiku-20241022" => 200_000,
+            "claude-3-5-sonnet-20241022" => 200_000,
+            "claude-3-5-opus-20241022" => 200_000,
+            "claude-3-haiku-20240307" => 200_000,
+            "claude-3-sonnet-20240229" => 200_000,
+            "claude-3-opus-20240229" => 200_000,
+            "claude-3-5-haiku-20251001" => 64_000, // Haiku 4.5 has 64K output limit
+            "claude-3-5-sonnet-20251001" => 200_000,
+            "claude-3-5-opus-20251001" => 200_000,
+            _ => 200_000, // Default to 200K for unknown models
+        };
+
         let api_request = AnthropicRequest {
             model: request.model.clone(),
-            max_tokens: MAX_RESPONSE_TOKENS,
+            max_tokens: model_context_window.min(MAX_RESPONSE_TOKENS),
             system: system_prompt,
             messages: api_messages,
             tools: build_api_tools(&request.tools),
