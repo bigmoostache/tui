@@ -20,6 +20,14 @@ use crate::state::{Message, State};
 use crate::ui::help::CommandPalette;
 use crate::ui::typewriter::TypewriterBuffer;
 
+/// Reverie stream state — holds the receiver channel for a running reverie.
+struct ReverieStream {
+    rx: Receiver<crate::infra::api::StreamEvent>,
+    pending_tools: Vec<ToolUse>,
+    /// Whether the reverie called Report this turn (to detect missing Report)
+    report_called: bool,
+}
+
 pub struct App {
     pub state: State,
     typewriter: TypewriterBuffer,
@@ -68,6 +76,8 @@ pub struct App {
     pending_console_wait_tool_results: Option<Vec<ToolResult>>,
     /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete
     accumulated_blocking_results: Vec<cp_base::watchers::WatcherResult>,
+    /// Active reverie stream (context optimizer sub-agent)
+    reverie_stream: Option<ReverieStream>,
 }
 
 impl App {
@@ -102,6 +112,7 @@ impl App {
             pending_question_tool_results: None,
             pending_console_wait_tool_results: None,
             accumulated_blocking_results: Vec::new(),
+            reverie_stream: None,
         }
     }
 

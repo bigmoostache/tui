@@ -4,14 +4,54 @@ use crate::app::actions::clean_llm_id_prefix;
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
 use crate::infra::tools::{execute_tool, perform_reload};
+use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::persistence::build_message_op;
-use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
+use crate::state::{
+    Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord, get_context_type_meta,
+};
 
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 
 use crate::app::App;
+
+// ─── Wait helpers (panel-readiness checks) ──────────────────────────────────
+
+/// Check if any async-wait panels have cache_deprecated = true
+pub fn has_dirty_panels(state: &State) -> bool {
+    state.context.iter().any(|c| {
+        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
+            && c.cache_deprecated
+    })
+}
+
+/// Check if any async-wait panels have cache_deprecated = true (file-like panels that need refresh before stream)
+pub fn has_dirty_file_panels(state: &State) -> bool {
+    state.context.iter().any(|c| {
+        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
+            && c.cache_deprecated
+    })
+}
+
+/// Trigger immediate cache refresh for all dirty async-wait panels.
+/// Returns true if any panels needed refresh.
+pub fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>) -> bool {
+    let mut any_triggered = false;
+    for ctx in &state.context {
+        let needs_wait = get_context_type_meta(ctx.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false);
+        if needs_wait && ctx.cache_deprecated && !ctx.cache_in_flight {
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
+            if let Some(request) = panel.build_cache_request(ctx, state) {
+                process_cache_request(request, cache_tx.clone());
+                any_triggered = true;
+            }
+        }
+    }
+    any_triggered
+}
+
+// ─── Tool pipeline ──────────────────────────────────────────────────────────
 
 impl App {
     pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
@@ -258,10 +298,10 @@ impl App {
         }
 
         // Trigger background cache refresh for dirty file panels (non-blocking)
-        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
 
         // Check if we need to wait for panels before continuing stream
-        if super::wait::has_dirty_file_panels(&self.state) {
+        if has_dirty_file_panels(&self.state) {
             // Set waiting flag — main loop will check and continue streaming when ready
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
@@ -278,7 +318,7 @@ impl App {
             return;
         }
 
-        let panels_ready = !super::wait::has_dirty_panels(&self.state);
+        let panels_ready = !has_dirty_panels(&self.state);
         let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
 
         if panels_ready || timed_out {
@@ -417,8 +457,8 @@ impl App {
         self.state.dirty = true;
 
         // Continue streaming
-        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
-        if super::wait::has_dirty_file_panels(&self.state) {
+        trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        if has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
         } else {

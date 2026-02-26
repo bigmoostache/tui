@@ -128,6 +128,16 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
         };
     }
 
+    // Guard: reverie already running — one optimizer at a time
+    if state.reverie.is_some() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "A reverie is already running. Wait for it to complete before invoking again.".to_string(),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    }
+
     let directive = tool.input.get("directive").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     // Signal to the event loop that a reverie should be started.

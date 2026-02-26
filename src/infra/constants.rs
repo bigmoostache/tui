@@ -89,6 +89,13 @@ pub const PERF_STATS_REFRESH_MS: u64 = 500;
 pub const MAX_API_RETRIES: u32 = 3;
 
 // =============================================================================
+// REVERIE (CONTEXT OPTIMIZER SUB-AGENT)
+// =============================================================================
+
+/// Maximum tool calls per reverie run before force-stopping
+pub const REVERIE_TOOL_CAP: usize = 15;
+
+// =============================================================================
 // PERSISTENCE
 // =============================================================================
 

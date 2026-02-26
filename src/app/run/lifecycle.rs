@@ -163,6 +163,16 @@ impl App {
             self.check_spine(&tx);
             self.process_api_check_results();
 
+            // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
+            // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
+            self.maybe_start_reverie_stream();
+            // Poll reverie stream events (text chunks, tool calls, done/error)
+            self.process_reverie_events();
+            // Execute pending reverie tool calls (after main tools — main AI has priority)
+            self.handle_reverie_tools();
+            // Check if reverie ended without calling Report (auto-relaunch guard rail)
+            self.check_reverie_end_turn();
+
             // Check ownership periodically (every 1 second)
             if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
                 self.last_ownership_check_ms = current_ms;
