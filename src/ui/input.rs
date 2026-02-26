@@ -233,11 +233,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Active reverie card — shows when a background optimizer is running
     if let Some(rev) = &state.reverie {
-        let rev_name = format!("{}", rev.reverie_type);
+        // Look up the agent's display name from PromptState
+        let ps = PromptState::get(state);
+        let agent_name =
+            ps.agents.iter().find(|a| a.id == rev.agent_id).map(|a| a.name.as_str()).unwrap_or(&rev.agent_id);
         let tools_done = rev.tool_call_count;
         let rev_spin = if rev.is_streaming { format!("{} ", spin) } else { String::new() };
         spans.push(Span::styled(
-            format!(" {}🧠 {} ({} tools) ", rev_spin, rev_name, tools_done),
+            format!(" {}🧠 {} ({} tools) ", rev_spin, agent_name, tools_done),
             Style::default().fg(Color::White).bg(Color::Rgb(100, 60, 160)).bold(),
         ));
         spans.push(Span::styled(" ", base_style));

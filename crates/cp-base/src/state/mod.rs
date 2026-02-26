@@ -37,8 +37,11 @@ pub mod reverie {
     pub struct ReverieState {
         /// What kind of reverie this is.
         pub reverie_type: ReverieType,
-        /// Optional directive from the main AI or trigger system.
-        pub directive: Option<String>,
+        /// Agent ID driving this reverie (e.g., "cleaner"). The agent's content
+        /// is injected into the P-reverie panel, NOT as a system prompt.
+        pub agent_id: String,
+        /// Optional additional context from the caller (e.g., "focus on UI files").
+        pub context: Option<String>,
         /// The reverie's own conversation (separate from main chat).
         pub messages: Vec<Message>,
         /// Number of tool calls executed this run (for guard rail cap).
@@ -50,11 +53,12 @@ pub mod reverie {
     }
 
     impl ReverieState {
-        /// Create a new reverie session.
-        pub fn new(reverie_type: ReverieType, directive: Option<String>) -> Self {
+        /// Create a new reverie session driven by the given agent.
+        pub fn new(reverie_type: ReverieType, agent_id: String, context: Option<String>) -> Self {
             Self {
                 reverie_type,
-                directive,
+                agent_id,
+                context,
                 messages: Vec::new(),
                 tool_call_count: 0,
                 is_streaming: true,

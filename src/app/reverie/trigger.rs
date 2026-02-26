@@ -46,8 +46,8 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
         notification_msg,
     );
 
-    // Start the reverie session
-    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, None));
+    // Start the reverie session with the default cleaner agent
+    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None));
 
     true
 }
@@ -58,7 +58,7 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
 /// in a tool result from `execute_optimize_context()`.
 ///
 /// Returns `true` if the reverie was started, `false` if guards prevented it.
-pub fn start_manual_reverie(state: &mut State, directive: Option<String>) -> bool {
+pub fn start_manual_reverie(state: &mut State, agent_id: String, context: Option<String>) -> bool {
     // Guard: reverie already running
     if state.reverie.is_some() {
         return false;
@@ -71,9 +71,11 @@ pub fn start_manual_reverie(state: &mut State, directive: Option<String>) -> boo
     }
 
     // Create spine notification
-    let msg = match &directive {
-        Some(d) if !d.is_empty() => format!("Context optimizer activated with directive: \"{}\"", d),
-        _ => "Context optimizer activated (manual)".to_string(),
+    let msg = match &context {
+        Some(c) if !c.is_empty() => {
+            format!("Context optimizer activated (agent: {}) with context: \"{}\"", agent_id, c)
+        }
+        _ => format!("Context optimizer activated (agent: {})", agent_id),
     };
     cp_mod_spine::SpineState::create_notification(
         state,
@@ -83,7 +85,7 @@ pub fn start_manual_reverie(state: &mut State, directive: Option<String>) -> boo
     );
 
     // Start the reverie session
-    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, directive));
+    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, agent_id, context));
 
     true
 }

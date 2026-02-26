@@ -27,6 +27,10 @@ fn secondary_model_string(state: &State) -> String {
     }
 }
 
+/// The reverie system prompt — kept minimal since the real agent instructions
+/// are injected into the P-reverie panel (for cache-friendly placement).
+const REVERIE_SYSTEM_PROMPT: &str = "You are a background sub-agent. Follow the instructions in the P-reverie panel.";
+
 /// Build the reverie prompt and start streaming to the secondary LLM.
 ///
 /// Uses the exact same `prepare_stream_context()` as the main worker. The
@@ -64,8 +68,8 @@ pub fn start_reverie_stream(state: &mut State, tx: Sender<StreamEvent>) {
             messages: ctx.messages,
             context_items: ctx.context_items,
             tools: ctx.tools,
-            system_prompt: tools::REVERIE_SYSTEM_PROMPT.to_string(),
-            seed_content: Some(tools::REVERIE_SYSTEM_PROMPT.to_string()),
+            system_prompt: REVERIE_SYSTEM_PROMPT.to_string(),
+            seed_content: Some(REVERIE_SYSTEM_PROMPT.to_string()),
             worker_id: DEFAULT_WORKER_ID.to_string(),
         },
         tx,

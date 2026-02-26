@@ -132,30 +132,35 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
 
     // Guard: reverie already running — one optimizer at a time
     if state.reverie.is_some() {
+        let agent_name = state.reverie.as_ref().map(|r| r.agent_id.as_str()).unwrap_or("unknown");
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: "A reverie is already running. Wait for it to complete before invoking again.".to_string(),
+            content: format!(
+                "A reverie is already running (agent: {}). Wait for it to complete before invoking again.",
+                agent_name
+            ),
             is_error: true,
             tool_name: tool.name.clone(),
         };
     }
 
-    let directive = tool.input.get("directive").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    // Agent is always "cleaner" for now (hardcoded default)
+    let agent_id = "cleaner".to_string();
+    let context = tool.input.get("directive").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     // Signal to the event loop that a reverie should be started.
-    // The actual start happens there — we just return the directive.
-    let msg = if directive.is_empty() {
-        "Context optimizer activated. It will run in the background and report when done.".to_string()
-    } else {
-        format!(
+    // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
+    let msg = match &context {
+        Some(c) if !c.is_empty() => format!(
             "Context optimizer activated with directive: \"{}\". It will run in the background and report when done.",
-            directive
-        )
+            c
+        ),
+        _ => "Context optimizer activated. It will run in the background and report when done.".to_string(),
     };
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("REVERIE_START:{}\n{}", directive, msg),
+        content: format!("REVERIE_START:{}\n{}\n{}", agent_id, context.as_deref().unwrap_or(""), msg),
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -186,36 +191,6 @@ pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolRe
     }
 }
 
-/// The reverie system prompt.
-#[cfg_attr(not(test), allow(dead_code))]
-pub const REVERIE_SYSTEM_PROMPT: &str = r#"You are a Context Optimizer — a background sub-agent working inside someone else's mind.
-
-Your job: reshape the context panels to keep them lean, relevant, and under budget.
-
-## Your Situation
-- You see the SAME context panels as the main AI agent
-- You have your OWN conversation (the main agent cannot see your messages)
-- The main agent's recent conversation is shown to you as a read-only panel
-- You must work quickly and efficiently — you have a limited number of tool calls
-
-## Your Objectives (in priority order)
-1. **Keep context below the cleaning threshold** — close irrelevant panels, summarize verbose content
-2. **Maximize relevance for the current task** — keep what matters, remove what doesn't
-3. **Preserve important information** — before closing panels, extract key info into logs/memories/scratchpad
-
-## Your Tools
-You can: close panels, open files, navigate the tree, create/summarize logs, manage memories, use scratchpad, close conversation histories (with proper log/memory extraction).
-You CANNOT: edit files, run commands, use git, create callbacks, or modify system settings.
-
-## Rules
-1. ALWAYS call the `reverie_report` tool when you're done — this is mandatory
-2. Be surgical — don't close panels the main agent is actively using
-3. When closing conversation histories, ALWAYS extract important information into logs and memories first
-4. Prefer closing old/stale panels over recent ones
-5. Check the main agent's recent conversation to understand what they're working on
-6. Work fast — minimize tool calls, batch operations where possible
-"#;
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,10 +210,7 @@ mod tests {
 
     #[test]
     fn reverie_tool_definitions_include_allowed_and_report() {
-        let main_tools = vec![
-            make_tool("Close_panel", true),
-            make_tool("Edit", false),
-        ];
+        let main_tools = vec![make_tool("Close_panel", true), make_tool("Edit", false)];
 
         let tools = reverie_tool_definitions(&main_tools);
         assert!(tools.iter().any(|t| t.id == "Close_panel"));
@@ -304,8 +276,11 @@ mod tests {
     }
 
     #[test]
-    fn system_prompt_is_non_empty() {
-        assert!(!REVERIE_SYSTEM_PROMPT.is_empty());
-        assert!(REVERIE_SYSTEM_PROMPT.contains("Context Optimizer"));
+    fn build_tool_restrictions_includes_allowed() {
+        let tools = vec![make_tool("Close_panel", true), make_tool("Edit", false)];
+        let text = build_tool_restrictions_text(&tools);
+        assert!(text.contains("Close_panel"));
+        assert!(!text.contains("- Edit"));
+        assert!(text.contains("reverie_report"));
     }
 }

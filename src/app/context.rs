@@ -135,9 +135,27 @@ pub fn prepare_stream_context(
             last_refresh_ms: crate::app::panels::now_ms(),
         });
 
-        // Add P-reverie: tool restrictions + reverie's own conversation context
-        // This tells the LLM which tools it's allowed to use (even though it sees ALL tools)
-        let mut reverie_panel_content = rev.tool_restrictions;
+        // Add P-reverie: agent prompt + context + tool restrictions + reverie conversation
+        // Agent content is injected here (NOT as system prompt) to preserve cache hits.
+        let mut reverie_panel_content = String::new();
+
+        // Inject the reverie agent's prompt content
+        if let Some(rev) = &state.reverie {
+            let ps = cp_mod_prompt::PromptState::get(state);
+            if let Some(agent) = ps.agents.iter().find(|a| a.id == rev.agent_id) {
+                reverie_panel_content.push_str("## Agent Instructions\n");
+                reverie_panel_content.push_str(&agent.content);
+                reverie_panel_content.push('\n');
+            }
+            // Inject additional context if provided
+            if let Some(ctx) = &rev.context {
+                reverie_panel_content.push_str("\n## Additional Context\n");
+                reverie_panel_content.push_str(ctx);
+                reverie_panel_content.push('\n');
+            }
+        }
+
+        reverie_panel_content.push_str(&rev.tool_restrictions);
         if !rev.messages.is_empty() {
             reverie_panel_content
                 .push_str("\n## Reverie Conversation\n(Your messages follow in the conversation below)\n");

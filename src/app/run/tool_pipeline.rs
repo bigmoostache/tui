@@ -132,12 +132,14 @@ impl App {
 
         // === REVERIE TRIGGER ===
         // Check if any tool result contains a REVERIE_START: sentinel (from optimize_context).
-        // If so, extract the directive and start the reverie.
+        // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
         for tr in &tool_results {
-            if let Some(directive_str) = tr.content.strip_prefix("REVERIE_START:") {
-                let directive_line = directive_str.lines().next().unwrap_or("");
-                let directive = if directive_line.is_empty() { None } else { Some(directive_line.to_string()) };
-                crate::app::reverie::trigger::start_manual_reverie(&mut self.state, directive);
+            if let Some(rest) = tr.content.strip_prefix("REVERIE_START:") {
+                let mut lines = rest.lines();
+                let agent_id = lines.next().unwrap_or("cleaner").to_string();
+                let context_line = lines.next().unwrap_or("");
+                let context = if context_line.is_empty() { None } else { Some(context_line.to_string()) };
+                crate::app::reverie::trigger::start_manual_reverie(&mut self.state, agent_id, context);
                 break;
             }
         }
